@@ -47,6 +47,7 @@ desktop.ini
 backend/data/uploads/*
 backend/data/models/*
 backend/data/logs/*
+backend/data/raw/*
 !backend/data/uploads/.gitkeep
 !backend/data/models/.gitkeep
 !backend/data/logs/.gitkeep

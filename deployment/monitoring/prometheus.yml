@@ -1,0 +1,55 @@
+# ============================================================
+# AMASCI - Prometheus Monitoring Configuration
+# Scrape targets for all platform services
+# ============================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    platform: amasci
+    environment: production
+
+rule_files:
+  - "alerts.yml"
+
+scrape_configs:
+  # --- Backend API Metrics ---
+  - job_name: "amasci-api"
+    metrics_path: "/api/v1/health"
+    scheme: http
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: backend
+          component: fastapi
+
+  # --- Nginx Metrics ---
+  - job_name: "amasci-nginx"
+    metrics_path: "/health"
+    scheme: http
+    static_configs:
+      - targets: ["nginx:80"]
+        labels:
+          service: frontend
+          component: nginx
+
+  # --- PostgreSQL Metrics ---
+  - job_name: "amasci-postgres"
+    scheme: http
+    static_configs:
+      - targets: ["postgres:5432"]
+        labels:
+          service: database
+          component: postgresql
+
+  # --- Neo4j Metrics ---
+  - job_name: "amasci-neo4j"
+    scheme: http
+    static_configs:
+      - targets: ["neo4j:7474"]
+        labels:
+          service: database
+          component: neo4j

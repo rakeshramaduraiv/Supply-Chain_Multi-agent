@@ -1,0 +1,43 @@
+# Supply Chain Network, Intelligence, Risk, & Entity Pages Redesign — Task Tracker
+
+- [x] Redesign "Supply Chain Network" page (Force-Directed Graph)
+  - [x] Pure-React canvas-based force simulation engine (stabilizes & pauses)
+  - [x] Interactive nodes & weighted relationship lines (TPKE dashed animated edges)
+  - [x] Left Panel: Live Entity Explorer counts
+  - [x] Right Panel: Node details slide-in
+  - [x] Bottom Panel: 7 analytics charts & relationship table
+- [x] Redesign "Risk & Root Cause" page (Incident Investigation Center)
+  - [x] Left Panel: Live Incident Queue with search, filter, and multi-field sorting
+  - [x] Center Panel: Traversal Path visualizer showing Supplier → Warehouse → Shipment → Product → Customer propagation
+  - [x] Right Panel: AI Root Cause Report with confidence levels, timeline, contributing factors, and recommendations
+  - [x] Bottom Panel: 7 charts (Issue Contribution, Root Cause Distribution, Risk Index Trend, Exposed Entities, Monthly Issue Trend, Forecast vs Actual, Business Impact Radar)
+- [x] Redesign "Entity Intelligence" page (Power BI Executive Report)
+  - [x] Left Panel: Live list selector for Entity Class (Supplier, Warehouse, Product, Shipment, Customer) + searchable instances
+  - [x] Center Canvas: Board-level executive layout displaying Overview, Performance, Forecast, Risk, and AI Optimization Recommendations
+  - [x] 8 BI Recharts: Performance Trend, Risk Trend, Forecast Trend, Historical Trend, Relationship Distribution, Connected Entities, Business Impact Radar, and Monthly Comparison
+- [x] Implement Intelligent Connected Navigation
+  - [x] Install react-router-dom and configure router in App.jsx & AppShell.jsx
+  - [x] Add dynamic breadcrumbs showing home, active page, selected entity, and active issue
+  - [x] Shared Entity Context & query parameter sync: carry parameters in URL (preserves browser history and deep linking)
+  - [x] Dashboard (Overview) -> Click High Risk Supplier -> open Entity Intelligence
+  - [x] Entity Intelligence -> Click "View Relationships" -> open Supply Chain Network, auto-focus & highlight node
+  - [x] Supply Chain Network -> Click "Investigate Issue" -> open Risk & Root Cause, auto-execute RCA
+  - [x] Risk & Root Cause -> Click "Explain" -> open Supply Chain Intelligence, auto-execute GraphRAG analysis
+  - [x] Verified Vite build completes with zero errors and warnings
+- [x] Implement Real-time Synchronization
+  - [x] Created FastAPI WebSocket `/ws` endpoint in backend router (`app/api/v1/endpoints/ws.py`)
+  - [x] Added event broadcasting utility for `Forecast Generated`, `Actual Uploaded`, `TPKE Completed`, `Knowledge Graph Updated`, and `Forecast Validated`
+  - [x] Implemented React hook `useRealtimeSync.js` in frontend to maintain WebSocket connections and invalidate query caches
+  - [x] Integrated real-time status banner/indicator in header (Sync: Real-time vs Sync: Polling)
+  - [x] Enabled global query fallback defaults in React Query Client: retry on failures, refetchInterval polling (15s), and staletime optimizations (5s)
+- [x] Create Executive Reporting Center
+  - [x] Implemented Left Panel selector supporting 7 reports: Business Summary, Forecast Report, Risk Report, Supplier Report, Warehouse Report, Entity Report, and Incident Report
+  - [x] Integrated Recharts (Area, Bar, Line, Pie, Radar charts), high-density KPIs, relationship summaries, and AI recommendations
+  - [x] Added Export actions: Print Report (PDF) using print-media stylesheets, Export Data (Excel CSV) download utility, and Download Charts (SVG download)
+  - [x] Synchronized reporting queries with live backend analytics hooks
+- [x] Create Business Alert Center
+  - [x] Developed `/alerts` GET endpoint and `/alerts/{alert_id}/dismiss` POST endpoint in backend router
+  - [x] Automatically generate alerts for: Late Delivery Risk, Supplier Reliability Drop, Warehouse Capacity Risk, Inventory Shortage, Demand Spike, and Transportation Delay
+  - [x] Provided UI alert cards displaying Severity, Business Impact, Affected Entities, Recommendations, and Forecast Impact
+  - [x] Allowed filtering (Category, Severity), Search query matching, and multi-field Sorting (Severity, Name, Category)
+  - [x] Coded interactive action buttons on alert cards: Dismiss (updates backend dismissed state), Investigate (RCA path), View Relationships (Network center focus), and Open Entity report (deep link)

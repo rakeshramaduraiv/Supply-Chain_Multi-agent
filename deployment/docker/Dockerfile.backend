@@ -1,0 +1,54 @@
+# ============================================================
+# AMASCI Backend - Production Multi-Stage Dockerfile
+# Optimized for minimal image size and security
+# ============================================================
+
+# --- Stage 1: Dependencies ---
+FROM python:3.11-slim AS dependencies
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# --- Stage 2: Production ---
+FROM python:3.11-slim AS production
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    APP_ENV=production \
+    PORT=8000
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r amasci && useradd -r -g amasci -s /bin/false amasci
+
+COPY --from=dependencies /install /usr/local
+
+RUN mkdir -p /app/data/uploads /app/data/models /app/data/logs /app/data/backups \
+    && chown -R amasci:amasci /app
+
+COPY --chown=amasci:amasci backend/ .
+
+USER amasci
+
+EXPOSE ${PORT}
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/v1/health || exit 1
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers ${WORKERS:-4} --access-log --log-level info"]

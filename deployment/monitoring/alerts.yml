@@ -1,0 +1,98 @@
+# ============================================================
+# AMASCI - Alert Rules Configuration
+# Critical alerts for platform health monitoring
+# ============================================================
+
+groups:
+  - name: amasci_service_health
+    rules:
+      - alert: APIDown
+        expr: up{job="amasci-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "AMASCI Backend API is down"
+          description: "Backend API has been unreachable for more than 1 minute"
+
+      - alert: NginxDown
+        expr: up{job="amasci-nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "AMASCI Nginx is down"
+          description: "Nginx reverse proxy has been unreachable for more than 1 minute"
+
+      - alert: PostgreSQLDown
+        expr: up{job="amasci-postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been unreachable for more than 30 seconds"
+
+      - alert: Neo4jDown
+        expr: up{job="amasci-neo4j"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Neo4j is down"
+          description: "Neo4j graph database has been unreachable for more than 1 minute"
+
+  - name: amasci_performance
+    rules:
+      - alert: HighAPILatency
+        expr: http_request_duration_seconds{quantile="0.95"} > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile response time exceeds 5 seconds for 5 minutes"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "More than 5% of requests are returning 5xx errors"
+
+  - name: amasci_resources
+    rules:
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.container_name }}"
+          description: "Container memory usage exceeds 85% of limit"
+
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.container_name }}"
+          description: "Container CPU usage exceeds 80% for 10 minutes"
+
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space"
+          description: "Less than 15% disk space remaining"

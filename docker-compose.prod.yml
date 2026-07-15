@@ -1,0 +1,172 @@
+# ============================================================
+# AMASCI - Production Docker Compose
+# Full stack: Nginx + API + PostgreSQL + Neo4j
+# ============================================================
+
+version: "3.9"
+
+services:
+  # --- Nginx Reverse Proxy + Frontend ---
+  nginx:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    container_name: amasci-nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    networks:
+      - amasci-net
+
+  # --- FastAPI Backend ---
+  api:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.backend
+    container_name: amasci-api
+    expose:
+      - "8000"
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+    volumes:
+      - upload_data:/app/data/uploads
+      - model_data:/app/data/models
+      - log_data:/app/data/logs
+      - backup_data:/app/data/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    networks:
+      - amasci-net
+
+  # --- PostgreSQL ---
+  postgres:
+    image: postgres:16-alpine
+    container_name: amasci-postgres
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - pg_backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=16MB
+        -c maintenance_work_mem=128MB
+        -c max_connections=100
+        -c log_min_duration_statement=1000
+        -c log_checkpoints=on
+    networks:
+      - amasci-net
+
+  # --- Neo4j ---
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: amasci-neo4j
+    expose:
+      - "7687"
+    ports:
+      - "${NEO4J_BROWSER_PORT:-7474}:7474"
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["graph-data-science"]'
+      NEO4J_dbms_memory_heap_initial__size: 512M
+      NEO4J_dbms_memory_heap_max__size: 1G
+      NEO4J_dbms_memory_pagecache_size: 512M
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_backups:/backups
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+    networks:
+      - amasci-net
+
+volumes:
+  pg_data:
+    driver: local
+  pg_backups:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_backups:
+    driver: local
+  upload_data:
+    driver: local
+  model_data:
+    driver: local
+  log_data:
+    driver: local
+  backup_data:
+    driver: local
+
+networks:
+  amasci-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

@@ -1,0 +1,4 @@
+Supplier Id,Product Card Id,Order Item Quantity,Late_delivery_risk,Shipping Mode,Order Region
+Supplier_04,Product_12,5,0,Standard Class,Southeast Asia
+Supplier_04,Product_12,12,1,Second Class,Western Europe
+Carrier_02,Product_12,3,1,First Class,US CA

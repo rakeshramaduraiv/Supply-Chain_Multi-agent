@@ -1,0 +1,1 @@
+"""AMASCI API v1."""

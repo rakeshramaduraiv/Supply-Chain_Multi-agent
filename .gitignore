@@ -1,0 +1,64 @@
+# ============================================================
+# AMASCI - Root Git Ignore
+# ============================================================
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Keep templates
+!.env.development
+!.env.testing
+!.env.production
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+venv/
+.venv/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Data (large files)
+backend/data/uploads/*
+backend/data/models/*
+backend/data/logs/*
+!backend/data/uploads/.gitkeep
+!backend/data/models/.gitkeep
+!backend/data/logs/.gitkeep
+
+# Docker volumes
+postgres_data/
+neo4j_data/
+
+# Build artifacts
+*.log
+*.pid
+
+# Backups
+*.sql.gz
+*.dump.gz

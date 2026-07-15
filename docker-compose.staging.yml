@@ -1,0 +1,134 @@
+# ============================================================
+# AMASCI - Staging Docker Compose
+# Production-like environment for pre-release validation
+# ============================================================
+
+version: "3.9"
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://staging.amasci.local}
+    container_name: amasci-nginx-staging
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    networks:
+      - amasci-staging
+
+  api:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.backend
+    container_name: amasci-api-staging
+    expose:
+      - "8000"
+    env_file:
+      - .env.staging
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-amasci_staging}:${POSTGRES_PASSWORD:-amasci_staging_pass}@postgres:5432/${POSTGRES_DB:-amasci_staging_db}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_staging_pass}
+    volumes:
+      - staging_uploads:/app/data/uploads
+      - staging_models:/app/data/models
+      - staging_logs:/app/data/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    networks:
+      - amasci-staging
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: amasci-postgres-staging
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amasci_staging}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-amasci_staging_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-amasci_staging_db}
+    volumes:
+      - staging_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amasci_staging} -d ${POSTGRES_DB:-amasci_staging_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    networks:
+      - amasci-staging
+
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: amasci-neo4j-staging
+    expose:
+      - "7687"
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-neo4j_staging_pass}
+      NEO4J_PLUGINS: '["graph-data-science"]'
+      NEO4J_dbms_memory_heap_max__size: 512M
+      NEO4J_dbms_memory_pagecache_size: 256M
+    volumes:
+      - staging_neo4j_data:/data
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+    networks:
+      - amasci-staging
+
+volumes:
+  staging_pg_data:
+  staging_neo4j_data:
+  staging_uploads:
+  staging_models:
+  staging_logs:
+
+networks:
+  amasci-staging:
+    driver: bridge

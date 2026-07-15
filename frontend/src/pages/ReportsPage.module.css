@@ -1,0 +1,309 @@
+.sidebar {
+  width: 280px;
+  background: var(--s1);
+  border-right: 1px solid var(--b);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--b);
+}
+
+.sidebarTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tp);
+}
+
+.reportsList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reportItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  border: 1px solid transparent;
+}
+
+.reportItem:hover {
+  background: var(--s2);
+}
+
+.reportItemActive {
+  background: rgba(9, 132, 227, 0.08);
+  border-color: rgba(9, 132, 227, 0.2);
+}
+
+.itemIconWrap {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: var(--s3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.reportItemActive .itemIconWrap {
+  background: rgba(9, 132, 227, 0.12);
+}
+
+.itemName {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tp);
+}
+
+.itemDesc {
+  font-size: 9.5px;
+  color: var(--tm);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.exportPanel {
+  padding: 16px;
+  border-top: 1px solid var(--b);
+  background: var(--s2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.expBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--s0);
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  color: var(--tp);
+  cursor: pointer;
+  transition: all 120ms;
+}
+
+.expBtn:hover {
+  border-color: var(--bs);
+  background: var(--s1);
+}
+
+/* Canvas styling */
+.canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--s0);
+  height: 100%;
+  overflow: hidden;
+}
+
+.canvasHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--b);
+  background: var(--s1);
+}
+
+.canvasTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tp);
+  margin: 0;
+}
+
+.canvasMeta {
+  font-size: 10px;
+  color: var(--tm);
+  margin-top: 2px;
+}
+
+.reportScrollable {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.reportArea {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.reportSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.secTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 2px 0;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.kpiCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpiLabel {
+  font-size: 10px;
+  color: var(--tm);
+  font-weight: 500;
+}
+
+.kpiVal {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--tp);
+  margin: 6px 0 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiSub {
+  font-size: 9px;
+  color: var(--tm);
+}
+
+.reportRow {
+  display: flex;
+  gap: 12px;
+}
+
+.reportCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tp);
+  margin: 0;
+}
+
+.dlBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--s2);
+  border: 1px solid var(--b);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 9px;
+  color: var(--ts);
+  cursor: pointer;
+}
+
+.dlBtn:hover {
+  background: var(--s3);
+  color: var(--tp);
+}
+
+.advisoryBox {
+  display: flex;
+  gap: 10px;
+  background: rgba(9, 132, 227, 0.04);
+  border: 1px solid rgba(9, 132, 227, 0.12);
+  padding: 10px 12px;
+  border-radius: 6px;
+}
+
+.entitySelect {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 4px;
+  color: var(--tp);
+}
+
+.reportTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: left;
+}
+
+.reportTable th {
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--b);
+  color: var(--tm);
+  font-weight: 600;
+}
+
+.reportTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--b);
+  color: var(--ts);
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .canvas, .canvas * {
+    visibility: visible;
+  }
+  .canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+  }
+  .canvasHeader {
+    border-bottom: 2px solid #000;
+  }
+}

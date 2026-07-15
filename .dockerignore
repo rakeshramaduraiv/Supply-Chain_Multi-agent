@@ -1,0 +1,55 @@
+# ============================================================
+# AMASCI - Docker Ignore
+# Exclude unnecessary files from Docker build context
+# ============================================================
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (injected at runtime)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+venv
+.venv
+
+# Node
+frontend/node_modules
+frontend/dist
+frontend/.vite
+
+# Data (mounted as volumes)
+backend/data/uploads/*
+backend/data/models/*
+backend/data/logs/*
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD
+.github
+
+# OS
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,874 @@
+/* ═══════════════════════════════════════════════════════════
+   RiskPage.module.css
+   Supply Chain Risk & Root Cause — Incident Investigation Center
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── PAGE ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 44px);
+  overflow: hidden;
+  background: var(--s0);
+}
+
+/* ── HEADER ── */
+.header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--b);
+  background: var(--s1);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.headerIconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgba(214,48,49,0.06);
+  border: 1px solid rgba(214,48,49,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headerTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--tp);
+  letter-spacing: -0.3px;
+}
+
+.headerSub {
+  font-size: 11px;
+  color: var(--tm);
+  margin-top: 2px;
+}
+
+.headerRight {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.syncBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--ts);
+  transition: background 120ms;
+}
+.syncBtn:hover {
+  background: var(--s2);
+}
+
+/* ── BODY ── */
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ════════════════════════════════════
+   LEFT PANEL — ISSUE QUEUE
+   ════════════════════════════════════ */
+.leftPanel {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--b);
+  background: var(--s1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.leftHeader {
+  padding: 14px;
+  border-bottom: 1px solid var(--b);
+  flex-shrink: 0;
+}
+
+.queueTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.queueLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tp);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.queueStats {
+  display: flex;
+  gap: 4px;
+}
+
+.searchWrap {
+  position: relative;
+  margin-bottom: 8px;
+  margin-top: 6px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--tm);
+}
+
+.searchInput {
+  width: 100%;
+  padding: 7px 8px 7px 26px;
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  font-size: 11px;
+  background: var(--s0);
+  color: var(--tp);
+  outline: none;
+  transition: border-color 150ms;
+}
+.searchInput:focus {
+  border-color: var(--blue);
+}
+
+.filterRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.filterSelect {
+  flex: 1;
+  padding: 5px 6px;
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  font-size: 10px;
+  background: var(--s0);
+  color: var(--tp);
+  outline: none;
+  cursor: pointer;
+}
+
+.sortRow {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sortBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms;
+}
+
+.issueList {
+  flex: 1;
+  overflow: auto;
+  background: var(--s0);
+  padding: 8px;
+}
+
+.issueCard {
+  background: var(--s1);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  transition: all 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.issueCard:hover {
+  transform: translateY(-1px);
+}
+
+.issueCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.issueIconBox {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.issueTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tp);
+  line-height: 1.2;
+}
+
+.issueMeta {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 8.5px;
+  color: var(--tm);
+}
+
+.riskPercent {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.riskLabel {
+  font-size: 8px;
+  color: var(--tm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: right;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.cardFooter {
+  border-top: 1px dashed var(--b);
+  padding-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--ts);
+}
+
+.regionBox {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.lossVal {
+  color: #d63031;
+  font-weight: 700;
+}
+
+.leftFooter {
+  padding: 10px 14px;
+  border-top: 1px solid var(--b);
+  background: var(--s1);
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ts);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════
+   CENTER PANEL — RELATIONSHIP TRAVERSAL
+   ════════════════════════════════════ */
+.centerPanel {
+  flex: 1;
+  overflow: hidden;
+  background: var(--s0);
+  border-right: 1px solid var(--b);
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+}
+
+.emptyIconBox {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  background: rgba(9,132,227,0.06);
+  border: 1px solid rgba(9,132,227,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tp);
+  margin-bottom: 8px;
+}
+
+.emptyDesc {
+  font-size: 11.5px;
+  color: var(--tm);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.centerContent {
+  height: 100%;
+  overflow: auto;
+  background: var(--s0);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.incidentSummaryCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.summaryHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.summaryTitleBox {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.summaryIconBox {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summaryScoreBox {
+  text-align: right;
+}
+
+.summaryScore {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.summaryScoreLabel {
+  font-size: 9px;
+  color: var(--tm);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.summaryBadgeRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.summaryProse {
+  background: var(--s0);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: var(--ts);
+  line-height: 1.6;
+}
+
+/* Traversal Visualizer Graph Path */
+.pathVisualizerCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.pathFlowContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 14px;
+  align-items: center;
+}
+
+.pathNodeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 580px;
+  position: relative;
+}
+
+.pathNodeBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 5;
+  width: 80px;
+}
+
+.pathNodeCircle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 200ms;
+}
+
+.pathNodeCircleActive {
+  box-shadow: 0 0 12px currentColor;
+  transform: scale(1.08);
+}
+
+.pathNodeTitle {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ts);
+}
+
+.pathNodeName {
+  font-size: 10px;
+  color: var(--tp);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 85px;
+}
+
+.pathLineConnector {
+  position: absolute;
+  top: 19px;
+  left: 38px;
+  right: 38px;
+  height: 2px;
+  background: var(--b);
+  z-index: 1;
+}
+
+.pathLineConnectorActive {
+  background: linear-gradient(90deg, var(--blue), var(--rl));
+}
+
+/* KPI metric cards */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.kpiCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.01);
+}
+
+.kpiLabel {
+  font-size: 9px;
+  color: var(--tm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.kpiValue {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 6px 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpiDesc {
+  font-size: 9.5px;
+  color: var(--ts);
+}
+
+.kpiTrack {
+  height: 4px;
+  background: var(--s0);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+/* ════════════════════════════════════
+   RIGHT PANEL — AI ROOT CAUSE REPORT
+   ════════════════════════════════════ */
+.rightPanel {
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--s1);
+  border-left: 1px solid var(--b);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.rightToolbar {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--b);
+  background: var(--s1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.toolbarLabelWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbarLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tp);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.investigateBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.rightContent {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rcaCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.rcaConfidenceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.rcaConfidenceLabel {
+  font-size: 10px;
+  color: var(--tm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rcaConfidenceVal {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rcaConfidenceScore {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rcaConfidenceTrack {
+  height: 5px;
+  background: var(--s0);
+  border-radius: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.rcaConfidenceFooter {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--tm);
+  margin-top: 6px;
+}
+
+.rootCauseDetail {
+  font-size: 11.5px;
+  color: var(--tp);
+  line-height: 1.6;
+  padding: 10px;
+  background: rgba(214, 48, 49, 0.04);
+  border: 1px solid rgba(214, 48, 49, 0.12);
+  border-radius: 6px;
+}
+
+/* Timeline component */
+.timelineContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  margin-top: 6px;
+}
+
+.timelineItem {
+  display: flex;
+  gap: 10px;
+}
+
+.timelineAxis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.timelineDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.timelineLine {
+  width: 1.5px;
+  flex: 1;
+  background: var(--b);
+  margin: 4px 0;
+}
+
+.timelineContent {
+  padding-bottom: 12px;
+}
+
+.timelineDate {
+  font-size: 9px;
+  color: var(--tm);
+  font-weight: 600;
+}
+
+.timelineTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tp);
+  margin-top: 1px;
+}
+
+.timelineDesc {
+  font-size: 9.5px;
+  color: var(--ts);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ════════════════════════════════════
+   BOTTOM — BI CHARTS
+   ════════════════════════════════════ */
+.bottomPanel {
+  flex-shrink: 0;
+  background: var(--s1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--b);
+}
+
+.bottomTabBar {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--b);
+  background: var(--s2);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.bottomTab {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  color: var(--tm);
+  transition: all 130ms;
+  font-family: var(--font);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bottomTab:hover   { color: var(--ts); }
+.bottomTabActive   { color: var(--blue); border-bottom-color: var(--blue); }
+
+.bottomContent {
+  flex: 1;
+  overflow: hidden;
+}
+
+.chartPane {
+  padding: 10px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.chartTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.chartTitle {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tp);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chartArea {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.grid2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  height: 100%;
+}
+
+.grid3x2 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+  height: 100%;
+}
+
+/* Tooltip standard styles */
+.tooltipWrap {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+}
+
+.tooltipLabel {
+  color: var(--tm);
+  margin-bottom: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.tooltipValRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tooltipValColor {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tooltipVal {
+  color: var(--tp);
+  font-weight: 600;
+}
+
+/* Spinner helper */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinAnimation {
+  animation: spin 0.7s linear infinite;
+}
+
+/* Resizing Divider */
+.divider {
+  height: 6px;
+  flex-shrink: 0;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--b);
+  border-bottom: 1px solid var(--b);
+  transition: background 150ms;
+}
+
+.dividerHandle {
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  pointer-events: none;
+}

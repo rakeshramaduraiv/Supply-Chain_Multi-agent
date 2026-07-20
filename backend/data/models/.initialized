@@ -1,0 +1,6 @@
+{
+  "status": "completed",
+  "dataset": "DataCoSupplyChainDataset.csv",
+  "duration_ms": 174545.82190001383,
+  "models_trained": 4
+}

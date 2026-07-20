@@ -43,13 +43,8 @@ frontend/.vite/
 Thumbs.db
 desktop.ini
 
-# Data (large files)
-backend/data/uploads/*
-backend/data/models/*
+# Data - logs only (runtime artifacts)
 backend/data/logs/*
-backend/data/raw/*
-!backend/data/uploads/.gitkeep
-!backend/data/models/.gitkeep
 !backend/data/logs/.gitkeep
 
 # Docker volumes

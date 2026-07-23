@@ -6,6 +6,7 @@ import ScoreBar from '../components/ui/ScoreBar'
 import InfoBox from '../components/ui/InfoBox'
 import { useSharedParams } from '../hooks/useSharedParams'
 import { AlertTriangle, ChevronRight, Layers, LayoutDashboard } from 'lucide-react'
+import EntityPage from './EntityPage'
 
 function grade(score) {
   if (score >= 0.85) return { letter: 'A', cls: 'bdg-low' }
@@ -240,6 +241,18 @@ export default function Overview() {
           </div>
         </div>
       )}
+
+      {/* Entity Intelligence — embedded below overview */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card-head" style={{ padding: '10px 16px', borderBottom: '1px solid var(--b)' }}>
+          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Layers size={14} style={{ color: 'var(--blue)' }} />
+            Entity Intelligence
+          </span>
+          <span className="badge bdg-blue">Explorer</span>
+        </div>
+        <EntityPage />
+      </div>
     </div>
   )
 }

@@ -25,8 +25,184 @@ import {
   RefreshCw, Zap, Target, FileText, Activity,
   ArrowRight, Info, Factory, Layers, BarChart2,
   Calendar, Star, ArrowDown, HelpCircle,
+  Brain, Send, BookOpen, ChevronDown,
 } from 'lucide-react'
 import styles from './RiskPage.module.css'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTELLIGENCE CHATBOT
+// ─────────────────────────────────────────────────────────────────────────────
+const ENTITY_COLORS_IC = {
+  Supplier: '#e5534b', Product: '#3fb950', Warehouse: '#d4a017',
+  Shipment: '#5b8aff', Customer: '#7c6fcd', Default: '#868e96',
+}
+const IC_CATEGORIES = [
+  { id: 'supplier', label: 'Supplier', color: '#e5534b', bg: 'rgba(229,83,75,0.08)', border: 'rgba(229,83,75,0.2)',
+    questions: ['Which suppliers have the highest delivery risk?', 'What is the dependency exposure if our top supplier fails?', 'Which suppliers are contributing most to late shipments?'] },
+  { id: 'delivery', label: 'Delivery', color: '#5b8aff', bg: 'rgba(91,138,255,0.08)', border: 'rgba(91,138,255,0.2)',
+    questions: ['What percentage of orders are delivered on time by region?', 'Which shipping modes have the lowest on-time delivery rates?', 'Which delivery routes carry the highest financial risk?'] },
+  { id: 'risk', label: 'Risk', color: '#e67e22', bg: 'rgba(230,126,34,0.08)', border: 'rgba(230,126,34,0.2)',
+    questions: ['What are the top 5 operational risks across the supply chain today?', 'How has the overall supply chain risk score changed over 90 days?', 'Which risk factors are trending upward and require immediate action?'] },
+  { id: 'forecast', label: 'Forecast', color: '#00b894', bg: 'rgba(0,184,148,0.08)', border: 'rgba(0,184,148,0.2)',
+    questions: ['What is the demand forecast for next quarter by product category?', 'How accurate have our demand forecasts been in the last 6 months?', 'Which seasonal patterns have the strongest influence on demand?'] },
+]
+
+function IntelligenceChatbot({ prefillQuestion }) {
+  const [question, setQuestion] = useState('')
+  const [history, setHistory] = useState([])
+  const [expanded, setExpanded] = useState({})
+
+  const analysisMut = useMutation({
+    mutationFn: (q) => api.queryGraphRAG({ query: q }).then(r => r.data),
+    onSuccess: (data, q) => setHistory(prev => [{ question: q, result: data }, ...prev].slice(0, 8)),
+  })
+
+  useEffect(() => {
+    if (prefillQuestion && prefillQuestion !== history[0]?.question) {
+      analysisMut.mutate(prefillQuestion)
+    }
+  }, [prefillQuestion])
+
+  const handleAsk = (q) => {
+    const t = (q || question).trim()
+    if (!t || analysisMut.isPending) return
+    setQuestion('')
+    analysisMut.mutate(t)
+  }
+
+  const latest = history[0]
+  const result = latest?.result
+  const answer = result?.chain_output?.answer || result?.chain_output?.response ||
+    (result?.results?.length > 0 ? `Found ${result.results.length} records matching your query.` : null)
+  const recommendations = result?.chain_output?.actions || result?.chain_output?.recommendations
+  const resolvedEntities = result?.resolved_entities || []
+
+  return (
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      {/* LEFT: Question Library */}
+      <div style={{ width: 210, flexShrink: 0, borderRight: '1px solid var(--b)', overflow: 'auto', background: 'var(--s1)' }}>
+        <div style={{ padding: '8px 10px 6px', borderBottom: '1px solid var(--b)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <BookOpen size={11} style={{ color: 'var(--blue)' }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--tp)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Questions</span>
+          </div>
+          <div style={{ border: '1px solid var(--b)', borderRadius: 5, overflow: 'hidden', background: 'var(--s0)' }}>
+            <textarea value={question} onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAsk() } }}
+              placeholder="Ask a supply chain question…"
+              style={{ width: '100%', padding: '7px 9px', border: 'none', resize: 'none', fontSize: 11, color: 'var(--tp)', background: 'transparent', outline: 'none', fontFamily: 'var(--font)', minHeight: 54, lineHeight: 1.5 }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '3px 7px', borderTop: '1px solid var(--b)', background: 'var(--s2)' }}>
+              <button onClick={() => handleAsk()} disabled={!question.trim() || analysisMut.isPending}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: question.trim() && !analysisMut.isPending ? 'var(--blue)' : 'var(--s3)', color: question.trim() && !analysisMut.isPending ? '#fff' : 'var(--tm)', border: 'none', borderRadius: 4, padding: '3px 8px', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
+                <Send size={9} /> Ask
+              </button>
+            </div>
+          </div>
+        </div>
+        {IC_CATEGORIES.map(cat => (
+          <div key={cat.id} style={{ borderBottom: '1px solid var(--b)' }}>
+            <button onClick={() => setExpanded(e => ({ ...e, [cat.id]: !e[cat.id] }))}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px', background: expanded[cat.id] ? cat.bg : 'none', border: 'none', cursor: 'pointer' }}>
+              <span style={{ flex: 1, fontSize: 10, fontWeight: 600, color: cat.color, textAlign: 'left' }}>{cat.label}</span>
+              {expanded[cat.id] ? <ChevronDown size={10} style={{ color: 'var(--tm)' }} /> : <ChevronRight size={10} style={{ color: 'var(--tm)' }} />}
+            </button>
+            {expanded[cat.id] && cat.questions.map((q, i) => (
+              <button key={i} onClick={() => handleAsk(q)} disabled={analysisMut.isPending}
+                style={{ display: 'block', width: 'calc(100% - 16px)', margin: '0 8px 4px', textAlign: 'left', background: 'none', border: `1px solid ${cat.border}`, borderRadius: 4, padding: '5px 8px', cursor: 'pointer', fontSize: 10, color: 'var(--ts)', lineHeight: 1.4 }}
+                onMouseEnter={e => e.currentTarget.style.background = cat.bg}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                {q}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* CENTER: Answer */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px 14px' }}>
+        {analysisMut.isPending && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--tm)', fontSize: 12, padding: '16px 0' }}>
+            <div style={{ width: 13, height: 13, border: '2px solid var(--b)', borderTop: '2px solid var(--blue)', borderRadius: '50%', animation: 'icSpin 0.7s linear infinite' }} />
+            Analysing supply chain data…
+          </div>
+        )}
+        {!analysisMut.isPending && !latest && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', color: 'var(--tm)', gap: 8 }}>
+            <Brain size={24} style={{ color: 'var(--blue)', opacity: 0.35 }} />
+            <div style={{ fontSize: 11 }}>Select a question or type your own to analyse the supply chain</div>
+          </div>
+        )}
+        {latest && !analysisMut.isPending && (
+          <>
+            <div style={{ background: 'rgba(9,132,227,0.06)', border: '1px solid rgba(9,132,227,0.2)', borderRadius: 7, padding: '8px 12px', marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'var(--blue)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 3 }}>Query</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--tp)' }}>{latest.question}</div>
+            </div>
+            {resolvedEntities.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+                {resolvedEntities.map((e, i) => {
+                  const color = ENTITY_COLORS_IC[e] || ENTITY_COLORS_IC.Default
+                  return <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: `${color}14`, border: `1px solid ${color}40`, color }}>{e}</span>
+                })}
+              </div>
+            )}
+            {answer && (
+              <div style={{ background: 'rgba(0,184,148,0.05)', border: '1px solid rgba(0,184,148,0.2)', borderRadius: 7, padding: '10px 12px', marginBottom: 8, fontSize: 12, color: 'var(--tp)', lineHeight: 1.7 }}>
+                {answer}
+              </div>
+            )}
+            {recommendations && (
+              <div style={{ background: 'rgba(63,185,80,0.05)', border: '1px solid rgba(63,185,80,0.2)', borderRadius: 7, padding: '10px 12px', fontSize: 12, color: 'var(--tp)', lineHeight: 1.7 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#3fb950', textTransform: 'uppercase', marginBottom: 5 }}>Recommended Actions</div>
+                {recommendations}
+              </div>
+            )}
+            {!answer && !recommendations && (
+              <div style={{ padding: 14, textAlign: 'center', color: 'var(--tm)', fontSize: 11, background: 'var(--s2)', borderRadius: 7, border: '1px solid var(--b)' }}>Analysis complete. No structured answer returned.</div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* RIGHT: Evidence */}
+      <div style={{ width: 170, flexShrink: 0, borderLeft: '1px solid var(--b)', overflow: 'auto', padding: '10px', background: 'var(--s1)' }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--tm)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Evidence</div>
+        {result ? (
+          <>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: 'var(--tm)', marginBottom: 3 }}>Records found</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--blue)' }}>{result.results?.length || 0}</div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: 'var(--tm)', marginBottom: 3 }}>Response time</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--tp)' }}>{result.duration_ms?.toFixed(0) || '–'}ms</div>
+            </div>
+            {result.intent && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 9, color: 'var(--tm)', marginBottom: 3 }}>Intent</div>
+                <div style={{ fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--ts)', background: 'var(--s2)', padding: '2px 5px', borderRadius: 3 }}>{result.intent}</div>
+              </div>
+            )}
+            {history.length > 1 && (
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--tm)', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>History</div>
+                {history.slice(1, 5).map((h, i) => (
+                  <button key={i} onClick={() => analysisMut.mutate(h.question)}
+                    style={{ width: '100%', textAlign: 'left', background: 'none', border: '1px solid var(--b)', borderRadius: 3, padding: '4px 6px', marginBottom: 3, cursor: 'pointer', fontSize: 9, color: 'var(--ts)', lineHeight: 1.3 }}>
+                    {h.question.length > 45 ? h.question.slice(0, 45) + '…' : h.question}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ fontSize: 10, color: 'var(--tm)', textAlign: 'center', marginTop: 16 }}>Awaiting analysis</div>
+        )}
+      </div>
+      <style>{`@keyframes icSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }`}</style>
+    </div>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG & DEFINITIONS
@@ -693,8 +869,7 @@ function IssueAnalysis({ issue, analytics, rcaResult }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RIGHT PANEL — AI INVESTIGATION (RCA chain, timelines, contributors)
 // ─────────────────────────────────────────────────────────────────────────────
-function AIInvestigation({ issue, rcaResult, isInvestigating, onInvestigate }) {
-  const { navigateToPage } = useSharedParams()
+function AIInvestigation({ issue, rcaResult, isInvestigating, onInvestigate, onExplain }) {
 
   if (!issue) {
     return (
@@ -948,10 +1123,9 @@ function AIInvestigation({ issue, rcaResult, isInvestigating, onInvestigate }) {
             })}
           </div>
 
-          {/* Explain trigger */}
           <div style={{ marginTop: 12 }}>
             <button
-              onClick={() => navigateToPage('/intelligence', { entityId: issue.entity_id })}
+              onClick={() => onExplain && onExplain(issue)}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 6,
@@ -959,8 +1133,8 @@ function AIInvestigation({ issue, rcaResult, isInvestigating, onInvestigate }) {
                 fontFamily: 'var(--font)'
               }}
             >
-              <Shield size={12} />
-              Explain Disruption Details
+              <Brain size={12} />
+              Explain with AI Intelligence
             </button>
           </div>
         </div>
@@ -973,8 +1147,8 @@ function AIInvestigation({ issue, rcaResult, isInvestigating, onInvestigate }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // BOTTOM PANEL — 7 CHARTS
 // ─────────────────────────────────────────────────────────────────────────────
-function BottomCharts({ issues, analytics, riskTrendSeries, forecastAccuracySeries, rcaTypeDist, onSelectIssue }) {
-  const [activeTab, setActiveTab] = useState('contribution')
+function BottomCharts({ issues, analytics, riskTrendSeries, forecastAccuracySeries, rcaTypeDist, onSelectIssue, intelligencePrefill, activeTab, setActiveTab }) {
+  // activeTab/setActiveTab are lifted to parent so "Explain with AI" can switch tabs
 
   // 1. Issue Contribution Chart: Business Loss exposure by Issue Type
   const contributionData = useMemo(() => {
@@ -1064,13 +1238,14 @@ function BottomCharts({ issues, analytics, riskTrendSeries, forecastAccuracySeri
       {/* Bottom Tabs */}
       <div className={styles.bottomTabBar}>
         {[
-          { id: 'contribution', label: '📊 Issue Contribution' },
-          { id: 'rootcause', label: '🧬 Root Causes' },
-          { id: 'risktrend', label: '📈 Risk Trend' },
-          { id: 'entities', label: '📦 Entity Exposure' },
-          { id: 'monthly', label: '📅 Monthly Trend' },
-          { id: 'forecast', label: '🎯 Forecast vs Actual' },
-          { id: 'impact', label: '⚡ Business Impact' }
+          { id: 'contribution', label: 'Issue Contribution' },
+          { id: 'rootcause', label: 'Root Causes' },
+          { id: 'risktrend', label: 'Risk Trend' },
+          { id: 'entities', label: 'Entity Exposure' },
+          { id: 'monthly', label: 'Monthly Trend' },
+          { id: 'forecast', label: 'Forecast vs Actual' },
+          { id: 'impact', label: 'Business Impact' },
+          { id: 'intelligence', label: 'AI Intelligence' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -1226,6 +1401,13 @@ function BottomCharts({ issues, analytics, riskTrendSeries, forecastAccuracySeri
           </div>
         )}
 
+        {/* 8. AI Intelligence Chatbot */}
+        {activeTab === 'intelligence' && (
+          <div style={{ height: '100%', overflow: 'hidden' }}>
+            <IntelligenceChatbot prefillQuestion={intelligencePrefill} />
+          </div>
+        )}
+
         {/* 7. Business Impact Radar */}
         {activeTab === 'impact' && (
           <div className={styles.chartPane}>
@@ -1256,11 +1438,13 @@ function BottomCharts({ issues, analytics, riskTrendSeries, forecastAccuracySeri
 // MAIN PAGE COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 export default function RiskPage() {
-  const { issueId, setParam, navigateToPage } = useSharedParams()
+  const { issueId, setParam } = useSharedParams()
   const [selectedIssue, setSelectedIssue] = useState(null)
   const [rcaResult, setRcaResult]         = useState(null)
   const [bottomHeight, setBottomHeight]   = useState(220)
   const [isDragging, setIsDragging]       = useState(false)
+  const [intelligencePrefill, setIntelligencePrefill] = useState('')
+  const [activeBottomTab, setActiveBottomTab] = useState('contribution')
   const pageRef = useRef(null)
 
   const {
@@ -1391,6 +1575,10 @@ export default function RiskPage() {
           rcaResult={rcaResult}
           isInvestigating={rcaMut.isPending}
           onInvestigate={handleInvestigate}
+          onExplain={(issue) => {
+            setIntelligencePrefill(`Analyze dependency exposure and disruption risk profile for ${issue.name} in ${issue.region}.`)
+            setActiveBottomTab('intelligence')
+          }}
         />
       </div>
 
@@ -1412,6 +1600,9 @@ export default function RiskPage() {
           forecastAccuracySeries={forecastAccuracySeries}
           rcaTypeDist={rcaTypeDist}
           onSelectIssue={handleSelectIssue}
+          intelligencePrefill={intelligencePrefill}
+          activeTab={activeBottomTab}
+          setActiveTab={setActiveBottomTab}
         />
       </div>
     </div>

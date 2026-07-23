@@ -58,7 +58,16 @@ async def analyze(request: RCAAnalyzeRequest) -> RCAReportResponse:
             raise HTTPException(status_code=400, detail=result.get("error", "Analysis failed"))
         return RCAReportResponse(report=result["report"])
     except ConnectionError as e:
-        raise HTTPException(status_code=503, detail=f"Graph database unavailable: {e}")
+        logger.warning(f"RCA graph unavailable: {e}")
+        return RCAReportResponse(report={
+            "problem_summary": "Graph database is currently offline. Start Neo4j to enable RCA.",
+            "causal_chain": {"events": []},
+            "risk_contributors": [],
+            "recommended_actions": ["Start the Neo4j database service to enable root cause analysis."],
+            "affected_entities": {},
+            "overall_confidence": 0.0,
+            "critical_relationships": [],
+        })
     except HTTPException:
         raise
     except Exception as e:

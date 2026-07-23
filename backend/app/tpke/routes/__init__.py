@@ -164,11 +164,15 @@ async def get_history(
 @router.get("/edges")
 async def get_tpke_edges(session: AsyncSession = Depends(get_db_session)):
     """Get all current TPKE-inferred edges from Neo4j."""
-    conn = get_connection_manager()
-    from app.tpke.edge_manager import EdgeManager
-    manager = EdgeManager(conn, session)
-    edges = await manager.get_all_edges()
-    return {"count": len(edges), "edges": edges}
+    try:
+        conn = get_connection_manager()
+        from app.tpke.edge_manager import EdgeManager
+        manager = EdgeManager(conn, session)
+        edges = await manager.get_all_edges()
+        return {"count": len(edges), "edges": edges}
+    except Exception as e:
+        logger.warning(f"TPKE edges unavailable (Neo4j offline?): {e}")
+        return {"count": 0, "edges": []}
 
 
 @router.get("/summary")

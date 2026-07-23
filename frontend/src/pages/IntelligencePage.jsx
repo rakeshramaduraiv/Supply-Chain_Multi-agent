@@ -1084,7 +1084,8 @@ export default function IntelligencePage() {
   // Auto ask when entityId is passed via url deep link
   useEffect(() => {
     if (entityId) {
-      const q = `Analyze dependency exposure and disruption risk profile for ${cleanNodeId(entityId)}.`
+      const humanName = entityId.replace(/^(supplier|product|warehouse|shipment|customer|order|event)[_-]/i, '').replace(/[_-]main$/i, '').replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const q = `Analyze dependency exposure and disruption risk profile for ${humanName}.`
       if (currentQuestion !== q) {
         setCurrentQuestion(q)
         setCompletedSteps(0)

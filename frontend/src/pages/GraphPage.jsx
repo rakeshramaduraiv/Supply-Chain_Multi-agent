@@ -876,6 +876,14 @@ function ForceGraphCanvas({
     t.k = Math.max(0.2, Math.min(4, t.k * factor))
   }, [])
 
+  // Attach wheel listener as non-passive so preventDefault works
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', onWheel)
+  }, [onWheel])
+
   const zoomIn  = () => { transformRef.current.k = Math.min(4, transformRef.current.k * 1.25) }
   const zoomOut = () => { transformRef.current.k = Math.max(0.2, transformRef.current.k * 0.8) }
   const resetView = () => { transformRef.current = { x: 0, y: 0, k: 1 }; simRef.current.alpha = 1 }
@@ -897,7 +905,6 @@ function ForceGraphCanvas({
           setTooltip(null); hoveredRef.current = null; setHovered(null)
           panRef.current.panning = false
         }}
-        onWheel={onWheel}
       />
 
       {/* Empty state */}
@@ -1804,9 +1811,9 @@ export default function GraphPage() {
       {/* ── HEADER ── */}
       <div className={styles.header}>
         <div style={{ flex: 1 }}>
-          <div className={styles.headerTitle}>Supply Chain Knowledge Graph</div>
+          <div className={styles.headerTitle}>Multi-Agent Knowledge Graph</div>
           <div className={styles.headerSub}>
-            Force-directed interactive visualization · Live Neo4j data
+            Force-directed visualization of the Neo4j knowledge graph built by the multi-agent system
           </div>
         </div>
 

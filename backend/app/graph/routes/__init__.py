@@ -181,7 +181,8 @@ async def get_schema_info():
         info = await service.get_schema_info()
         return BaseResponse(data=info, message="Schema info retrieved")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Schema info unavailable (Neo4j offline?): {e}")
+        return BaseResponse(data={"constraints": [], "indexes": [], "available": False}, message="Schema unavailable")
 
 
 # ============================================================
@@ -251,8 +252,14 @@ async def get_statistics():
             message="Graph statistics retrieved",
         )
     except Exception as e:
-        logger.error(f"Statistics failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Statistics unavailable (Neo4j offline?): {e}")
+        return BaseResponse(
+            data=GraphStatisticsSchema(
+                total_nodes=0, total_relationships=0, node_counts={}, relationship_counts={},
+                graph_density=0.0, connected_components=0,
+            ),
+            message="Graph statistics unavailable — Neo4j offline",
+        )
 
 
 @router.get("/validate", response_model=BaseResponse[ValidationResultSchema])
@@ -285,8 +292,11 @@ async def get_nodes(
             message=f"Retrieved {len(nodes)} {label} nodes",
         )
     except Exception as e:
-        logger.error(f"Get nodes failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Get nodes unavailable (Neo4j offline?): {e}")
+        return BaseResponse(
+            data=NodeListSchema(label=label, nodes=[], count=0),
+            message=f"Nodes unavailable — Neo4j offline",
+        )
 
 
 @router.get("/relationships", response_model=BaseResponse[RelationshipListSchema])
@@ -319,8 +329,11 @@ async def get_entity(node_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Get entity failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Get entity unavailable (Neo4j offline?): {e}")
+        return BaseResponse(
+            data=EntitySchema(entity={"node_id": node_id, "properties": {}}, connections=[]),
+            message="Entity unavailable — Neo4j offline",
+        )
 
 
 @router.get("/subgraph", response_model=BaseResponse[SubgraphSchema])
@@ -334,8 +347,11 @@ async def get_subgraph(
         subgraph = await service.get_subgraph(node_id, max_hops=max_hops)
         return BaseResponse(data=SubgraphSchema(**subgraph), message="Subgraph retrieved")
     except Exception as e:
-        logger.error(f"Get subgraph failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Get subgraph unavailable (Neo4j offline?): {e}")
+        return BaseResponse(
+            data=SubgraphSchema(center_node=None, neighbors=[], edges=[]),
+            message="Subgraph unavailable — Neo4j offline",
+        )
 
 
 @router.get("/centrality/{label}", response_model=BaseResponse[CentralitySchema])

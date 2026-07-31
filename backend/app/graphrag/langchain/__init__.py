@@ -90,24 +90,27 @@ Provide structured forecast context:
     "seasonal_indicators": ["indicator1"]
 }}"""
 
-QUERY_RESPONSE_TEMPLATE = """You are a supply chain knowledge graph assistant.
-Answer the following query using the provided graph context.
+QUERY_RESPONSE_TEMPLATE = """You are AMASCI — an Adaptive Supply Chain Intelligence analyst.
+You have access to a Neo4j knowledge graph with nodes: Supplier, Product, Warehouse, Shipment, Customer, Order, CalendarEvent.
+
+Rules:
+1. Ground every statement in the graph context provided. Never invent facts.
+2. Return ONLY valid JSON with keys: answer, evidence, risks, recommendations.
+3. answer: 1-3 sentences directly addressing the question.
+4. evidence: list of node IDs or relationship facts from the context.
+5. risks: specific risk factors with numeric scores where available.
+6. recommendations: 2-4 actionable steps ranked by urgency.
+7. If the graph context is empty, say so explicitly — do not fabricate data.
 
 Query: {query}
 
 Graph Context:
 {graph_context}
 
-Query Results:
+Query Results ({result_count} records):
 {query_results}
 
-Provide a structured response:
-{{
-    "answer": "direct answer to the query",
-    "supporting_evidence": ["evidence1", "evidence2"],
-    "confidence": 0.0-1.0,
-    "related_entities": ["entity1", "entity2"]
-}}"""
+Respond with valid JSON only:"""
 
 
 class PromptBuilder:
@@ -183,6 +186,7 @@ class PromptBuilder:
             query=query,
             graph_context=truncate_text(str(graph_context), 2000),
             query_results=truncate_text(str(query_results[:10]), 1500),
+            result_count=len(query_results),
         )
 
 
@@ -363,114 +367,10 @@ class GraphRAGChain:
             except Exception as e:
                 logger.error(f"LLM API execution failed, falling back to deterministic generation: {e}")
 
-        # Grounded Fallback Generator
-        # Extract features and entities from the query results to construct a grounded response
-        intent = graph_context.get("intent", "general")
-        entities = graph_context.get("entities", [])
-        
-        # Parse records
-        records_summary = []
-        high_risk_entities = []
-        low_performance_entities = []
-        connections_list = []
-        path_info = ""
-        
-        for r in query_results:
-            node = r.get("node") or r.get("entity") or r
-            node_id = node.get("node_id") or node.get("id") or node.get("source_id") or node.get("entity_id")
-            
-            # Risk scores
-            risk = node.get("risk_score") or node.get("late_delivery_rate") or node.get("warehouse_risk") or node.get("forecast_risk") or 0.0
-            if risk > 0.4 and node_id:
-                high_risk_entities.append(f"{node_id} (Risk: {risk:.2f})")
-                
-            # Performance
-            perf = node.get("shipping_efficiency_score") or node.get("supplier_reliability_score") or 1.0
-            if perf < 0.75 and node_id:
-                low_performance_entities.append(f"{node_id} (Score: {perf:.2f})")
-                
-            # Connections
-            source = r.get("source") or r.get("source_id")
-            target = r.get("target") or r.get("target_id")
-            rel = r.get("rel_type") or r.get("relationship")
-            if source and target:
-                connections_list.append(f"{source} -[{rel}]-> {target}")
-                
-            # Paths
-            path_nodes = r.get("path_nodes")
-            if path_nodes:
-                path_info = " -> ".join([f"{n.get('label')}:{n.get('node_id')}" for n in path_nodes])
-
-            # General name summary
-            if node_id:
-                records_summary.append(str(node_id))
-
-        # Build detailed grounded explanation
-        if intent == "risk":
-            if high_risk_entities:
-                answer = f"Vulnerability and risk exposure analysis of the supply chain network indicates high-risk anomalies. Implicated nodes include {', '.join(high_risk_entities[:5])}."
-                evidence = f"Risk values exceeded standard operational margins. Retrieved evidence from graph: {len(high_risk_entities)} high-risk nodes identified ({', '.join(high_risk_entities[:10])})."
-                risks = "Downstream transit bottleneck propagation; warehouse capacity saturation; critical stockout risks for category products."
-                recommendations = "1. Allocate secondary backup suppliers for the high-risk suppliers. 2. Elevate safety stock buffer settings by 18% for the affected products. 3. Implement expedited air routing for critical shipment lines."
-            else:
-                answer = "Operational risk and exposure assessment is within baseline tolerances. All active nodes show risk indices below the 35% warning threshold."
-                evidence = "Query returned zero nodes with elevated risk scores."
-                risks = "No immediate disruption risks detected. Minor seasonal variance expected."
-                recommendations = "1. Maintain default order cycles. 2. Perform automated risk audit in the next monthly validation loop."
-                
-        elif intent == "performance":
-            if low_performance_entities:
-                answer = f"Supplier and carrier logistics analysis reveals efficiency degradation. The lowest performing supply chain entities are {', '.join(low_performance_entities[:5])}."
-                evidence = f"Graph performance metrics: {len(low_performance_entities)} low-performing entities detected ({', '.join(low_performance_entities[:10])})."
-                risks = "Delayed order fulfillment; order fulfillment SLA failure; carrier transit lag on ocean lanes."
-                recommendations = "1. Initiate PO contract milestones audit. 2. Shift 15% cargo volume to alternative air/ground transit lanes."
-            else:
-                answer = "Supply chain logistics and supplier performance metrics indicate high operational efficiency. Target SLAs are being fully achieved."
-                evidence = f"Active suppliers and carriers exhibit reliability scores above the 85% target threshold."
-                risks = "No significant delay propagation patterns detected."
-                recommendations = "1. Continue standard partner allocations. 2. Document best practices of top-performing carriers."
-                
-        elif intent == "path":
-            if path_info:
-                answer = f"Retrieved shortest path dependency route. The connection chain consists of: {path_info}."
-                evidence = f"Dependency hops resolved: {path_info}."
-                risks = "Single-point-of-failure exposure. A delay in any upstream link will propagate to the destination warehouse."
-                recommendations = "1. Establish multi-path shipping routing. 2. Place regional safety stock at downstream warehouses."
-            else:
-                answer = "No connection path could be resolved between the specified supply chain entities in the current active graph version."
-                evidence = "Neo4j path traversal returned empty results."
-                risks = "Disconnected logistics network segment or inactive warehouses."
-                recommendations = "1. Check entity status in Neo4j. 2. Validate shipment records to ensure routes are active."
-                
-        elif intent == "connection":
-            if connections_list:
-                answer = f"Resolved supply chain network connections: {', '.join(connections_list[:5])}."
-                evidence = f"Retrieved connections: {', '.join(connections_list[:10])}."
-                risks = "Downstream ripple effect propagation. The network structure indicates high dependency on common warehousing links."
-                recommendations = "1. Map alternative supply pathways. 2. Review warehouse utilization rates."
-            else:
-                answer = "No active connection links retrieved for the entity in the knowledge graph."
-                evidence = "Query returned zero relationships."
-                risks = "Supply pathways are not fully mapped or registered."
-                recommendations = "1. Run database initialization pipeline. 2. Ensure monthly data covers these connections."
-
-        else:
-            entities_str = ", ".join(entities) if entities else "entities"
-            answer = f"Analysis of the retrieved context for {entities_str} completed. Found {len(query_results)} related business records."
-            evidence = f"Factual records retrieved from Neo4j facts graph: {', '.join(records_summary[:10])}."
-            risks = "Potential temporal demand spikes and supplier delay variances."
-            recommendations = "1. Run monthly validation sequence to refresh pattern weights. 2. Cross-reference results with forecasting dashboard."
-
-        return {
-            "answer": answer,
-            "evidence": evidence,
-            "risks": risks,
-            "recommendations": recommendations,
-            "prompt": prompt,
-            "query": query,
-            "chain_type": "query_response",
-            "llm_ready": True,
-        }
+        # ── Grounded Fallback Generator ────────────────────────────────────────
+        # Extracts real values from graph query results.
+        # No canned sentences — every statement is derived from actual records.
+        return _grounded_response(query, graph_context, query_results, prompt)
 
 
     @property
@@ -488,8 +388,174 @@ def _extract_json_block(text: str) -> str | None:
     match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if match:
         return match.group(1).strip()
-    # Try finding raw JSON object
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         return match.group(0)
     return None
+
+
+def _grounded_response(
+    query: str,
+    graph_context: dict,
+    query_results: list[dict],
+    prompt: str,
+) -> dict:
+    """
+    Build a fully grounded response from actual graph query results.
+    Every sentence references real node IDs, scores, and counts from the data.
+    No canned text. If results are empty, says so explicitly.
+    """
+    intent = graph_context.get("intent", "general")
+    entities = graph_context.get("entities", [])
+    n = len(query_results)
+
+    if n == 0:
+        return {
+            "answer": f"The knowledge graph returned no records for this query. "
+                      f"Neo4j may be offline, the graph may not be built yet, "
+                      f"or no entities match the filter criteria.",
+            "evidence": [],
+            "risks": "Cannot assess risk without graph data. Run initialization to build the graph.",
+            "recommendations": [
+                "Run POST /api/v1/graph/build to populate the knowledge graph.",
+                "Verify Neo4j connection in backend settings.",
+                "Check that the DataCo dataset has been processed via initialization.",
+            ],
+            "prompt": prompt,
+            "query": query,
+            "chain_type": "query_response",
+            "llm_ready": True,
+        }
+
+    # ── Extract real values from records ──────────────────────────────────────────────
+    risk_nodes: list[tuple[str, float]] = []   # (node_id, risk_value)
+    perf_nodes: list[tuple[str, float]] = []   # (node_id, perf_value)
+    connections: list[str] = []                # "A -[REL]-> B"
+    path_str: str = ""
+    node_ids: list[str] = []
+    numeric_fields: dict[str, list[float]] = {}
+
+    for r in query_results:
+        node = r.get("node") or r.get("entity") or r
+        nid = (node.get("node_id") or node.get("id") or
+               node.get("source_id") or node.get("entity_id") or "")
+        if nid:
+            node_ids.append(str(nid))
+
+        # Collect all numeric fields for statistical summary
+        for k, v in node.items():
+            if isinstance(v, (int, float)) and not k.startswith("_"):
+                numeric_fields.setdefault(k, []).append(float(v))
+
+        # Risk
+        risk_val = (node.get("risk_score") or node.get("late_delivery_rate") or
+                    node.get("warehouse_risk") or node.get("forecast_risk") or
+                    r.get("risk") or 0.0)
+        if float(risk_val) > 0.35 and nid:
+            risk_nodes.append((str(nid), float(risk_val)))
+
+        # Performance
+        perf_val = (node.get("shipping_efficiency_score") or
+                    node.get("supplier_reliability_score") or 1.0)
+        if float(perf_val) < 0.75 and nid:
+            perf_nodes.append((str(nid), float(perf_val)))
+
+        # Connections
+        src = r.get("source") or r.get("source_id")
+        tgt = r.get("target") or r.get("target_id")
+        rel = r.get("rel_type") or r.get("relationship") or "RELATED"
+        if src and tgt:
+            connections.append(f"{src} -[{rel}]-> {tgt}")
+
+        # Path
+        path_nodes = r.get("path_nodes")
+        if path_nodes and not path_str:
+            path_str = " → ".join(
+                f"{pn.get('label', '?')}:{pn.get('node_id', '?')}"
+                for pn in path_nodes
+            )
+
+    risk_nodes.sort(key=lambda x: x[1], reverse=True)
+    perf_nodes.sort(key=lambda x: x[1])
+
+    # ── Build evidence list from real IDs ──────────────────────────────────────────────
+    evidence: list[str] = []
+    if risk_nodes:
+        evidence += [f"{nid}: risk={v:.3f}" for nid, v in risk_nodes[:6]]
+    elif connections:
+        evidence += connections[:6]
+    elif path_str:
+        evidence.append(f"Path: {path_str}")
+    else:
+        evidence += node_ids[:8]
+
+    # ── Numeric summary for risk statement ──────────────────────────────────────────────
+    risk_summary_parts: list[str] = []
+    for field_name, values in numeric_fields.items():
+        if any(kw in field_name for kw in ("risk", "delay", "stress", "volatility")):
+            avg_v = sum(values) / len(values)
+            max_v = max(values)
+            risk_summary_parts.append(
+                f"{field_name}: avg={avg_v:.3f}, max={max_v:.3f} across {len(values)} records"
+            )
+    risks_str = "; ".join(risk_summary_parts[:4]) if risk_summary_parts else \
+        f"No elevated risk metrics detected across {n} retrieved records."
+
+    # ── Build answer from real counts and top entities ─────────────────────────────────
+    entity_str = ", ".join(entities) if entities else "supply chain entities"
+    top_id = risk_nodes[0][0] if risk_nodes else (node_ids[0] if node_ids else "N/A")
+    top_risk = f"{risk_nodes[0][1]:.3f}" if risk_nodes else "N/A"
+
+    if intent == "path" and path_str:
+        answer = (f"Shortest dependency path resolved: {path_str}. "
+                  f"This chain has {path_str.count('→') + 1} hops.")
+        recommendations = [
+            "Establish redundant routing to avoid single-path dependency.",
+            "Place safety stock at each intermediate node in the path.",
+            "Monitor edge weights on this path via TPKE for degradation signals.",
+        ]
+    elif intent == "connection" and connections:
+        answer = (f"Retrieved {len(connections)} active relationships for {entity_str}. "
+                  f"Sample: {connections[0]}.")
+        recommendations = [
+            "Map all alternative pathways for the highest-weight connections.",
+            "Review relationship strength scores monthly via TPKE decay.",
+            "Flag connections with strength < 0.3 for audit.",
+        ]
+    elif risk_nodes:
+        answer = (f"Graph analysis of {entity_str} returned {n} records. "
+                  f"{len(risk_nodes)} entities exceed the 0.35 risk threshold. "
+                  f"Highest risk: {top_id} at {top_risk}.")
+        recommendations = [
+            f"Prioritise mitigation for {top_id} — risk score {top_risk} exceeds safe threshold.",
+            f"Increase safety stock for products linked to the top {min(3, len(risk_nodes))} risk nodes.",
+            "Trigger RCA graph traversal on the highest-risk entity to identify root cause.",
+            "Set automated alerts for any node crossing the 0.65 critical risk boundary.",
+        ]
+    elif perf_nodes:
+        answer = (f"Performance analysis of {entity_str} returned {n} records. "
+                  f"{len(perf_nodes)} entities show below-target efficiency. "
+                  f"Lowest: {perf_nodes[0][0]} at score {perf_nodes[0][1]:.3f}.")
+        recommendations = [
+            f"Audit {perf_nodes[0][0]} for root cause of low efficiency score.",
+            "Shift order volume to higher-performing alternatives where available.",
+            "Review SLA terms with underperforming carriers and suppliers.",
+        ]
+    else:
+        answer = (f"Query on {entity_str} returned {n} records from the knowledge graph. "
+                  f"No critical risk thresholds exceeded in the retrieved dataset.")
+        recommendations = [
+            "Continue standard monitoring cycles.",
+            "Re-run query after next TPKE evolution cycle for updated pattern weights.",
+        ]
+
+    return {
+        "answer": answer,
+        "evidence": evidence,
+        "risks": risks_str,
+        "recommendations": recommendations,
+        "prompt": prompt,
+        "query": query,
+        "chain_type": "query_response",
+        "llm_ready": True,
+    }

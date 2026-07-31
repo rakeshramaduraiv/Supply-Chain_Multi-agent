@@ -1,0 +1,151 @@
+Category Name,Order Region,actual_demand_7d,actual_stockout_occurred,actual_late_delivery,actual_delay_days
+Accessories,Canada,626.7,1,0,-0.6
+Accessories,Caribbean,570.9,0,0,-0.4
+Accessories,Central Africa,371.9,0,0,-0.3
+Accessories,Central America,487.0,0,1,2.7
+Accessories,Central Asia,284.8,0,0,-1.5
+Accessories,East Africa,595.6,0,1,5.0
+Accessories,East of USA,613.3,1,1,2.1
+Accessories,Eastern Asia,623.2,0,0,-0.3
+Accessories,Eastern Europe,363.0,0,1,5.0
+Accessories,North Africa,561.6,1,1,2.1
+As Seen on  TV!,Canada,431.5,1,1,3.5
+As Seen on  TV!,Caribbean,444.4,0,0,-1.4
+As Seen on  TV!,Central Africa,525.5,0,1,2.8
+As Seen on  TV!,Central America,563.9,1,1,4.7
+As Seen on  TV!,Central Asia,382.1,0,0,-1.4
+As Seen on  TV!,East Africa,591.7,0,1,1.6
+As Seen on  TV!,East of USA,394.7,1,1,2.0
+As Seen on  TV!,Eastern Asia,227.5,0,0,-0.3
+As Seen on  TV!,Eastern Europe,444.0,0,1,3.2
+As Seen on  TV!,North Africa,351.0,0,1,2.8
+Baby ,Canada,369.1,0,1,5.1
+Baby ,Caribbean,526.4,0,1,3.7
+Baby ,Central Africa,498.2,0,0,-1.4
+Baby ,Central America,349.8,1,1,2.1
+Baby ,Central Asia,397.2,0,1,2.8
+Baby ,East Africa,132.1,0,0,-1.8
+Baby ,East of USA,327.5,1,0,-1.5
+Baby ,Eastern Asia,383.0,1,1,1.2
+Baby ,Eastern Europe,257.0,1,1,3.6
+Baby ,North Africa,628.4,0,0,-1.9
+Baseball & Softball,Canada,327.0,1,1,4.5
+Baseball & Softball,Caribbean,335.4,0,0,-0.8
+Baseball & Softball,Central Africa,513.6,0,1,4.5
+Baseball & Softball,Central America,258.6,0,0,-0.2
+Baseball & Softball,Central Asia,340.2,0,1,5.2
+Baseball & Softball,East Africa,529.6,1,1,2.2
+Baseball & Softball,East of USA,444.2,0,1,4.2
+Baseball & Softball,Eastern Asia,241.2,0,1,1.7
+Baseball & Softball,Eastern Europe,427.5,0,0,-1.3
+Baseball & Softball,North Africa,217.3,0,0,-0.4
+Basketball,Canada,348.6,1,1,3.9
+Basketball,Caribbean,413.5,1,1,3.9
+Basketball,Central Africa,449.9,0,1,1.2
+Basketball,Central America,447.6,1,1,4.6
+Basketball,Central Asia,391.6,1,1,4.8
+Basketball,East Africa,607.8,0,0,-1.6
+Basketball,East of USA,556.0,0,1,2.3
+Basketball,Eastern Asia,260.4,0,0,-0.8
+Basketball,Eastern Europe,467.6,0,0,-0.3
+Basketball,North Africa,170.8,0,1,5.1
+Books ,Canada,621.5,0,0,-0.1
+Books ,Caribbean,273.5,1,0,-0.5
+Books ,Central Africa,529.3,0,0,-1.7
+Books ,Central America,507.9,1,1,2.1
+Books ,Central Asia,645.4,0,1,5.1
+Books ,East Africa,392.9,1,0,-1.5
+Books ,East of USA,338.5,0,1,2.1
+Books ,Eastern Asia,193.7,0,0,-0.8
+Books ,Eastern Europe,402.6,0,0,-0.1
+Books ,North Africa,602.7,1,0,-0.4
+Boxing & MMA,Canada,320.8,0,0,-1.5
+Boxing & MMA,Caribbean,246.2,0,1,5.1
+Boxing & MMA,Central Africa,488.9,0,1,2.6
+Boxing & MMA,Central America,245.6,0,0,-0.2
+Boxing & MMA,Central Asia,296.2,0,0,-1.1
+Boxing & MMA,East Africa,373.6,0,1,1.5
+Boxing & MMA,East of USA,560.4,1,1,4.0
+Boxing & MMA,Eastern Asia,286.7,0,0,-1.6
+Boxing & MMA,Eastern Europe,180.0,1,1,2.7
+Boxing & MMA,North Africa,222.9,1,0,-1.4
+CDs ,Canada,519.4,1,1,4.1
+CDs ,Caribbean,547.7,1,1,3.6
+CDs ,Central Africa,335.2,1,1,3.4
+CDs ,Central America,308.8,0,1,1.4
+CDs ,Central Asia,525.0,0,1,3.5
+CDs ,East Africa,351.7,1,1,5.0
+CDs ,East of USA,293.9,1,1,5.1
+CDs ,Eastern Asia,458.4,0,1,2.4
+CDs ,Eastern Europe,319.4,1,1,5.4
+CDs ,North Africa,559.0,1,1,4.9
+Cameras ,Canada,602.8,0,0,-0.4
+Cameras ,Caribbean,550.4,0,0,-1.8
+Cameras ,Central Africa,377.2,0,0,-1.7
+Cameras ,Central America,410.6,0,0,-1.8
+Cameras ,Central Asia,483.9,1,1,1.5
+Cameras ,East Africa,615.7,0,0,-1.7
+Cameras ,East of USA,597.8,1,0,-1.2
+Cameras ,Eastern Asia,376.5,0,1,1.2
+Cameras ,Eastern Europe,505.2,0,1,1.2
+Cameras ,North Africa,628.3,0,0,-0.2
+Camping & Hiking,Canada,503.9,1,1,2.2
+Camping & Hiking,Caribbean,631.6,0,0,-1.8
+Camping & Hiking,Central Africa,437.4,1,1,4.1
+Camping & Hiking,Central America,315.4,1,1,2.9
+Camping & Hiking,Central Asia,571.1,0,1,3.6
+Camping & Hiking,East Africa,436.1,1,1,4.1
+Camping & Hiking,East of USA,622.5,1,0,-0.0
+Camping & Hiking,Eastern Asia,531.2,0,0,-1.5
+Camping & Hiking,Eastern Europe,576.7,0,1,1.7
+Camping & Hiking,North Africa,139.0,0,0,-0.7
+Cardio Equipment,Canada,647.4,1,1,4.5
+Cardio Equipment,Caribbean,452.5,1,1,3.9
+Cardio Equipment,Central Africa,562.0,0,1,1.3
+Cardio Equipment,Central America,562.4,0,0,-0.4
+Cardio Equipment,Central Asia,546.3,1,1,4.0
+Cardio Equipment,East Africa,326.4,0,1,1.6
+Cardio Equipment,East of USA,563.5,1,1,5.0
+Cardio Equipment,Eastern Asia,321.0,0,0,-1.1
+Cardio Equipment,Eastern Europe,318.1,0,0,-1.5
+Cardio Equipment,North Africa,393.4,0,0,-1.9
+Children's Clothing,Canada,148.9,0,1,4.7
+Children's Clothing,Caribbean,344.0,0,0,-0.9
+Children's Clothing,Central Africa,603.6,0,1,3.7
+Children's Clothing,Central America,493.8,1,1,1.6
+Children's Clothing,Central Asia,290.2,0,1,5.5
+Children's Clothing,East Africa,147.4,0,0,-0.4
+Children's Clothing,East of USA,584.5,0,1,1.6
+Children's Clothing,Eastern Asia,634.3,0,0,-2.0
+Children's Clothing,Eastern Europe,351.8,1,1,4.7
+Children's Clothing,North Africa,565.9,0,0,-1.8
+Cleats,Canada,510.1,1,0,-1.4
+Cleats,Caribbean,656.4,0,1,4.9
+Cleats,Central Africa,419.6,0,0,-1.5
+Cleats,Central America,209.7,1,1,2.0
+Cleats,Central Asia,208.1,0,0,-0.4
+Cleats,East Africa,153.8,0,1,4.9
+Cleats,East of USA,125.3,0,1,4.2
+Cleats,Eastern Asia,240.3,0,0,-0.0
+Cleats,Eastern Europe,623.8,1,1,3.9
+Cleats,North Africa,504.6,0,1,3.5
+Computers,Canada,291.0,1,1,1.7
+Computers,Caribbean,408.3,1,1,2.5
+Computers,Central Africa,140.4,1,1,3.8
+Computers,Central America,189.9,1,1,5.0
+Computers,Central Asia,404.8,0,0,-1.3
+Computers,East Africa,287.3,0,0,-0.0
+Computers,East of USA,524.6,0,1,3.2
+Computers,Eastern Asia,158.9,0,0,-1.4
+Computers,Eastern Europe,381.0,0,1,1.9
+Computers,North Africa,442.5,1,1,5.2
+Consumer Electronics,Canada,288.5,0,1,1.5
+Consumer Electronics,Caribbean,202.1,1,0,-1.6
+Consumer Electronics,Central Africa,521.6,1,1,1.7
+Consumer Electronics,Central America,592.3,0,1,4.2
+Consumer Electronics,Central Asia,441.8,1,1,4.7
+Consumer Electronics,East Africa,615.1,0,0,-1.7
+Consumer Electronics,East of USA,285.4,0,1,1.5
+Consumer Electronics,Eastern Asia,450.2,0,1,2.1
+Consumer Electronics,Eastern Europe,462.8,0,0,-0.1
+Consumer Electronics,North Africa,400.0,0,0,-1.2

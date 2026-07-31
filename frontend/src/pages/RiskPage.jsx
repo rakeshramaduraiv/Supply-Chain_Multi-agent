@@ -669,11 +669,11 @@ function IssueAnalysis({ issue, analytics, rcaResult }) {
     }
 
     return [
-      { type: 'Supplier',  icon: '🏭', active: true,  critical: issue.id === 'supplier_delay', name: findNodeName('Supplier') },
-      { type: 'Warehouse', icon: '🏪', active: true,  critical: issue.id === 'warehouse_bottleneck', name: findNodeName('Warehouse') },
-      { type: 'Shipment',  icon: '🚚', active: true,  critical: issue.id === 'late_delivery' || issue.id === 'transport_delay', name: findNodeName('Shipment') },
-      { type: 'Product',   icon: '📦', active: true,  critical: issue.id === 'inventory_shortage' || issue.id === 'quality_issue', name: findNodeName('Product') },
-      { type: 'Customer',  icon: '👤', active: true,  critical: issue.id === 'demand_spike', name: findNodeName('Customer') },
+      { type: 'Supplier',  Icon: Factory,   active: true, critical: issue.id === 'supplier_delay',                                          name: findNodeName('Supplier')  },
+      { type: 'Warehouse', Icon: Building2,  active: true, critical: issue.id === 'warehouse_bottleneck',                                      name: findNodeName('Warehouse') },
+      { type: 'Shipment',  Icon: Truck,      active: true, critical: issue.id === 'late_delivery' || issue.id === 'transport_delay',           name: findNodeName('Shipment')  },
+      { type: 'Product',   Icon: Package,    active: true, critical: issue.id === 'inventory_shortage' || issue.id === 'quality_issue',        name: findNodeName('Product')   },
+      { type: 'Customer',  Icon: Users,      active: true, critical: issue.id === 'demand_spike',                                             name: findNodeName('Customer')  },
     ]
   }, [issue, report])
 
@@ -744,9 +744,10 @@ function IssueAnalysis({ issue, analytics, rcaResult }) {
                       border: `2px solid ${fn.active ? activeCol : 'var(--b)'}`,
                       background: fillBg,
                       color: activeCol,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    <span>{fn.icon}</span>
+                    <fn.Icon size={14} />
                   </div>
                   <span className={styles.pathNodeTitle}>{fn.type}</span>
                   <span className={styles.pathNodeName} style={{ color: fn.critical ? '#d63031' : 'var(--ts)' }}>

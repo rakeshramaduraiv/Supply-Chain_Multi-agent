@@ -96,25 +96,40 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
     """
     Administrator-triggered retraining.
     Uses the existing processed master dataset.
+    DB operations are best-effort — retrain proceeds even if PostgreSQL is offline.
     """
-    state_repo = SystemStateRepository(session)
-    state = await state_repo.get_state()
-
-    if state is None or not state.is_initialized:
-        raise HTTPException(status_code=400, detail="System not initialized. Cannot retrain.")
-
-    log_repo = InitializationLogRepository(session)
-    log_entry = await log_repo.log_start(
-        action="retrain",
-        triggered_by="admin_api",
-        dataset_filename=state.dataset_filename,
-    )
-    await session.commit()
+    # Check disk-based initialization first (works without DB)
+    if not is_initialized_on_disk():
+        # Try DB as fallback
+        db_initialized = False
+        try:
+            state_repo = SystemStateRepository(session)
+            state = await state_repo.get_state()
+            db_initialized = state is not None and state.is_initialized
+        except Exception:
+            pass
+        if not db_initialized:
+            raise HTTPException(status_code=400, detail="System not initialized. Cannot retrain.")
 
     start_time = time.perf_counter()
+    log_entry = None
+
+    # Best-effort DB logging
+    try:
+        state_repo = SystemStateRepository(session)
+        state = await state_repo.get_state()
+        log_repo = InitializationLogRepository(session)
+        log_entry = await log_repo.log_start(
+            action="retrain",
+            triggered_by="admin_api",
+            dataset_filename=getattr(state, "dataset_filename", None),
+        )
+        await session.commit()
+    except Exception as db_err:
+        logger.warning(f"DB logging skipped (offline): {db_err}")
+        log_repo = None
 
     try:
-        # Load processed dataset
         processed_path = Path(settings.upload_dir) / "processed_master.parquet"
         if not processed_path.exists():
             raise FileNotFoundError("Processed master dataset not found. Re-initialize the system.")
@@ -122,21 +137,25 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
         import pandas as pd
         df = pd.read_parquet(processed_path)
 
-        # Retrain all models
         from app.ml.training import TrainingOrchestrator
         orchestrator = TrainingOrchestrator()
         results = orchestrator.train_all(df, dataset_version="retrain")
 
         duration_ms = (time.perf_counter() - start_time) * 1000
 
-        # Update state
-        await state_repo.mark_retrained(duration_ms)
-        await log_repo.log_complete(
-            log_id=log_entry.id,
-            duration_ms=duration_ms,
-            details={k: v.to_dict() for k, v in results.items()},
-        )
-        await session.commit()
+        # Best-effort DB state update
+        try:
+            if log_entry and log_repo:
+                await log_repo.log_complete(
+                    log_id=log_entry.id,
+                    duration_ms=duration_ms,
+                    details={k: v.to_dict() for k, v in results.items()},
+                )
+            state_repo2 = SystemStateRepository(session)
+            await state_repo2.mark_retrained(duration_ms)
+            await session.commit()
+        except Exception as db_err:
+            logger.warning(f"DB state update skipped (offline): {db_err}")
 
         return {
             "status": "completed",
@@ -150,8 +169,12 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
 
     except Exception as e:
         duration_ms = (time.perf_counter() - start_time) * 1000
-        await log_repo.log_failure(log_id=log_entry.id, error=str(e), duration_ms=duration_ms)
-        await session.commit()
+        try:
+            if log_entry and log_repo:
+                await log_repo.log_failure(log_id=log_entry.id, error=str(e), duration_ms=duration_ms)
+                await session.commit()
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
 
 

@@ -1,10 +1,36 @@
 """
 TPKE Pattern Detector
 ======================
-Sliding-window temporal pattern detection with conditional probability scoring.
+Detects CAUSAL SEQUENTIAL patterns from deviation events.
 
-Detects co-occurrence patterns between supply chain entities (suppliers, products,
-regions, shipping modes) that repeatedly appear together in deviation events.
+The algorithm:
+
+    1. Classify each deviation event into a named event type
+       (LATE_DELIVERY, INVENTORY_DROP, DEMAND_SPIKE, SUPPLIER_DELAY, STOCKOUT)
+
+    2. Within the sliding window W, scan for sequences:
+           Event A on Day T  →  Event B on Day T+delta (delta <= lag_days)
+
+    3. Count how many times each (A → B) sequence occurs  →  frequency
+
+    4. Apply K gate: frequency must be >= K (minimum observations)
+
+    5. Compute conditional probability:
+           P(B | A) = count(A then B) / count(A)
+
+    6. Apply θ gate: P(B | A) must be >= θ (confidence threshold)
+
+    7. Score temporal regularity of the sequence across the window
+
+    8. Compute final edge weight:
+           w = α·P(B|A) + β·(freq/max_freq) + γ·temporal_score
+
+    9. Return TemporalPattern objects ready for graph evolution
+
+Example output:
+    LATE_DELIVERY  ──0.85──►  INVENTORY_DROP
+    INVENTORY_DROP ──0.72──►  STOCKOUT
+    DEMAND_SPIKE   ──0.68──►  SUPPLIER_DELAY
 """
 
 import logging
@@ -18,6 +44,62 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+# ─── Event type classification ────────────────────────────────────────────────
+
+# Maps (entity_type, deviation_direction) → named event type
+# deviation_direction: "over" = actual > predicted, "under" = actual < predicted
+_EVENT_TYPE_MAP: dict[tuple[str, str], str] = {
+    ("Supplier",  "over"):  "SUPPLIER_DELAY",
+    ("Supplier",  "under"): "SUPPLIER_IMPROVEMENT",
+    ("Product",   "over"):  "DEMAND_SPIKE",
+    ("Product",   "under"): "DEMAND_DROP",
+    ("Warehouse", "over"):  "INVENTORY_STRESS",
+    ("Warehouse", "under"): "INVENTORY_DROP",
+    ("Shipment",  "over"):  "LATE_DELIVERY",
+    ("Shipment",  "under"): "EARLY_DELIVERY",
+    ("Order",     "over"):  "ORDER_SURGE",
+    ("Order",     "under"): "ORDER_DECLINE",
+    ("Customer",  "over"):  "COMPLAINT_SPIKE",
+    ("Customer",  "under"): "SATISFACTION_GAIN",
+}
+
+# Causal relationship label for each (source_event → target_event) pair
+# These become the Neo4j relationship type on the TPKE-inferred edge
+_CAUSAL_RELATIONSHIP_MAP: dict[tuple[str, str], str] = {
+    ("LATE_DELIVERY",    "INVENTORY_DROP"):    "LATE_DELIVERY_TRIGGERS_STOCKOUT",
+    ("LATE_DELIVERY",    "COMPLAINT_SPIKE"):   "LATE_DELIVERY_CAUSES_COMPLAINT",
+    ("LATE_DELIVERY",    "INVENTORY_STRESS"):  "LATE_DELIVERY_TRIGGERS_STOCKOUT",
+    ("INVENTORY_DROP",   "COMPLAINT_SPIKE"):   "STOCKOUT_CAUSES_COMPLAINT",
+    ("INVENTORY_DROP",   "ORDER_DECLINE"):     "STOCKOUT_SUPPRESSES_ORDERS",
+    ("DEMAND_SPIKE",     "SUPPLIER_DELAY"):    "DEMAND_SPIKE_AMPLIFIES_SUPPLIER_RISK",
+    ("DEMAND_SPIKE",     "INVENTORY_DROP"):    "DEMAND_SPIKE_DEPLETES_INVENTORY",
+    ("DEMAND_SPIKE",     "INVENTORY_STRESS"):  "DEMAND_SPIKE_DEPLETES_INVENTORY",
+    ("SUPPLIER_DELAY",   "INVENTORY_DROP"):    "SUPPLIER_DELAY_CAUSES_STOCKOUT",
+    ("SUPPLIER_DELAY",   "INVENTORY_STRESS"):  "SUPPLIER_DELAY_CAUSES_STOCKOUT",
+    ("SUPPLIER_DELAY",   "LATE_DELIVERY"):     "SUPPLIER_DELAY_CASCADES_TO_DELIVERY",
+    ("INVENTORY_STRESS", "LATE_DELIVERY"):     "INVENTORY_STRESS_DELAYS_SHIPMENT",
+    ("INVENTORY_STRESS", "COMPLAINT_SPIKE"):   "INVENTORY_STRESS_CAUSES_COMPLAINT",
+    ("ORDER_SURGE",      "INVENTORY_STRESS"):  "ORDER_SURGE_STRESSES_INVENTORY",
+    ("ORDER_SURGE",      "SUPPLIER_DELAY"):    "ORDER_SURGE_OVERLOADS_SUPPLIER",
+}
+
+
+def _classify_event(entity_type: str, deviation: float) -> str:
+    """Map an entity deviation to a named event type."""
+    direction = "over" if deviation > 0 else "under"
+    return _EVENT_TYPE_MAP.get((entity_type, direction), "DEVIATION")
+
+
+def _causal_rel_type(source_event: str, target_event: str) -> str:
+    """Return the causal relationship label for a (source → target) event pair."""
+    return _CAUSAL_RELATIONSHIP_MAP.get(
+        (source_event, target_event),
+        f"{source_event}_INFLUENCES_{target_event}",
+    )
+
+
+# ─── Data classes ─────────────────────────────────────────────────────────────
+
 @dataclass
 class DeviationEvent:
     """A single forecast-vs-actual deviation event."""
@@ -25,52 +107,80 @@ class DeviationEvent:
     timestamp: datetime
     entity_id: str
     entity_type: str
+    event_type: str          # classified name, e.g. LATE_DELIVERY
     predicted_value: float
     actual_value: float
-    deviation: float  # actual - predicted
+    deviation: float         # actual - predicted
     deviation_pct: float
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
-class CoOccurrence:
-    """A detected co-occurrence between two entities."""
-    source_id: str
-    source_type: str
-    target_id: str
-    target_type: str
-    frequency: int
-    conditional_probability: float
-    temporal_score: float
-    timestamps: list[datetime] = field(default_factory=list)
+class CausalSequence:
+    """
+    A detected A → B causal sequence.
+
+    source_event: event type of A (e.g. LATE_DELIVERY)
+    target_event: event type of B (e.g. INVENTORY_DROP)
+    source_entity_id / target_entity_id: the specific entities involved
+    occurrence_timestamps: list of (A_time, B_time) pairs
+    """
+    source_event: str
+    target_event: str
+    source_entity_id: str
+    source_entity_type: str
+    target_entity_id: str
+    target_entity_type: str
+    frequency: int                              # K: how many times this sequence occurred
+    source_total: int                           # how many times source event occurred alone
+    conditional_probability: float             # P(B|A) = frequency / source_total
+    temporal_score: float                       # regularity of the sequence over time
+    occurrence_timestamps: list[tuple[datetime, datetime]] = field(default_factory=list)
 
 
 @dataclass
 class TemporalPattern:
-    """A validated temporal pattern that qualifies for graph evolution."""
+    """A validated causal pattern that qualifies for graph evolution."""
     source_id: str
     source_type: str
     target_id: str
     target_type: str
-    relationship_type: str
-    weight: float  # Combined score: α·confidence + β·frequency + γ·temporal
-    confidence: float
-    frequency: int
+    relationship_type: str   # causal label, e.g. LATE_DELIVERY_TRIGGERS_STOCKOUT
+    weight: float            # w = α·confidence + β·freq_norm + γ·temporal
+    confidence: float        # P(B|A)
+    frequency: int           # K occurrences
     temporal_score: float
     evidence: dict[str, Any] = field(default_factory=dict)
 
 
+# ─── Pattern Detector ─────────────────────────────────────────────────────────
+
 class PatternDetector:
     """
-    Detects temporal co-occurrence patterns from deviation events.
+    Detects causal sequential patterns from deviation events.
 
-    Algorithm:
-    1. Collect deviation events within sliding window
-    2. Group events by time buckets (daily)
-    3. Compute pairwise co-occurrence frequencies
-    4. Calculate conditional probability P(B|A)
-    5. Score temporal regularity (how evenly distributed across time)
-    6. Filter by frequency threshold and confidence threshold
+    Parameters
+    ----------
+    window_size_days : int
+        Sliding window W — only events within this many days are considered.
+        Older events are discarded (they may no longer be relevant).
+
+    frequency_threshold : int
+        K — minimum number of times a sequence must occur before an edge is added.
+        Prevents noise from creating spurious edges.
+
+    confidence_threshold : float
+        θ — minimum P(B|A) required.
+        If Late Delivery occurred 100 times but Complaint only 20 times,
+        P = 0.20 < θ → edge NOT added.
+
+    lag_days : int
+        Maximum days between event A and event B for them to count as a sequence.
+        Default 7: if B happens within 7 days of A, it's considered caused by A.
+
+    alpha, beta, gamma : float
+        Weights for the scoring formula:
+        w = α·P(B|A) + β·(freq/max_freq) + γ·temporal_score
     """
 
     def __init__(
@@ -78,13 +188,15 @@ class PatternDetector:
         window_size_days: int = 90,
         frequency_threshold: int = 3,
         confidence_threshold: float = 0.6,
+        lag_days: int = 7,
         alpha: float = 0.4,
         beta: float = 0.35,
         gamma: float = 0.25,
     ):
         self._window_days = window_size_days
-        self._freq_threshold = frequency_threshold
-        self._conf_threshold = confidence_threshold
+        self._K = frequency_threshold           # minimum observations gate
+        self._theta = confidence_threshold      # probability gate
+        self._lag_days = lag_days
         self._alpha = alpha
         self._beta = beta
         self._gamma = gamma
@@ -95,9 +207,15 @@ class PatternDetector:
         reference_time: datetime | None = None,
     ) -> list[TemporalPattern]:
         """
-        Main entry: detect all qualifying temporal patterns from events.
+        Main entry: detect all qualifying causal patterns from deviation events.
 
-        Returns list of TemporalPattern objects ready for graph evolution.
+        Steps:
+            1. Filter events to sliding window W
+            2. Scan for A → B sequences within lag_days
+            3. Count frequencies and compute P(B|A)
+            4. Apply K gate and θ gate
+            5. Score temporal regularity
+            6. Compute final weight and return TemporalPattern list
         """
         if not events:
             return []
@@ -105,195 +223,218 @@ class PatternDetector:
         ref_time = reference_time or datetime.now(timezone.utc)
         window_start = ref_time - timedelta(days=self._window_days)
 
-        # Filter to window
+        # Step 1: Filter to sliding window W
         windowed = [e for e in events if e.timestamp >= window_start]
-        if len(windowed) < self._freq_threshold:
-            logger.info(f"Insufficient events in window: {len(windowed)}")
+        if len(windowed) < self._K:
+            logger.info(
+                f"TPKE: only {len(windowed)} events in window "
+                f"(need K={self._K}) — no patterns detected"
+            )
             return []
 
-        # Group by daily buckets
-        buckets = self._bucket_events(windowed)
+        # Sort chronologically — required for sequence scanning
+        windowed.sort(key=lambda e: e.timestamp)
 
-        # Compute co-occurrences
-        co_occurrences = self._compute_co_occurrences(buckets)
+        # Step 2: Scan for A → B sequences
+        sequences = self._find_sequences(windowed)
 
-        # Score and filter
-        patterns = self._score_and_filter(co_occurrences, len(buckets))
+        # Step 3–6: Apply gates, score, return patterns
+        patterns = self._score_and_filter(sequences)
 
-        logger.info(f"Detected {len(patterns)} temporal patterns from {len(windowed)} events")
+        logger.info(
+            f"TPKE: {len(windowed)} events → "
+            f"{len(sequences)} candidate sequences → "
+            f"{len(patterns)} patterns above K={self._K}, θ={self._theta}"
+        )
         return patterns
 
-    def _bucket_events(self, events: list[DeviationEvent]) -> dict[str, list[DeviationEvent]]:
-        """Group events into daily buckets."""
-        buckets: dict[str, list[DeviationEvent]] = defaultdict(list)
-        for event in events:
-            key = event.timestamp.strftime("%Y-%m-%d")
-            buckets[key].append(event)
-        return buckets
+    # ── Sequence detection ────────────────────────────────────────────────────
 
-    def _compute_co_occurrences(
-        self, buckets: dict[str, list[DeviationEvent]]
-    ) -> list[CoOccurrence]:
-        """Compute pairwise entity co-occurrence across time buckets."""
-        # Count how many buckets each entity appears in
-        entity_bucket_count: dict[str, int] = defaultdict(int)
-        # Count how many buckets each pair co-occurs in
-        pair_bucket_count: dict[tuple[str, str], int] = defaultdict(int)
-        # Track timestamps for each pair
-        pair_timestamps: dict[tuple[str, str], list[datetime]] = defaultdict(list)
+    def _find_sequences(
+        self, events: list[DeviationEvent]
+    ) -> list[CausalSequence]:
+        """
+        Scan the sorted event list for A → B sequences.
 
-        for bucket_date, events in buckets.items():
-            # Unique entities in this bucket
-            entities = set()
-            entity_map: dict[str, DeviationEvent] = {}
-            for e in events:
-                entity_key = f"{e.entity_type}:{e.entity_id}"
-                entities.add(entity_key)
-                entity_map[entity_key] = e
+        For each event A at time T, look forward for any event B
+        where B.timestamp is within (T, T + lag_days].
 
-            for ek in entities:
-                entity_bucket_count[ek] += 1
+        Count:
+        - How many times each (A_type, B_type, A_entity, B_entity) pair occurs
+        - How many times each (A_type, A_entity) occurs in total (for P(B|A))
+        """
+        lag = timedelta(days=self._lag_days)
 
-            # Pairwise co-occurrence within same bucket
-            entity_list = sorted(entities)
-            for i in range(len(entity_list)):
-                for j in range(i + 1, len(entity_list)):
-                    pair = (entity_list[i], entity_list[j])
-                    pair_bucket_count[pair] += 1
-                    ts = entity_map[entity_list[i]].timestamp
-                    pair_timestamps[pair].append(ts)
+        # sequence_counts[(src_event, tgt_event, src_id, src_type, tgt_id, tgt_type)]
+        sequence_counts: dict[tuple, int] = defaultdict(int)
+        sequence_timestamps: dict[tuple, list[tuple[datetime, datetime]]] = defaultdict(list)
 
-        # Build CoOccurrence objects with conditional probability
-        results: list[CoOccurrence] = []
-        total_buckets = len(buckets)
+        # source_counts[(src_event, src_id, src_type)]
+        source_counts: dict[tuple[str, str, str], int] = defaultdict(int)
 
-        for (src_key, tgt_key), freq in pair_bucket_count.items():
-            if freq < self._freq_threshold:
-                continue
+        n = len(events)
+        for i, event_a in enumerate(events):
+            src_key = (event_a.event_type, event_a.entity_id, event_a.entity_type)
+            source_counts[src_key] += 1
 
-            src_type, src_id = src_key.split(":", 1)
-            tgt_type, tgt_id = tgt_key.split(":", 1)
+            # Look forward for event B within lag window
+            for j in range(i + 1, n):
+                event_b = events[j]
 
-            # P(target | source) = co-occurrence / source_count
-            src_count = entity_bucket_count[src_key]
-            cond_prob = freq / src_count if src_count > 0 else 0.0
+                # Stop scanning forward once we exceed lag window
+                if event_b.timestamp > event_a.timestamp + lag:
+                    break
 
-            # Temporal regularity: std of inter-event intervals (lower = more regular)
-            timestamps = sorted(pair_timestamps[(src_key, tgt_key)])
-            temporal_score = self._compute_temporal_regularity(timestamps, total_buckets)
+                # Skip same entity (an entity can't cause itself)
+                if event_b.entity_id == event_a.entity_id:
+                    continue
 
-            results.append(CoOccurrence(
-                source_id=src_id,
-                source_type=src_type,
-                target_id=tgt_id,
-                target_type=tgt_type,
+                seq_key = (
+                    event_a.event_type,
+                    event_b.event_type,
+                    event_a.entity_id,
+                    event_a.entity_type,
+                    event_b.entity_id,
+                    event_b.entity_type,
+                )
+                sequence_counts[seq_key] += 1
+                sequence_timestamps[seq_key].append(
+                    (event_a.timestamp, event_b.timestamp)
+                )
+
+        # Build CausalSequence objects
+        sequences: list[CausalSequence] = []
+        for seq_key, freq in sequence_counts.items():
+            src_event, tgt_event, src_id, src_type, tgt_id, tgt_type = seq_key
+            src_total = source_counts[(src_event, src_id, src_type)]
+            cond_prob = freq / src_total if src_total > 0 else 0.0
+            timestamps = sequence_timestamps[seq_key]
+            temporal_score = self._compute_temporal_regularity(timestamps)
+
+            sequences.append(CausalSequence(
+                source_event=src_event,
+                target_event=tgt_event,
+                source_entity_id=src_id,
+                source_entity_type=src_type,
+                target_entity_id=tgt_id,
+                target_entity_type=tgt_type,
                 frequency=freq,
-                conditional_probability=cond_prob,
-                temporal_score=temporal_score,
-                timestamps=timestamps,
+                source_total=src_total,
+                conditional_probability=round(cond_prob, 4),
+                temporal_score=round(temporal_score, 4),
+                occurrence_timestamps=timestamps,
             ))
 
-        return results
+        return sequences
 
-    def _compute_temporal_regularity(self, timestamps: list[datetime], total_buckets: int) -> float:
+    # ── Temporal regularity scoring ───────────────────────────────────────────
+
+    def _compute_temporal_regularity(
+        self, timestamps: list[tuple[datetime, datetime]]
+    ) -> float:
         """
-        Score temporal regularity [0, 1].
-        Higher = more evenly distributed across the window (more reliable pattern).
+        Score how regularly the sequence recurs over time [0, 1].
+
+        Higher = more evenly distributed (Day 1, Day 5, Day 11, Day 20 → high)
+        Lower  = clustered in one burst (Day 1, Day 2, Day 3 → low)
+
+        Uses coefficient of variation of inter-occurrence intervals.
         """
         if len(timestamps) < 2:
             return 0.5
 
-        # Compute intervals between consecutive occurrences
-        intervals = []
-        for i in range(1, len(timestamps)):
-            delta = (timestamps[i] - timestamps[i - 1]).total_seconds() / 86400.0
-            intervals.append(delta)
+        # Use the A-event timestamps to measure recurrence intervals
+        a_times = sorted(t[0] for t in timestamps)
+        intervals = [
+            (a_times[i] - a_times[i - 1]).total_seconds() / 86400.0
+            for i in range(1, len(a_times))
+        ]
 
         if not intervals:
             return 0.5
 
-        mean_interval = np.mean(intervals)
+        mean_interval = float(np.mean(intervals))
         if mean_interval == 0:
             return 1.0
 
-        # Coefficient of variation (lower = more regular)
-        cv = np.std(intervals) / mean_interval if mean_interval > 0 else 1.0
+        # Coefficient of variation: lower CV = more regular
+        cv = float(np.std(intervals)) / mean_interval
 
-        # Convert to [0, 1] score where 1 = perfectly regular
+        # Convert to [0, 1]: perfectly regular CV=0 → score=1.0
         regularity = 1.0 / (1.0 + cv)
 
-        # Bonus for spanning more of the window
-        span_ratio = len(timestamps) / max(total_buckets, 1)
-        span_bonus = min(span_ratio * 0.2, 0.2)
+        # Bonus for spanning a wider time range (not all clustered at start)
+        total_span = (a_times[-1] - a_times[0]).total_seconds() / 86400.0
+        span_bonus = min(total_span / (self._window_days * 2), 0.2)
 
         return min(regularity + span_bonus, 1.0)
 
+    # ── Gate application and scoring ──────────────────────────────────────────
+
     def _score_and_filter(
-        self, co_occurrences: list[CoOccurrence], total_buckets: int
+        self, sequences: list[CausalSequence]
     ) -> list[TemporalPattern]:
-        """Apply weighted scoring formula and filter by confidence threshold."""
+        """
+        Apply K gate, θ gate, compute weight, return TemporalPattern list.
+
+        K gate:  frequency >= K  (minimum observations)
+        θ gate:  P(B|A) >= θ     (conditional probability threshold)
+        Weight:  w = α·P(B|A) + β·(freq/max_freq) + γ·temporal_score
+        """
+        # K gate
+        qualified = [s for s in sequences if s.frequency >= self._K]
+
+        # θ gate
+        qualified = [s for s in qualified if s.conditional_probability >= self._theta]
+
+        if not qualified:
+            return []
+
+        max_freq = max(s.frequency for s in qualified)
+
         patterns: list[TemporalPattern] = []
+        for seq in qualified:
+            freq_norm = seq.frequency / max_freq if max_freq > 0 else 0.0
 
-        # Normalize frequency to [0, 1]
-        max_freq = max((c.frequency for c in co_occurrences), default=1)
-
-        for co in co_occurrences:
-            confidence = co.conditional_probability
-            freq_normalized = co.frequency / max_freq if max_freq > 0 else 0.0
-            temporal = co.temporal_score
-
-            # w(e) = α·confidence + β·frequency + γ·temporal
+            # w = α·P(B|A) + β·(freq/max_freq) + γ·temporal_score
             weight = (
-                self._alpha * confidence
-                + self._beta * freq_normalized
-                + self._gamma * temporal
+                self._alpha * seq.conditional_probability
+                + self._beta * freq_norm
+                + self._gamma * seq.temporal_score
             )
+            weight = round(min(weight, 1.0), 4)
 
-            if weight < self._conf_threshold:
-                continue
+            # Determine causal relationship label
+            rel_type = _causal_rel_type(seq.source_event, seq.target_event)
 
-            # Determine relationship type based on entity types
-            rel_type = self._infer_relationship_type(co.source_type, co.target_type)
+            # First and last occurrence timestamps
+            a_times = sorted(t[0] for t in seq.occurrence_timestamps)
 
             patterns.append(TemporalPattern(
-                source_id=co.source_id,
-                source_type=co.source_type,
-                target_id=co.target_id,
-                target_type=co.target_type,
+                source_id=seq.source_entity_id,
+                source_type=seq.source_entity_type,
+                target_id=seq.target_entity_id,
+                target_type=seq.target_entity_type,
                 relationship_type=rel_type,
-                weight=round(weight, 4),
-                confidence=round(confidence, 4),
-                frequency=co.frequency,
-                temporal_score=round(temporal, 4),
+                weight=weight,
+                confidence=seq.conditional_probability,
+                frequency=seq.frequency,
+                temporal_score=seq.temporal_score,
                 evidence={
-                    "bucket_count": co.frequency,
-                    "conditional_probability": round(confidence, 4),
-                    "temporal_regularity": round(temporal, 4),
-                    "first_seen": co.timestamps[0].isoformat() if co.timestamps else None,
-                    "last_seen": co.timestamps[-1].isoformat() if co.timestamps else None,
+                    "source_event": seq.source_event,
+                    "target_event": seq.target_event,
+                    "frequency": seq.frequency,
+                    "source_total_occurrences": seq.source_total,
+                    "conditional_probability": seq.conditional_probability,
+                    "temporal_regularity": seq.temporal_score,
+                    "first_seen": a_times[0].isoformat() if a_times else None,
+                    "last_seen": a_times[-1].isoformat() if a_times else None,
+                    "formula": f"w = {self._alpha}×{seq.conditional_probability} + "
+                               f"{self._beta}×{round(freq_norm, 3)} + "
+                               f"{self._gamma}×{seq.temporal_score} = {weight}",
                 },
             ))
 
         # Sort by weight descending
         patterns.sort(key=lambda p: p.weight, reverse=True)
         return patterns
-
-    @staticmethod
-    def _infer_relationship_type(source_type: str, target_type: str) -> str:
-        """Infer the Neo4j relationship type from entity type pair."""
-        pair = (source_type, target_type)
-        mapping = {
-            ("Supplier", "Product"): "SUPPLIES",
-            ("Product", "Supplier"): "SUPPLIES",
-            ("Product", "Warehouse"): "STORED_IN",
-            ("Warehouse", "Product"): "STORED_IN",
-            ("Supplier", "Warehouse"): "SHIPS_VIA",
-            ("Warehouse", "Supplier"): "SHIPS_VIA",
-            ("Order", "Customer"): "PLACED",
-            ("Customer", "Order"): "PLACED",
-            ("Shipment", "Customer"): "DELIVERED_TO",
-            ("Customer", "Shipment"): "DELIVERED_TO",
-            ("Order", "Product"): "CONTAINS",
-            ("Product", "Order"): "CONTAINS",
-        }
-        return mapping.get(pair, "INFLUENCES")

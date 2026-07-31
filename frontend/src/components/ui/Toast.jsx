@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 
-const ToastCtx = createContext(null)
+const noop = { success: () => {}, error: () => {}, info: () => {} }
+const ToastCtx = createContext(noop)
 
 let id = 0
 

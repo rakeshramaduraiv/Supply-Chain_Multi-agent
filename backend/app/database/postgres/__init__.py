@@ -40,20 +40,13 @@ async_session_factory = async_sessionmaker(
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency injection for database sessions."""
+    """Dependency injection for database sessions. Yields None when DB is offline."""
     try:
         async with async_session_factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
-    except OSError as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
+            yield session
+    except Exception as e:
+        logger.warning(f"PostgreSQL unavailable, yielding null session: {e}")
+        yield None  # type: ignore[misc]
 
 
 async def init_db() -> None:

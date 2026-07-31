@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
+import { useRef } from 'react'
 import { api } from '../api/client'
 import KpiCard from '../components/ui/KpiCard'
 import DataTable from '../components/ui/DataTable'
 import ScoreBar from '../components/ui/ScoreBar'
 import InfoBox from '../components/ui/InfoBox'
 import { useSharedParams } from '../hooks/useSharedParams'
-import { AlertTriangle, ChevronRight, Layers, LayoutDashboard } from 'lucide-react'
+import { AlertTriangle, Layers, LayoutDashboard } from 'lucide-react'
 import EntityPage from './EntityPage'
 
 function grade(score) {
@@ -19,7 +20,16 @@ export default function Overview() {
   const summary = useQuery({ queryKey: ['datasetSummary'], queryFn: () => api.getDatasetSummary().then(r => r.data) })
   const analytics = useQuery({ queryKey: ['datasetAnalytics'], queryFn: () => api.getDatasetAnalytics().then(r => r.data) })
   const forecast = useQuery({ queryKey: ['autoForecast'], queryFn: () => api.getAutoForecast().then(r => r.data) })
-  const { navigateToPage } = useSharedParams()
+  const { navigateToPage, setParam } = useSharedParams()
+  const entitySectionRef = useRef(null)
+
+  const scrollToEntity = (type, entityId) => {
+    setParam('type', type)
+    setParam('entityId', entityId)
+    setTimeout(() => {
+      entitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
 
   if (summary.isLoading || analytics.isLoading) {
     return (
@@ -87,13 +97,8 @@ export default function Overview() {
   ]
 
   // Handlers for interactive navigation
-  const handleKpiSupplierClick = () => {
-    navigateToPage('/entities', { type: 'Supplier', entityId: 'supplier_delay_main' })
-  }
-
-  const handleKpiLogisticsClick = () => {
-    navigateToPage('/entities', { type: 'Shipment', entityId: 'transport_delay_main' })
-  }
+  const handleKpiSupplierClick = () => scrollToEntity('Supplier', 'supplier_delay_main')
+  const handleKpiLogisticsClick = () => scrollToEntity('Shipment', 'transport_delay_main')
 
   return (
     <div className="page active">
@@ -143,7 +148,7 @@ export default function Overview() {
                   return (
                     <div
                       key={key}
-                      onClick={() => navigateToPage('/entities', { type: targetPages[key], entityId: targetEntity[key] })}
+                      onClick={() => scrollToEntity(targetPages[key], targetEntity[key])}
                       style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', height: '100%', justifyContent: 'flex-end', cursor: 'pointer' }}
                     >
                       <div style={{ width: '100%', maxWidth: '36px', height: `${displayScore * 100}%`, background: colors[key], borderRadius: '3px 3px 0 0', transition: 'height .6s ease' }} />
@@ -179,7 +184,7 @@ export default function Overview() {
             ].map((item, idx) => (
               <div
                 key={idx}
-                onClick={() => navigateToPage('/entities', { type: item.type, entityId: item.id })}
+                onClick={() => scrollToEntity(item.type, item.id)}
                 style={{
                   display: 'flex', justifyContent: 'space-between', padding: '8px 12px',
                   background: 'var(--s1)', border: '1px solid var(--b)', borderRadius: '6px',
@@ -243,7 +248,7 @@ export default function Overview() {
       )}
 
       {/* Entity Intelligence — embedded below overview */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div ref={entitySectionRef} className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="card-head" style={{ padding: '10px 16px', borderBottom: '1px solid var(--b)' }}>
           <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Layers size={14} style={{ color: 'var(--blue)' }} />

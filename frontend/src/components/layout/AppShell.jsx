@@ -14,6 +14,8 @@ import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 import { ChevronRight, Home, Bell, X, Trash2, AlertTriangle, AlertCircle, CheckCircle, Info } from 'lucide-react'
 import { useBusinessAlerts, SUPPLY_CHAIN_QUERY_KEYS } from '../../hooks/useSupplyChainData'
 
+import Logo from '../ui/Logo'
+
 const PAGES = [
   { id: 'overview',     path: '/',             label: 'Overview' },
   { id: 'dataset',      path: '/dataset',      label: 'Dataset' },
@@ -88,9 +90,7 @@ export default function AppShell() {
   return (
     <div className="shell">
       <div className="topbar">
-        <div className="logo" onClick={() => handleNavClick('/')} style={{ cursor: 'pointer' }}>
-          AMASCI <em>Phase 1</em>
-        </div>
+        <Logo size="sm" onClick={() => handleNavClick('/')} style={{ cursor: 'pointer' }} />
         <nav className="nav">
           {PAGES.map(p => (
             <button
@@ -111,37 +111,37 @@ export default function AppShell() {
             <span className={`status-dot ${apiStatus} pulse`} />
             {apiStatus === 'ok' ? 'System ready' : 'API offline'}
           </div>
-          <button
-            ref={bellRef}
-            onClick={() => setBellOpen(o => !o)}
-            style={{
-              position: 'relative', background: bellOpen ? 'rgba(255,255,255,0.12)' : 'none',
-              border: 'none', cursor: 'pointer', padding: '4px 6px',
-              display: 'flex', alignItems: 'center',
-              color: 'rgba(255,255,255,0.8)', borderRadius: 5,
-            }}
-            title="Notifications"
-          >
-            <Bell size={16} />
-            {alertCount > 0 && (
-              <span style={{
-                position: 'absolute', top: 1, right: 1,
-                background: '#d63031', color: '#fff', borderRadius: '50%',
-                width: 13, height: 13, fontSize: 7, fontWeight: 800,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>{alertCount > 99 ? '99+' : alertCount}</span>
-            )}
+          <div ref={bellRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setBellOpen(o => !o)}
+              style={{
+                position: 'relative', background: bellOpen ? 'var(--s2)' : 'none',
+                border: 'none', cursor: 'pointer', padding: '4px 6px',
+                display: 'flex', alignItems: 'center',
+                color: 'var(--ts)', borderRadius: 5,
+              }}
+              title="Notifications"
+            >
+              <Bell size={16} />
+              {alertCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 1, right: 1,
+                  background: '#d63031', color: '#fff', borderRadius: '50%',
+                  width: 13, height: 13, fontSize: 7, fontWeight: 800,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{alertCount > 99 ? '99+' : alertCount}</span>
+              )}
+            </button>
 
-            {/* Dropdown panel */}
+            {/* Dropdown panel — outside the button to avoid nesting */}
             {bellOpen && (
-              <div onClick={e => e.stopPropagation()} style={{
+              <div style={{
                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
                 width: 340, maxHeight: 420, overflowY: 'auto',
                 background: 'var(--s0)', border: '1px solid var(--b)',
                 borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
                 zIndex: 9999, color: 'var(--tp)',
               }}>
-                {/* Header */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '10px 14px', borderBottom: '1px solid var(--b)',
@@ -160,7 +160,6 @@ export default function AppShell() {
                   </div>
                 </div>
 
-                {/* Alert list */}
                 {alertsQuery.isLoading ? (
                   <div style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--tm)' }}>Loading…</div>
                 ) : alertsList.length === 0 ? (
@@ -212,7 +211,7 @@ export default function AppShell() {
                 )}
               </div>
             )}
-          </button>
+          </div>
           <div className="user-circle">SC</div>
         </div>
       </div>

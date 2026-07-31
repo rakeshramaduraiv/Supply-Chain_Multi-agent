@@ -34,7 +34,7 @@ import {
 } from 'recharts'
 import {
   Search, ChevronDown, ChevronRight, Filter, RefreshCw,
-  ArrowUpRight, ArrowDownLeft, X, ZoomIn, ZoomOut, Maximize2,
+  ArrowUpRight, ArrowDownLeft, X,
   Info, Activity, AlertTriangle,
 } from 'lucide-react'
 import { api } from '../api/client'
@@ -490,13 +490,13 @@ function drawGraph(ctx, nodes, edges, transform, selected, hovered, tpkeEdgeSet,
 
     keyProps.slice(0, 3).forEach((propName, idx) => {
       const y = startY + idx * rowHeight
-      let symbol = '📝'
+      let symbol = '#'
       if (propName === 'name' || propName.endsWith('id') || propName.endsWith('Id')) {
-        symbol = '🔑'
+        symbol = 'K'
       } else if (['price', 'capacity', 'profit', 'sales', 'days'].includes(propName.toLowerCase())) {
-        symbol = '∑'
+        symbol = '\u03a3'
       } else if (['country', 'city', 'market', 'zone'].includes(propName.toLowerCase())) {
-        symbol = '📍'
+        symbol = '@'
       }
 
       // Draw datatype icon/symbol
@@ -627,14 +627,8 @@ function EntityExplorer({ nodeCounts, totalRels, onSelectType, selectedType }) {
                   className={styles.entityIcon}
                   style={{ background: `${cfg.color}18`, border: `1px solid ${cfg.color}50` }}
                 >
-                  <span style={{ fontSize: 13 }}>
-                    {type === 'Supplier'   ? '🏭' :
-                     type === 'Product'   ? '📦' :
-                     type === 'Warehouse' ? '🏪' :
-                     type === 'Shipment'  ? '🚚' :
-                     type === 'Customer'  ? '👤' :
-                     type === 'Order'     ? '🛒' :
-                     type === 'Region'    ? '📍' : '🏢'}
+                  <span style={{ fontSize:11, fontWeight:700, color: cfg.color }}>
+                    {type.slice(0,2).toUpperCase()}
                   </span>
                 </div>
 
@@ -707,11 +701,9 @@ function ForceGraphCanvas({
   const containerRef = useRef(null)
   const simRef       = useRef({ nodes: [], edges: [], alpha: 1, rafId: null })
   const transformRef = useRef({ x: 0, y: 0, k: 1 })
-  const dragRef      = useRef({ dragging: false, nodeId: null, startX: 0, startY: 0, moved: false })
-  const panRef       = useRef({ panning: false, startX: 0, startY: 0 })
   const hoveredRef   = useRef(null)
   const selectedRef  = useRef(selectedNodeId)
-  const [tooltip, setTooltip]   = useState(null)  // { x, y, node }
+  const [tooltip, setTooltip]   = useState(null)
   const [hovered,  setHovered]  = useState(null)
   const [dims, setDims]         = useState({ w: 800, h: 500 })
 
@@ -799,41 +791,7 @@ function ForceGraphCanvas({
   }, [])
 
   // ── Mouse/Touch handlers ──────────────────────────────────────────────
-  const onMouseDown = useCallback((e) => {
-    if (e.button !== 0) return
-    const nd = hitTest(e.clientX, e.clientY)
-    if (nd) {
-      dragRef.current = { dragging: true, nodeId: nd.id, startX: e.clientX, startY: e.clientY, moved: false }
-      nd.fx = nd.x; nd.fy = nd.y
-    } else {
-      panRef.current = { panning: true, startX: e.clientX - transformRef.current.x, startY: e.clientY - transformRef.current.y }
-    }
-  }, [hitTest])
-
   const onMouseMove = useCallback((e) => {
-    const drag = dragRef.current
-    const pan  = panRef.current
-
-    if (drag.dragging) {
-      const moved = Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) > 4
-      if (moved) drag.moved = true
-      const nd = simRef.current.nodes.find(n => n.id === drag.nodeId)
-      if (nd) {
-        nd.fx = (e.clientX - transformRef.current.x - canvasRef.current.getBoundingClientRect().left) / transformRef.current.k
-        nd.fy = (e.clientY - transformRef.current.y - canvasRef.current.getBoundingClientRect().top ) / transformRef.current.k
-        nd.x  = nd.fx; nd.y = nd.fy
-        simRef.current.alpha = Math.max(simRef.current.alpha, 0.3)
-      }
-      return
-    }
-
-    if (pan.panning) {
-      transformRef.current.x = e.clientX - pan.startX
-      transformRef.current.y = e.clientY - pan.startY
-      return
-    }
-
-    // Hover
     const nd = hitTest(e.clientX, e.clientY)
     hoveredRef.current = nd?.id || null
     setHovered(nd?.id || null)
@@ -842,51 +800,14 @@ function ForceGraphCanvas({
       canvasRef.current.style.cursor = 'pointer'
     } else {
       setTooltip(null)
-      canvasRef.current.style.cursor = pan.panning ? 'grabbing' : 'grab'
+      canvasRef.current.style.cursor = 'default'
     }
   }, [hitTest])
 
   const onMouseUp = useCallback((e) => {
-    const drag = dragRef.current
-    if (drag.dragging) {
-      if (!drag.moved) {
-        const nd = simRef.current.nodes.find(n => n.id === drag.nodeId)
-        if (nd) { nd.fx = null; nd.fy = null }
-        onSelectNode(drag.nodeId === selectedRef.current ? null : drag.nodeId)
-      } else {
-        // Release pin
-        const nd = simRef.current.nodes.find(n => n.id === drag.nodeId)
-        if (nd) { nd.fx = null; nd.fy = null }
-      }
-      dragRef.current.dragging = false
-    }
-    panRef.current.panning = false
-  }, [onSelectNode])
-
-  const onWheel = useCallback((e) => {
-    e.preventDefault()
-    const factor = e.deltaY > 0 ? 0.9 : 1.1
-    const canvas = canvasRef.current
-    const rect   = canvas.getBoundingClientRect()
-    const mx     = e.clientX - rect.left
-    const my     = e.clientY - rect.top
-    const t      = transformRef.current
-    t.x = mx - (mx - t.x) * factor
-    t.y = my - (my - t.y) * factor
-    t.k = Math.max(0.2, Math.min(4, t.k * factor))
-  }, [])
-
-  // Attach wheel listener as non-passive so preventDefault works
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
-  }, [onWheel])
-
-  const zoomIn  = () => { transformRef.current.k = Math.min(4, transformRef.current.k * 1.25) }
-  const zoomOut = () => { transformRef.current.k = Math.max(0.2, transformRef.current.k * 0.8) }
-  const resetView = () => { transformRef.current = { x: 0, y: 0, k: 1 }; simRef.current.alpha = 1 }
+    const nd = hitTest(e.clientX, e.clientY)
+    if (nd) onSelectNode(nd.id === selectedRef.current ? null : nd.id)
+  }, [hitTest, onSelectNode])
 
   const isEmpty = !graphNodes.length
 
@@ -898,19 +819,15 @@ function ForceGraphCanvas({
         width={dims.w}
         height={dims.h}
         className={styles.graphCanvas}
-        onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={() => {
-          setTooltip(null); hoveredRef.current = null; setHovered(null)
-          panRef.current.panning = false
-        }}
+        onMouseLeave={() => { setTooltip(null); hoveredRef.current = null; setHovered(null) }}
       />
 
       {/* Empty state */}
       {isEmpty && (
         <div className={styles.emptyGraph}>
-          <div className={styles.emptyGraphIcon}>🕸️</div>
+          <div className={styles.emptyGraphIcon}><Activity size={36} style={{ color:'var(--tm)', opacity:0.4 }} /></div>
           <div className={styles.emptyGraphTitle}>Neo4j Knowledge Graph</div>
           <div className={styles.emptyGraphDesc}>
             Build the graph to visualize your supply chain network.
@@ -934,18 +851,6 @@ function ForceGraphCanvas({
         </div>
       </div>
 
-      {/* Zoom controls */}
-      <div className={styles.graphControls}>
-        <button className={styles.graphControlBtn} onClick={zoomIn}  title="Zoom in">+</button>
-        <button className={styles.graphControlBtn} onClick={zoomOut} title="Zoom out">−</button>
-        <button className={styles.graphControlBtn} onClick={resetView} title="Reset view" style={{ fontSize: 12 }}>⌂</button>
-      </div>
-
-      {/* Hint */}
-      <div className={styles.graphHint}>
-        <Info size={10} />
-        Scroll to zoom · Drag canvas to pan · Drag nodes to reposition · Click to inspect
-      </div>
 
       {/* Hover tooltip */}
       {tooltip && tooltip.node && (
@@ -1042,14 +947,8 @@ function EntityDetailPanel({ nodeId, nodeCounts, graphDash, riskDash, trendData,
       {/* Header */}
       <div className={styles.detailHeader} style={{ background: `${cfg.color}10` }}>
         <div className={styles.detailIconWrap} style={{ background: `${cfg.color}20`, border: `1.5px solid ${cfg.color}50` }}>
-          <span style={{ fontSize: 16 }}>
-            {label === 'Supplier'   ? '🏭' :
-             label === 'Product'   ? '📦' :
-             label === 'Warehouse' ? '🏪' :
-             label === 'Shipment'  ? '🚚' :
-             label === 'Customer'  ? '👤' :
-             label === 'Order'     ? '🛒' :
-             label === 'Region'    ? '📍' : '🏢'}
+          <span style={{ fontSize:11, fontWeight:700, color: cfg.color }}>
+            {label.slice(0,2).toUpperCase()}
           </span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1134,7 +1033,7 @@ function EntityDetailPanel({ nodeId, nodeCounts, graphDash, riskDash, trendData,
                 {(riskScore * 100).toFixed(0)}%
               </div>
               <div className={styles.riskLabel} style={{ color: 'var(--tm)' }}>
-                {riskScore >= 0.65 ? '⚠️ High Risk' : riskScore >= 0.35 ? '⚡ Medium Risk' : '✅ Low Risk'}
+                {riskScore >= 0.65 ? 'High Risk' : riskScore >= 0.35 ? 'Medium Risk' : 'Low Risk'}
               </div>
               <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'var(--s3)', overflow: 'hidden' }}>
                 <div style={{
@@ -1409,7 +1308,7 @@ function AnalyticsCharts({ graphDash, riskDash, trendData, tpkeDash, nodeCounts 
   return (
     <>
       <div className={styles.bottomTabs}>
-        {[['charts','📊 Analytics'], ['table','🔗 Relationships']].map(([id, lbl]) => (
+        {[['charts','Analytics'], ['table','Relationships']].map(([id, lbl]) => (
           <button
             key={id}
             className={`${styles.bottomTab} ${tab === id ? styles.bottomTabActive : ''}`}

@@ -27,7 +27,7 @@ async def websocket_endpoint(websocket: WebSocket):
         if websocket in active_connections:
             active_connections.remove(websocket)
 
-async def broadcast_event(event_name: str, payload: dict = None):
+async def broadcast_event(event_name: str, payload: dict | None = None):
     """Broadcast real-time refresh event to all connected clients."""
     if not active_connections:
         return
@@ -42,7 +42,7 @@ async def broadcast_event(event_name: str, payload: dict = None):
         try:
             await ws.send_text(msg)
         except Exception as e:
-            logger.warn(f"Failed to send websocket broadcast: {e}")
+            logger.warning(f"Failed to send websocket broadcast: {e}")
             dead_connections.append(ws)
             
     for dead in dead_connections:

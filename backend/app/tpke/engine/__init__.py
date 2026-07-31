@@ -2,11 +2,16 @@
 TPKE Engine — Main Orchestrator
 =================================
 Coordinates the full TPKE pipeline:
+
     1. Ingest forecast + actual data
-    2. Compute deviations → DeviationEvents
-    3. Detect temporal patterns (PatternDetector)
-    4. Apply edge decay (EdgeManager)
-    5. Evolve graph with new patterns (EdgeManager)
+    2. Compute deviations → classify into named DeviationEvents
+       (LATE_DELIVERY, INVENTORY_DROP, DEMAND_SPIKE, SUPPLIER_DELAY, …)
+    3. Detect causal A → B sequences (PatternDetector)
+       - Sliding window W filters old events
+       - K gate: sequence must occur >= K times
+       - θ gate: P(B|A) must be >= θ
+    4. Apply edge decay to existing TPKE edges (EdgeManager)
+    5. Evolve graph: create new edges or strengthen existing ones
     6. Update graph version TPKE mutation count
     7. Return EvolutionReport
 """
@@ -23,7 +28,12 @@ from app.core.config import get_settings
 from app.graph.connection import Neo4jConnectionManager
 from app.graph.versioning import GraphVersionManager
 from app.tpke.edge_manager import EdgeManager, EdgeMutation, DecayResult
-from app.tpke.pattern import PatternDetector, DeviationEvent, TemporalPattern
+from app.tpke.pattern import (
+    PatternDetector,
+    DeviationEvent,
+    TemporalPattern,
+    _classify_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +76,8 @@ class TPKEEngine:
     Temporal Pattern-Triggered Knowledge Graph Evolution Engine.
 
     Inputs:
-    - Forecast results (predicted values per entity)
-    - Actual uploads (real observed values)
+    - forecast_data: predicted values per entity per date
+    - actual_data:   real observed values per entity per date
 
     Output:
     - EvolutionReport with all graph mutations
@@ -82,6 +92,7 @@ class TPKEEngine:
             window_size_days=self._settings.tpke_window_size_days,
             frequency_threshold=self._settings.tpke_frequency_threshold,
             confidence_threshold=self._settings.tpke_confidence_threshold,
+            lag_days=self._settings.tpke_lag_days,
         )
         self._edge_manager = EdgeManager(connection, session)
         self._version_manager = GraphVersionManager(connection, session)
@@ -96,10 +107,10 @@ class TPKEEngine:
         Execute full TPKE evolution cycle.
 
         Args:
-            forecast_data: List of forecast records with keys:
+            forecast_data: List of records with keys:
                 entity_id, entity_type, predicted_value, forecast_date, metadata
-            actual_data: List of actual records with keys:
-                entity_id, entity_type, actual_value, date, metadata
+            actual_data: List of records with keys:
+                entity_id, entity_type, actual_value, date
             triggered_by: User or system identifier
 
         Returns:
@@ -109,15 +120,18 @@ class TPKEEngine:
         run_id = f"tpke_{int(time.time())}"
         now = datetime.now(timezone.utc)
 
-        logger.info(f"TPKE run {run_id}: {len(forecast_data)} forecasts, {len(actual_data)} actuals")
+        logger.info(
+            f"TPKE run {run_id}: "
+            f"{len(forecast_data)} forecasts, {len(actual_data)} actuals"
+        )
 
-        # Step 1: Compute deviation events
-        events = self._compute_deviations(forecast_data, actual_data)
+        # Step 1: Compute deviations and classify into named event types
+        events = self._compute_and_classify_events(forecast_data, actual_data)
 
-        # Step 2: Detect temporal patterns
+        # Step 2: Detect causal A → B patterns (K gate + θ gate + sliding window)
         patterns = self._detector.detect_patterns(events, reference_time=now)
 
-        # Step 3: Apply edge decay
+        # Step 3: Apply edge decay to all existing TPKE edges
         decay_result = await self._edge_manager.decay(reference_time=now)
 
         # Step 4: Evolve graph with detected patterns
@@ -132,7 +146,6 @@ class TPKEEngine:
                 triggered_by=triggered_by,
             )
 
-            # Update TPKE mutation count on graph version
             mutation_count = len(mutations) + len(decay_result.mutations)
             if mutation_count > 0:
                 await self._version_manager.increment_tpke_mutations(mutation_count)
@@ -163,13 +176,14 @@ class TPKEEngine:
                     "weight": p.weight,
                     "confidence": p.confidence,
                     "frequency": p.frequency,
+                    "evidence": p.evidence,
                 }
                 for p in patterns[:10]
             ],
             parameters={
                 "window_size_days": self._settings.tpke_window_size_days,
-                "frequency_threshold": self._settings.tpke_frequency_threshold,
-                "confidence_threshold": self._settings.tpke_confidence_threshold,
+                "frequency_threshold_K": self._settings.tpke_frequency_threshold,
+                "confidence_threshold_theta": self._settings.tpke_confidence_threshold,
                 "decay_rate": self._settings.tpke_decay_rate,
             },
         )
@@ -197,23 +211,35 @@ class TPKEEngine:
             "tpke_mutations_on_version": active_version.get("tpke_mutations", 0) if active_version else 0,
             "parameters": {
                 "window_size_days": self._settings.tpke_window_size_days,
-                "frequency_threshold": self._settings.tpke_frequency_threshold,
-                "confidence_threshold": self._settings.tpke_confidence_threshold,
+                "frequency_threshold_K": self._settings.tpke_frequency_threshold,
+                "confidence_threshold_theta": self._settings.tpke_confidence_threshold,
                 "decay_rate": self._settings.tpke_decay_rate,
             },
         }
 
-    def _compute_deviations(
+    # ── Private: deviation computation and event classification ───────────────
+
+    def _compute_and_classify_events(
         self,
         forecast_data: list[dict[str, Any]],
         actual_data: list[dict[str, Any]],
     ) -> list[DeviationEvent]:
         """
-        Match forecast records to actuals and compute deviations.
+        Match forecast records to actuals, compute deviations,
+        and classify each deviation into a named event type.
 
         Matching key: (entity_id, entity_type, date)
+
+        Classification:
+            Supplier  + actual > predicted  → SUPPLIER_DELAY
+            Product   + actual > predicted  → DEMAND_SPIKE
+            Warehouse + actual < predicted  → INVENTORY_DROP
+            Shipment  + actual > predicted  → LATE_DELIVERY
+            etc.
+
+        Only deviations >= 10% are considered significant events.
         """
-        # Index actuals by (entity_id, entity_type, date_str)
+        # Index actuals by (entity_id, entity_type, date)
         actual_index: dict[tuple[str, str, str], dict[str, Any]] = {}
         for a in actual_data:
             date_str = self._normalize_date(a.get("date", ""))
@@ -238,10 +264,11 @@ class TPKEEngine:
             deviation = actual_val - predicted
             deviation_pct = abs(deviation / predicted) if predicted != 0 else 0.0
 
-            # Only significant deviations become events
-            if deviation_pct < 0.1:  # Less than 10% deviation = not interesting
+            # Only significant deviations become events (>= 10%)
+            if deviation_pct < 0.10:
                 continue
 
+            # Parse timestamp
             try:
                 ts = datetime.fromisoformat(date_str) if date_str else datetime.now(timezone.utc)
                 if ts.tzinfo is None:
@@ -249,12 +276,16 @@ class TPKEEngine:
             except (ValueError, TypeError):
                 ts = datetime.now(timezone.utc)
 
+            # Classify into named event type
+            event_type = _classify_event(entity_type, deviation)
+
             event_counter += 1
             events.append(DeviationEvent(
                 event_id=f"dev_{event_counter}",
                 timestamp=ts,
                 entity_id=entity_id,
                 entity_type=entity_type,
+                event_type=event_type,
                 predicted_value=predicted,
                 actual_value=actual_val,
                 deviation=deviation,
@@ -262,14 +293,16 @@ class TPKEEngine:
                 metadata=f.get("metadata", {}),
             ))
 
-        logger.info(f"Computed {len(events)} deviation events from {len(forecast_data)} forecasts")
+        logger.info(
+            f"TPKE: {len(forecast_data)} forecasts matched → "
+            f"{len(events)} significant deviation events classified"
+        )
         return events
 
     @staticmethod
     def _normalize_date(date_val: Any) -> str:
-        """Normalize date to ISO string (date part only)."""
+        """Normalize date to ISO date string (YYYY-MM-DD)."""
         if not date_val:
             return ""
         s = str(date_val)
-        # Take just the date part if it's a datetime
         return s[:10] if len(s) >= 10 else s

@@ -44,14 +44,14 @@ def _compute_summary() -> dict:
     if df is None:
         return {"ready": False, "message": "Dataset not processed yet"}
 
-    total_orders = int(len(df))
+    total_orders = len(df)
 
     # Late delivery
     late_count = int(df["Late_delivery_risk"].sum())
     late_pct = round(late_count / total_orders * 100, 2)
 
     # Shipping delay
-    avg_delay = round(float(df["shipping_delay_days"].mean()), 2)
+    avg_delay = round(df["shipping_delay_days"].mean(), 2)
 
     # Date range
     dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
@@ -66,10 +66,10 @@ def _compute_summary() -> dict:
     shipping_modes = {}
     for mode, grp in df.groupby("Shipping Mode"):
         shipping_modes[mode] = {
-            "count": int(len(grp)),
+            "count": len(grp),
             "pct": round(len(grp) / total_orders * 100, 1),
-            "late_rate": round(float(grp["Late_delivery_risk"].mean()) * 100, 2),
-            "avg_delay": round(float(grp["shipping_delay_days"].mean()), 2),
+            "late_rate": round(grp["Late_delivery_risk"].mean() * 100, 2),
+            "avg_delay": round(grp["shipping_delay_days"].mean(), 2),
         }
 
     # Supplier reliability (1 - late_rate per department)
@@ -79,7 +79,7 @@ def _compute_summary() -> dict:
         avg_delay=("shipping_delay_days", "mean"),
     ).reset_index()
     dept_stats["reliability"] = 1 - (dept_stats["late"] / dept_stats["total"])
-    avg_reliability = round(float(dept_stats["reliability"].mean()), 4)
+    avg_reliability = round(dept_stats["reliability"].mean(), 4)
 
     # Top categories
     top_cats = df.groupby("Category Name").agg(
@@ -165,9 +165,9 @@ def _compute_analytics() -> dict:
     for mode, grp in df.groupby("Shipping Mode"):
         shipping_risk.append({
             "name": mode,
-            "value": round(float(grp["Late_delivery_risk"].mean()) * 100, 1),
-            "count": int(len(grp)),
-            "avg_delay": round(float(grp["shipping_delay_days"].mean()), 2),
+            "value": round(grp["Late_delivery_risk"].mean() * 100, 1),
+            "count": len(grp),
+            "avg_delay": round(grp["shipping_delay_days"].mean(), 2),
         })
     shipping_risk.sort(key=lambda x: x["value"], reverse=True)
 
@@ -208,13 +208,13 @@ def _compute_analytics() -> dict:
     walk_forward = {
         "train_start": sorted_dates.iloc[0].strftime("%Y-%m-%d"),
         "train_end": sorted_dates.iloc[train_end_idx].strftime("%Y-%m-%d"),
-        "train_rows": train_end_idx,
+        "train_rows": int(train_end_idx),
         "val_start": sorted_dates.iloc[train_end_idx + 1].strftime("%Y-%m-%d"),
         "val_end": sorted_dates.iloc[val_end_idx].strftime("%Y-%m-%d"),
-        "val_rows": val_end_idx - train_end_idx,
+        "val_rows": int(val_end_idx - train_end_idx),
         "test_start": sorted_dates.iloc[val_end_idx + 1].strftime("%Y-%m-%d"),
         "test_end": sorted_dates.iloc[-1].strftime("%Y-%m-%d"),
-        "test_rows": n - val_end_idx,
+        "test_rows": int(n - val_end_idx),
     }
 
     # === Risk heatmap (category × region) ===
@@ -244,7 +244,8 @@ def _compute_analytics() -> dict:
     df_dated = df.copy()
     df_dated["_date"] = pd.to_datetime(df_dated["order date (DateOrders)"], errors="coerce")
     df_dated = df_dated.dropna(subset=["_date"])
-    monthly = df_dated.groupby(df_dated["_date"].dt.to_period("M")).agg(
+    df_dated["_period"] = df_dated["_date"].dt.strftime("%Y-%m")
+    monthly = df_dated.groupby("_period").agg(
         orders=("Late_delivery_risk", "count"),
         late_rate=("Late_delivery_risk", "mean"),
         avg_delay=("shipping_delay_days", "mean"),
@@ -252,7 +253,7 @@ def _compute_analytics() -> dict:
     ).reset_index()
     monthly_trend = [
         {
-            "period": str(row["_date"]),
+            "period": str(row["_period"]),
             "orders": int(row["orders"]),
             "late_rate": round(float(row["late_rate"]), 4),
             "avg_delay": round(float(row["avg_delay"]), 2),
@@ -273,7 +274,7 @@ def _compute_analytics() -> dict:
         "risk_breakdown": risk_breakdown,
         "monthly_trend": monthly_trend,
         "training_metrics": training_metrics,
-        "total_orders": total,
+        "total_orders": int(total),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return _analytics_cache
@@ -390,7 +391,7 @@ def _compute_auto_forecast() -> dict:
             if len(grp) < 5:
                 continue
 
-            row_result = {"category": cat, "region": region, "order_count": int(len(grp))}
+            row_result = {"category": cat, "region": region, "order_count": len(grp)}
 
             for intel_type in IntelligenceType:
                 versions = registry_data.get(intel_type.value, [])
@@ -416,15 +417,16 @@ def _compute_auto_forecast() -> dict:
                 row_result[f"{intel_type.value}_risk"] = round(float(np.mean(preds_grp)), 4)
 
             # Combined risk
-            risks = [row_result.get(f"{t.value}_risk", 0) for t in IntelligenceType]
-            row_result["combined_risk"] = round(float(np.mean([r for r in risks if r > 0])), 4)
+            risks = [float(row_result.get(f"{t.value}_risk", 0)) for t in IntelligenceType]
+            valid_risks = [r for r in risks if r > 0]
+            row_result["combined_risk"] = round(sum(valid_risks) / len(valid_risks) if valid_risks else 0.0, 4)
             category_forecasts.append(row_result)
 
         category_forecasts.sort(key=lambda x: x.get("combined_risk", 0), reverse=True)
 
         # Overall confidence
-        all_confs = [v.get("confidence", 0) for v in forecast_results.values()]
-        overall_confidence = round(float(np.mean(all_confs)) if all_confs else 0, 4)
+        numeric_confs = [float(v.get("confidence", 0)) for v in forecast_results.values() if isinstance(v, dict) and "confidence" in v]
+        overall_confidence = round(sum(numeric_confs) / len(numeric_confs) if numeric_confs else 0.0, 4)
 
         return {
             "ready": True,

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 1440
-    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+    cors_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:3001"
 
     # --- PostgreSQL ---
     postgres_host: str = "localhost"
@@ -71,10 +71,16 @@ class Settings(BaseSettings):
     openai_model_name: str = "gpt-4o"
 
     # --- TPKE Configuration ---
+    # θ: minimum P(B|A) for an edge to be created
     tpke_confidence_threshold: float = 0.6
+    # K: minimum number of times a sequence must occur
     tpke_frequency_threshold: int = 3
-    tpke_decay_rate: float = 0.1
+    # decay_rate per day: w_new = w_old × (1 - rate)^days
+    tpke_decay_rate: float = 0.05
+    # W: sliding window — only events within this many days are considered
     tpke_window_size_days: int = 90
+    # lag_days: max days between event A and event B to count as a sequence
+    tpke_lag_days: int = 7
 
     # --- Logging ---
     log_level: str = "INFO"

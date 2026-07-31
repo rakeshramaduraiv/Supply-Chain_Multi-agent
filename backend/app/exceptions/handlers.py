@@ -120,6 +120,13 @@ def register_exception_handlers(app: FastAPI) -> None:
             f"Unhandled exception: {exc}",
             extra={"path": request.url.path, "traceback": traceback.format_exc()},
         )
+        origin = request.headers.get("origin", "")
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin or "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
         return ORJSONResponse(
             status_code=500,
             content=_build_error_response(
@@ -127,4 +134,5 @@ def register_exception_handlers(app: FastAPI) -> None:
                 error_code="INTERNAL_ERROR",
                 message="An unexpected error occurred" if not logger.isEnabledFor(logging.DEBUG) else str(exc),
             ),
+            headers=cors_headers,
         )

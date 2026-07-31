@@ -46,14 +46,14 @@ export const api = {
   getTpkeDash:        () => http.get('/api/v1/dashboard/tpke'),
   getRootcauseDash:   () => http.get('/api/v1/dashboard/rootcause'),
   getTrends:          () => http.get('/api/v1/dashboard/trends'),
-  getComparison:      () => http.get('/api/v1/dashboard/comparison'),
+  getComparison:      (b) => http.post('/api/v1/dashboard/comparison', b || { comparison_type: 'period' }),
   getExecSummary:     () => http.get('/api/v1/dashboard/executive-summary'),
   exportDashboard:    () => http.get('/api/v1/dashboard/export'),
 
   // Data / Upload
-  uploadTrain:        (f) => { const fd = new FormData(); fd.append('file', f); return multipart('/api/v1/data/upload/train', fd) },
-  uploadForecast:     (f) => { const fd = new FormData(); fd.append('file', f); return multipart('/api/v1/data/upload/forecast', fd) },
-  uploadActual:       (f) => { const fd = new FormData(); fd.append('file', f); return multipart('/api/v1/data/upload/actual', fd) },
+  uploadTrain:        (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/train', fd) },
+  uploadForecast:     (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/forecast', fd) },
+  uploadActual:       (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/actual', fd) },
   getDatasetHistory:  () => http.get('/api/v1/data/dataset/history'),
   getDataset:         (id) => http.get(`/api/v1/data/dataset/${id}`),
   getDatasetProfile:  (id) => http.get(`/api/v1/data/dataset/${id}/profile`),
@@ -97,10 +97,10 @@ export const api = {
   queryGraphRAG:      (b) => http.post('/api/v1/graphrag/query', b),
   getGraphRAGHistory: () => http.get('/api/v1/graphrag/history'),
   getGraphRAGStats:   () => http.get('/api/v1/graphrag/statistics'),
-  getGraphRAGContext: (p) => http.get('/api/v1/graphrag/context', { params: p }),
-  getGraphRAGSubgraph:(p) => http.get('/api/v1/graphrag/subgraph', { params: p }),
+  getGraphRAGContext: (b) => http.post('/api/v1/graphrag/context', b),
+  getGraphRAGSubgraph:(b) => http.post('/api/v1/graphrag/subgraph', b),
   getRootCauseRAG:    (b) => http.post('/api/v1/graphrag/root-cause', b),
-  getDependencies:    (p) => http.get('/api/v1/graphrag/dependencies', { params: p }),
+  getDependencies:    (b) => http.post('/api/v1/graphrag/dependencies', b),
   getGraphRAGCache:   () => http.get('/api/v1/graphrag/cache'),
   clearGraphRAGCache: () => http.delete('/api/v1/graphrag/cache'),
 
@@ -108,9 +108,9 @@ export const api = {
   analyzeRCA:         (b) => http.post('/api/v1/rca/analyze', b),
   getRCAHistory:      () => http.get('/api/v1/rca/history'),
   getRCALatest:       () => http.get('/api/v1/rca/latest'),
-  getRCAPath:         (p) => http.get('/api/v1/rca/path', { params: p }),
+  getRCAPath:         (b) => http.post('/api/v1/rca/path', b),
   getRCAStats:        () => http.get('/api/v1/rca/statistics'),
-  getRCASubgraph:     (p) => http.get('/api/v1/rca/subgraph', { params: p }),
+  getRCASubgraph:     (b) => http.post('/api/v1/rca/subgraph', b),
 
   // TPKE
   getTpkeStatus:      () => http.get('/api/v1/tpke/status'),
@@ -136,6 +136,6 @@ export const api = {
   getBusinessIncident:  () => http.get('/api/v1/business/incident'),
   getBusinessAlerts:    () => http.get('/api/v1/business/alerts'),
   dismissBusinessAlert: (id) => http.post(`/api/v1/business/alerts/${id}/dismiss`),
-  uploadBusinessMonthly:(f) => { const fd = new FormData(); fd.append('file', f); return multipart('/api/v1/business/upload/monthly', fd) },
-  uploadBusinessActual: (f) => { const fd = new FormData(); fd.append('file', f); return multipart('/api/v1/business/upload/actual', fd) },
+  uploadBusinessMonthly:(f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/monthly', fd) },
+  uploadBusinessActual: (f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/actual', fd) },
 }

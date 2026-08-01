@@ -58,7 +58,7 @@ class EvolutionReportResponse(BaseModel):
 
 class TPKEStatusResponse(BaseModel):
     total_tpke_edges: int
-    active_graph_version: int | None
+    active_graph_version: str | int | None = None
     tpke_mutations_on_version: int
     parameters: dict[str, Any]
 

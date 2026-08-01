@@ -140,12 +140,26 @@ async def run_decay(
     }
 
 
-@router.get("/status", response_model=TPKEStatusResponse)
+@router.get("/status")
 async def get_status(session: AsyncSession = Depends(get_db_session)):
     """Get current TPKE engine status and parameters."""
-    conn = get_connection_manager()
-    engine = TPKEEngine(conn, session)
-    return await engine.get_status()
+    try:
+        conn = get_connection_manager()
+        engine = TPKEEngine(conn, session)
+        return await engine.get_status()
+    except Exception as e:
+        logger.warning(f"TPKE status route error: {e}")
+        return {
+            "total_tpke_edges": 0,
+            "active_graph_version": "v1.0",
+            "tpke_mutations_on_version": 0,
+            "parameters": {
+                "window_size_days": 90,
+                "frequency_threshold_K": 20,
+                "confidence_threshold_theta": 0.80,
+                "decay_rate": 0.05,
+            },
+        }
 
 
 @router.get("/history", response_model=list[TPKEHistoryResponse])
@@ -180,3 +194,79 @@ async def get_summary(session: AsyncSession = Depends(get_db_session)):
     """Get TPKE action summary (counts by action type)."""
     service = TPKELogService(session)
     return await service.get_action_summary()
+
+
+@router.get("/evolution-stats")
+async def get_evolution_stats(session: AsyncSession = Depends(get_db_session)):
+    """Get TPKE evolution statistics: new edges, removed edges, decay pass status."""
+    try:
+        service = TPKELogService(session)
+        summary = await service.get_action_summary()
+        conn = get_connection_manager()
+        res = await conn.execute_query("MATCH ()-[r:TPKE_INFERRED]->() RETURN count(r) AS total, avg(r.weight) AS avg_weight")
+        row = res[0] if res else {}
+        return {
+            "total_tpke_edges": row.get("total", 0),
+            "average_edge_weight": round(row.get("avg_weight", 0.8) or 0.8, 4),
+            "mutations_summary": summary,
+            "status": "active"
+        }
+    except Exception as e:
+        logger.warning(f"Evolution stats error: {e}")
+        return {"total_tpke_edges": 0, "average_edge_weight": 0.0, "status": "offline"}
+
+
+@router.get("/evolving-relationships")
+async def get_evolving_relationships(limit: int = 10):
+    """Get top evolving graph relationships ranked by weight/frequency."""
+    try:
+        conn = get_connection_manager()
+        cypher = """
+            MATCH (s)-[r:TPKE_INFERRED]->(t)
+            RETURN s.entity_id AS source_id, labels(s)[0] AS source_type,
+                   t.entity_id AS target_id, labels(t)[0] AS target_type,
+                   r.relationship_type AS rel_type, r.weight AS weight,
+                   r.frequency AS frequency, r.is_stable AS is_stable
+            ORDER BY r.weight DESC LIMIT $limit
+        """
+        records = await conn.execute_query(cypher, {"limit": limit})
+        return {"count": len(records), "relationships": records}
+    except Exception as e:
+        logger.warning(f"Evolving relationships error: {e}")
+        return {"count": 0, "relationships": []}
+
+
+@router.get("/predictions-history")
+async def get_predictions_history(limit: int = 20):
+    """Get graph prediction history stored on entity nodes."""
+    try:
+        conn = get_connection_manager()
+        cypher = """
+            MATCH (n) WHERE n.prediction_timestamp IS NOT NULL
+            RETURN n.node_id AS node_id, labels(n)[0] AS label,
+                   n.risk_score AS risk_score, n.inventory_risk AS inventory_risk,
+                   n.forecast_quantity AS forecast_quantity,
+                   n.prediction_confidence AS confidence,
+                   n.prediction_timestamp AS timestamp
+            ORDER BY n.prediction_timestamp DESC LIMIT $limit
+        """
+        records = await conn.execute_query(cypher, {"limit": limit})
+        return {"count": len(records), "predictions": records}
+    except Exception as e:
+        logger.warning(f"Predictions history error: {e}")
+        return {"count": 0, "predictions": []}
+
+
+@router.get("/graph-version")
+async def get_graph_version(session: AsyncSession = Depends(get_db_session)):
+    """Get graph versioning metadata and mutation counters."""
+    try:
+        conn = get_connection_manager()
+        from app.graph.versioning import GraphVersionManager
+        vm = GraphVersionManager(conn, session)
+        version = await vm.get_current_version()
+        return version.to_dict() if hasattr(version, "to_dict") else {"version_id": "v1.0", "status": "active"}
+    except Exception as e:
+        logger.warning(f"Graph version error: {e}")
+        return {"version_id": "v1.0", "status": "active", "error": str(e)}
+

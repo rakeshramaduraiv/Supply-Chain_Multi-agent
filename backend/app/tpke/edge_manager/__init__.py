@@ -132,6 +132,15 @@ _GET_ALL_TPKE_EDGES = """
            r.last_updated   AS last_updated
 """
 
+# Promote a temporary TPKE edge to stable/permanent
+_PROMOTE_TPKE_EDGE = """
+    MATCH (s {entity_id: $source_id})-[r:TPKE_INFERRED]->(t {entity_id: $target_id})
+    WHERE r.relationship_type = $rel_type
+    SET r.is_stable   = true,
+        r.promoted_at = $now
+    RETURN count(r) AS promoted
+"""
+
 _COUNT_TPKE_EDGES = """
     MATCH ()-[r:TPKE_INFERRED]->()
     RETURN count(r) AS count
@@ -180,6 +189,18 @@ class EdgeManager:
                 await self._strengthen_edge(pattern, existing, now)
             else:
                 await self._create_edge(pattern, now)
+
+            # Step 7: Edge Promotion Gate (High confidence + high frequency + high weight)
+            if pattern.confidence >= 0.85 and pattern.frequency >= 15 and pattern.weight >= 0.80:
+                await self._conn.execute_query(
+                    _PROMOTE_TPKE_EDGE,
+                    {
+                        "source_id": pattern.source_id,
+                        "target_id": pattern.target_id,
+                        "rel_type": pattern.relationship_type,
+                        "now": now,
+                    }
+                )
 
         # Persist all mutations to PostgreSQL
         for m in self._mutations:

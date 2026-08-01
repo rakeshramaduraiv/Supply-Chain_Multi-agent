@@ -126,7 +126,42 @@ class RCAEngine:
             f"[RCA] Analysis complete: {report.report_id} "
             f"({timer.duration_ms:.0f}ms, confidence={report.overall_confidence:.2f})"
         )
+
+        # Step 9: Persist Root Cause Analysis results into Neo4j graph
+        try:
+            await self._persist_rca_to_graph(report)
+        except Exception as e:
+            logger.warning(f"[RCA] Graph persistence notice: {e}")
+
         return report
+
+    async def _persist_rca_to_graph(self, report: RCAReport) -> None:
+        """Persist Root Cause Analysis event nodes and causal links into Neo4j."""
+        now = utc_now_iso()
+        cypher = """
+            MERGE (r:RootCauseEvent {report_id: $report_id})
+            SET r.target_id          = $target_id,
+                r.target_label       = $target_label,
+                r.rca_type           = $rca_type,
+                r.problem_summary    = $problem_summary,
+                r.overall_confidence = $overall_confidence,
+                r.timestamp          = $now
+            WITH r
+            MATCH (target {node_id: $target_id})
+            MERGE (r)-[:RCA_AFFECTS_TARGET]->(target)
+        """
+        await self._conn.execute_query(
+            cypher,
+            {
+                "report_id": report.report_id,
+                "target_id": report.target_id,
+                "target_label": report.target_label,
+                "rca_type": report.rca_type,
+                "problem_summary": report.problem_summary,
+                "overall_confidence": report.overall_confidence,
+                "now": now,
+            }
+        )
 
     async def get_subgraph(
         self, target_id: str, target_label: str, hops: int = 2

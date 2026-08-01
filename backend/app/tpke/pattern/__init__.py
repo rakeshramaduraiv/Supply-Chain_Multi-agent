@@ -150,7 +150,23 @@ class TemporalPattern:
     confidence: float        # P(B|A)
     frequency: int           # K occurrences
     temporal_score: float
+    sequence_length: int = 2 # 2, 3, or 4
+    path_nodes: list[tuple[str, str]] = field(default_factory=list) # Full (entity_id, entity_type) chain
     evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class MultiLengthSequence:
+    """A detected causal sequence of variable length (length 2, 3, or 4)."""
+    sequence_length: int
+    events_chain: list[str]
+    entities_chain: list[tuple[str, str]]
+    frequency: int
+    source_total: int
+    conditional_probability: float
+    temporal_score: float
+    occurrence_timestamps: list[list[datetime]] = field(default_factory=list)
+
 
 
 # ─── Pattern Detector ─────────────────────────────────────────────────────────
@@ -326,6 +342,107 @@ class PatternDetector:
             ))
 
         return sequences
+
+    def _find_multi_length_sequences(
+        self, events: list[DeviationEvent], max_chain_length: int = 4
+    ) -> list[MultiLengthSequence]:
+        """
+        Scan events for multi-length causal chains:
+        Length 2: A → B
+        Length 3: A → B → C
+        Length 4: A → B → C → D
+        """
+        lag = timedelta(days=self._lag_days)
+        n = len(events)
+
+        chain_counts: dict[tuple, int] = defaultdict(int)
+        chain_timestamps: dict[tuple, list[list[datetime]]] = defaultdict(list)
+        head_counts: dict[tuple, int] = defaultdict(int)
+
+        for i, event_a in enumerate(events):
+            head_key = (event_a.event_type, event_a.entity_id, event_a.entity_type)
+            head_counts[head_key] += 1
+
+            for j in range(i + 1, n):
+                event_b = events[j]
+                if event_b.timestamp > event_a.timestamp + lag:
+                    break
+                if event_b.entity_id == event_a.entity_id:
+                    continue
+
+                # Length 2 chain
+                k2 = (
+                    (event_a.event_type, event_b.event_type),
+                    ((event_a.entity_id, event_a.entity_type), (event_b.entity_id, event_b.entity_type))
+                )
+                chain_counts[k2] += 1
+                chain_timestamps[k2].append([event_a.timestamp, event_b.timestamp])
+
+                if max_chain_length < 3:
+                    continue
+
+                # Length 3 chain
+                for k in range(j + 1, n):
+                    event_c = events[k]
+                    if event_c.timestamp > event_b.timestamp + lag:
+                        break
+                    if event_c.entity_id in (event_a.entity_id, event_b.entity_id):
+                        continue
+
+                    k3 = (
+                        (event_a.event_type, event_b.event_type, event_c.event_type),
+                        ((event_a.entity_id, event_a.entity_type),
+                         (event_b.entity_id, event_b.entity_type),
+                         (event_c.entity_id, event_c.entity_type))
+                    )
+                    chain_counts[k3] += 1
+                    chain_timestamps[k3].append([event_a.timestamp, event_b.timestamp, event_c.timestamp])
+
+                    if max_chain_length < 4:
+                        continue
+
+                    # Length 4 chain
+                    for m in range(k + 1, n):
+                        event_d = events[m]
+                        if event_d.timestamp > event_c.timestamp + lag:
+                            break
+                        if event_d.entity_id in (event_a.entity_id, event_b.entity_id, event_c.entity_id):
+                            continue
+
+                        k4 = (
+                            (event_a.event_type, event_b.event_type, event_c.event_type, event_d.event_type),
+                            ((event_a.entity_id, event_a.entity_type),
+                             (event_b.entity_id, event_b.entity_type),
+                             (event_c.entity_id, event_c.entity_type),
+                             (event_d.entity_id, event_d.entity_type))
+                        )
+                        chain_counts[k4] += 1
+                        chain_timestamps[k4].append([event_a.timestamp, event_b.timestamp, event_c.timestamp, event_d.timestamp])
+
+        multi_sequences: list[MultiLengthSequence] = []
+        for (events_tuple, entities_tuple), freq in chain_counts.items():
+            first_event = events_tuple[0]
+            first_id, first_type = entities_tuple[0]
+            src_total = head_counts[(first_event, first_id, first_type)]
+            cond_prob = freq / src_total if src_total > 0 else 0.0
+            timestamps = chain_timestamps[(events_tuple, entities_tuple)]
+            
+            # regularity based on head timestamps
+            head_ts = [(ts_list[0], ts_list[-1]) for ts_list in timestamps]
+            temp_score = self._compute_temporal_regularity(head_ts)
+
+            multi_sequences.append(MultiLengthSequence(
+                sequence_length=len(events_tuple),
+                events_chain=list(events_tuple),
+                entities_chain=list(entities_tuple),
+                frequency=freq,
+                source_total=src_total,
+                conditional_probability=round(cond_prob, 4),
+                temporal_score=round(temp_score, 4),
+                occurrence_timestamps=timestamps,
+            ))
+
+        return multi_sequences
 
     # ── Temporal regularity scoring ───────────────────────────────────────────
 

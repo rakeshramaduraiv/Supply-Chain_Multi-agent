@@ -19,9 +19,12 @@ from app.initialization.routes import router as initialization_router
 from app.tpke.routes import router as tpke_router
 from app.graph.prediction_integration.routes import router as prediction_integration_router
 from app.api.v1.endpoints.business import router as business_router
+from app.api.v1.endpoints import live_ops
+from app.api.v1.endpoints import rca_investigation
 
 from app.graphrag.context_builder.routes import router as context_builder_router
 from app.graphrag.prompt_routes import router as prompt_composer_router
+from app.graphrag.copilot_routes import router as copilot_router
 from app.api.v1.endpoints.decision_routes import router as decision_router
 from app.ml.agent_memory.routes import router as agent_memory_router
 
@@ -50,16 +53,19 @@ api_router.include_router(prediction_integration_router, prefix="/graph")
 
 # --- GraphRAG Intelligence ---
 api_router.include_router(graphrag_router, prefix="")
+api_router.include_router(copilot_router, prefix="")
 
 
 # --- Root Cause Analysis ---
 api_router.include_router(rca_router, prefix="")
+api_router.include_router(rca_investigation.router, prefix="")
 
 # --- Dashboard Intelligence ---
 api_router.include_router(dashboard_router, prefix="")
 
 # --- Business Operations (Frontend-facing) ---
 api_router.include_router(business_router, prefix="")
+api_router.include_router(live_ops.router, prefix="")
 
 # --- TPKE Evolution ---
 api_router.include_router(tpke_router, prefix="")

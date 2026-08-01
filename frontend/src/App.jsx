@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HashRouter } from 'react-router-dom'
 import { ToastProvider } from './components/ui/Toast'
 import AppShell from './components/layout/AppShell'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -19,7 +20,9 @@ export default function App() {
     <QueryClientProvider client={qc}>
       <HashRouter>
         <ToastProvider>
-          <AppShell />
+          <ErrorBoundary>
+            <AppShell />
+          </ErrorBoundary>
         </ToastProvider>
       </HashRouter>
     </QueryClientProvider>

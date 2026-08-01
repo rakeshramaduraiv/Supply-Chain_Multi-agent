@@ -111,6 +111,7 @@ export const api = {
   getRCAPath:         (b) => http.post('/api/v1/rca/path', b),
   getRCAStats:        () => http.get('/api/v1/rca/statistics'),
   getRCASubgraph:     (b) => http.post('/api/v1/rca/subgraph', b),
+  getRCAReport:       (id) => http.get(`/api/v1/rca/report/${id}`),
 
   // TPKE
   getTpkeStatus:      () => http.get('/api/v1/tpke/status'),
@@ -138,4 +139,17 @@ export const api = {
   dismissBusinessAlert: (id) => http.post(`/api/v1/business/alerts/${id}/dismiss`),
   uploadBusinessMonthly:(f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/monthly', fd) },
   uploadBusinessActual: (f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/actual', fd) },
+
+  // Live Operations Enterprise Dashboard
+  getLiveOpsEntities:        (params) => http.get('/api/v1/business/live-ops/entities', { params }),
+  getLiveOpsEntityAnalytics: (params) => http.get('/api/v1/business/live-ops/entity-analytics', { params }),
+  getLiveOpsRelationships:   (entity_id) => http.get('/api/v1/business/live-ops/relationships', { params: { entity_id } }),
+
+  // Enterprise AI Supply Chain Investigator
+  investigateIncident:    (b) => http.post('/api/v1/rca/investigation/analyze-incident', b),
+  simulateCounterfactual: (b) => http.post('/api/v1/rca/investigation/simulate-counterfactual', b),
+  getInvestigationHistory: () => http.get('/api/v1/rca/investigation/history'),
+
+  // Enterprise AI Investigation Copilot
+  queryCopilot:           (b) => http.post('/api/v1/graphrag/copilot/query', b),
 }

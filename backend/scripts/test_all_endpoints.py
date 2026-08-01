@@ -26,24 +26,20 @@ ENDPOINTS = [
     ("GET",  "/api/v1/dashboard/graph",           "Dashboard Graph"),
     # ML
     ("GET",  "/api/v1/ml/models",                 "ML Models List"),
-    ("GET",  "/api/v1/ml/status",                 "ML Status"),
     # Graph
     ("GET",  "/api/v1/graph/statistics",          "Graph Statistics"),
-    ("GET",  "/api/v1/graph/nodes",               "Graph Nodes"),
-    ("GET",  "/api/v1/graph/schema",              "Graph Schema"),
-    ("GET",  "/api/v1/graph/subgraph",            "Graph Subgraph"),
-    ("GET",  "/api/v1/graph/dashboard",           "Graph Dashboard"),
+    ("GET",  "/api/v1/graph/nodes?label=Supplier", "Graph Nodes"),
+    ("GET",  "/api/v1/graph/schema/info",         "Graph Schema"),
+    ("GET",  "/api/v1/graph/subgraph?node_id=supplier_main", "Graph Subgraph"),
     # TPKE
     ("GET",  "/api/v1/tpke/status",               "TPKE Status"),
     ("GET",  "/api/v1/tpke/edges",                "TPKE Edges"),
-    ("GET",  "/api/v1/tpke/summary",              "TPKE Summary"),
-    ("GET",  "/api/v1/tpke/history",              "TPKE History"),
     # RCA
     ("GET",  "/api/v1/rca/statistics",            "RCA Statistics"),
     ("GET",  "/api/v1/rca/latest",                "RCA Latest"),
     ("GET",  "/api/v1/rca/history",               "RCA History"),
     # GraphRAG
-    ("GET",  "/api/v1/graphrag/stats",            "GraphRAG Stats"),
+    ("GET",  "/api/v1/graphrag/statistics",       "GraphRAG Stats"),
     ("GET",  "/api/v1/graphrag/cache",            "GraphRAG Cache"),
     # Business
     ("GET",  "/api/v1/business/dashboard",        "Business Dashboard"),
@@ -54,6 +50,10 @@ ENDPOINTS = [
     ("GET",  "/api/v1/business/intelligence",     "Business Intelligence"),
     ("GET",  "/api/v1/business/incident",         "Business Incident"),
     ("GET",  "/api/v1/business/alerts",           "Business Alerts"),
+    # Live Operations Enterprise Dashboard
+    ("GET",  "/api/v1/business/live-ops/entities?entity_type=Supplier", "Live Ops Entities"),
+    ("GET",  "/api/v1/business/live-ops/entity-analytics?entity_id=supplier_main&entity_type=Supplier", "Live Ops Analytics"),
+    ("GET",  "/api/v1/business/live-ops/relationships?entity_id=supplier_main", "Live Ops Relationships"),
     # Admin
     ("GET",  "/api/v1/admin/initialization/status","Admin Init Status"),
 ]

@@ -12,7 +12,7 @@
  *   → Neo4j Knowledge Graph → Graph Intelligence → TPKE → PostgreSQL
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { api } from '../api/client'
 
 // ─── Canonical query keys (used for targeted invalidation) ───────────────────
@@ -57,6 +57,16 @@ export const SUPPLY_CHAIN_QUERY_KEYS = {
 
   // Alerts
   alerts:    ['supplyChain', 'alerts'],
+
+  // Live Operations
+  liveOpsEntities:  ['supplyChain', 'liveOpsEntities'],
+  liveOpsAnalytics: ['supplyChain', 'liveOpsAnalytics'],
+  liveOpsRels:      ['supplyChain', 'liveOpsRels'],
+
+  // Enterprise AI Investigator
+  rcaInvestigation: ['supplyChain', 'rcaInvestigation'],
+  rcaCounterfactual: ['supplyChain', 'rcaCounterfactual'],
+  rcaHistoryLog:    ['supplyChain', 'rcaHistoryLog'],
 }
 
 // ─── Stale-time constants (ms) ───────────────────────────────────────────────
@@ -313,4 +323,42 @@ export function useRiskPageData() {
 export function useInvalidateSupplyChain() {
   const qc = useQueryClient()
   return () => qc.invalidateQueries({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.all })
+}
+
+// ─── Live Operations Enterprise Dashboard Hooks ─────────────────────────────
+
+export function useLiveOpsEntities(params = {}) {
+  return useQuery({
+    queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsEntities, params],
+    queryFn: () => api.getLiveOpsEntities(params).then(r => r.data),
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useLiveOpsEntityAnalytics(params = {}) {
+  return useQuery({
+    queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsAnalytics, params],
+    queryFn: () => api.getLiveOpsEntityAnalytics(params).then(r => r.data),
+    enabled: !!params.entity_id,
+    staleTime: 10_000,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useLiveOpsRelationships(entityId) {
+  return useQuery({
+    queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsRels, entityId],
+    queryFn: () => api.getLiveOpsRelationships(entityId).then(r => r.data),
+    enabled: !!entityId,
+    staleTime: 15_000,
+  })
+}
+
+export function useRcaInvestigationHistory() {
+  return useQuery({
+    queryKey: SUPPLY_CHAIN_QUERY_KEYS.rcaHistoryLog,
+    queryFn: () => api.getInvestigationHistory().then(r => r.data),
+    staleTime: 30_000,
+  })
 }

@@ -1,4 +1,4 @@
-/* ReportsPage.module.css — Enterprise Executive Command Center */
+/* DecisionJournal.module.css — Enterprise AI Decision Journal */
 
 .page {
   display: flex;
@@ -9,7 +9,6 @@
   font-family: var(--font);
 }
 
-/* ── HEADER EXECUTIVE BAND ── */
 .headerBand {
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -17,8 +16,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   z-index: 10;
 }
 
@@ -34,7 +33,6 @@
   font-size: 18px;
   font-weight: 800;
   color: #f8fafc;
-  letter-spacing: -0.3px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -46,7 +44,6 @@
   margin-top: 2px;
 }
 
-/* ── EXECUTIVE TIME MACHINE ── */
 .timeMachineBar {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -84,45 +81,27 @@
   border-color: var(--blue) !important;
 }
 
-/* ── CEO DASHBOARD KPI GRID ── */
-.ceoGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  width: 100%;
-}
-
-.ceoKpiCard {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 12px 14px;
+.searchBar {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 8px 14px;
+  align-items: center;
 }
 
-.ceoKpiLabel {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.searchInput {
+  flex: 1;
+  background: var(--s0);
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--tp);
+  outline: none;
 }
 
-.ceoKpiVal {
-  font-size: 18px;
-  font-weight: 800;
-  color: #f1f5f9;
-  font-family: var(--mono);
-}
-
-.ceoKpiSub {
-  font-size: 9.5px;
-  color: #64748b;
-}
-
-/* ── MAIN WORKSPACE LAYOUT ── */
 .body {
   display: flex;
   flex: 1;
@@ -139,21 +118,66 @@
   gap: 16px;
 }
 
-/* ── AI EXECUTIVE BRIEF ── */
-.briefCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 12px;
-  padding: 18px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+/* ── GRID LAYOUT FOR 16 SECTIONS ── */
+.journalGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
 }
 
-.briefSection {
-  background: var(--s0);
+.sectionCard {
+  background: var(--s1);
   border: 1px solid var(--b);
-  border-radius: 8px;
-  padding: 12px 16px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.secTitle {
   font-size: 11.5px;
-  line-height: 1.5;
+  font-weight: 800;
+  color: var(--tp);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--b);
+  padding-bottom: 6px;
+}
+
+.secBody {
+  font-size: 10.5px;
   color: var(--ts);
+  line-height: 1.5;
+}
+
+/* ── ANIMATED TIMELINE BANNER ── */
+.animatedTimeline {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #f8fafc;
+}
+
+.timelineFlow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.flowStep {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 9.5px;
+  white-space: nowrap;
 }

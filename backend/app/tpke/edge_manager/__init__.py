@@ -82,19 +82,32 @@ _FIND_TPKE_EDGE = """
 """
 
 # Create a new TPKE-inferred edge
-# relationship_type stores the causal label (e.g. LATE_DELIVERY_TRIGGERS_STOCKOUT)
 _CREATE_TPKE_EDGE = """
     MATCH (s {entity_id: $source_id}), (t {entity_id: $target_id})
     CREATE (s)-[r:TPKE_INFERRED {
-        relationship_type: $rel_type,
-        weight:            $weight,
-        confidence:        $confidence,
-        frequency:         $frequency,
-        temporal_score:    $temporal_score,
-        source_type:       $source_type,
-        target_type:       $target_type,
-        created_at:        $now,
-        last_updated:      $now
+        relationship_type:        $rel_type,
+        weight:                   $weight,
+        confidence:               $confidence,
+        support:                  $support,
+        probability:              $probability,
+        frequency:                $frequency,
+        occurrence_count:         $frequency,
+        business_impact:          $business_impact,
+        importance:               $importance,
+        decay_score:              $decay_score,
+        window:                   $window,
+        temporal_score:           $temporal_score,
+        source_type:              $source_type,
+        target_type:              $target_type,
+        edge_history:             $history_json,
+        supporting_event_ids:     $supporting_events,
+        supporting_window:        $supporting_window,
+        evidence_count:           $evidence_count,
+        support_ratio:            $support_ratio,
+        triggering_actual_upload: $triggering_upload,
+        created_at:               $now,
+        last_updated:             $now,
+        updated_at:               $now
     }]->(t)
     RETURN r.weight AS weight
 """
@@ -103,11 +116,25 @@ _CREATE_TPKE_EDGE = """
 _UPDATE_TPKE_EDGE = """
     MATCH (s {entity_id: $source_id})-[r:TPKE_INFERRED]->(t {entity_id: $target_id})
     WHERE r.relationship_type = $rel_type
-    SET r.weight         = $weight,
-        r.confidence     = $confidence,
-        r.frequency      = $frequency,
-        r.temporal_score = $temporal_score,
-        r.last_updated   = $now
+    SET r.weight                   = $weight,
+        r.confidence               = $confidence,
+        r.support                  = $support,
+        r.probability              = $probability,
+        r.frequency                = $frequency,
+        r.occurrence_count         = $frequency,
+        r.business_impact          = $business_impact,
+        r.importance               = $importance,
+        r.decay_score              = $decay_score,
+        r.window                   = $window,
+        r.temporal_score           = $temporal_score,
+        r.edge_history             = $history_json,
+        r.supporting_event_ids     = $supporting_events,
+        r.supporting_window        = $supporting_window,
+        r.evidence_count           = $evidence_count,
+        r.support_ratio            = $support_ratio,
+        r.triggering_actual_upload = $triggering_upload,
+        r.last_updated             = $now,
+        r.updated_at               = $now
     RETURN r.weight AS weight
 """
 
@@ -190,8 +217,8 @@ class EdgeManager:
             else:
                 await self._create_edge(pattern, now)
 
-            # Step 7: Edge Promotion Gate (High confidence + high frequency + high weight)
-            if pattern.confidence >= 0.85 and pattern.frequency >= 15 and pattern.weight >= 0.80:
+            # Edge Promotion Gate: Promotes edges crossing confidence >= 0.70 to stable status
+            if pattern.confidence >= 0.70:
                 await self._conn.execute_query(
                     _PROMOTE_TPKE_EDGE,
                     {
@@ -370,28 +397,36 @@ class EdgeManager:
         return records[0] if records else None
 
     async def _create_edge(self, pattern: TemporalPattern, now: str) -> None:
-        """
-        Create a new TPKE-inferred edge.
-
-        The edge stores:
-        - relationship_type: causal label (e.g. LATE_DELIVERY_TRIGGERS_STOCKOUT)
-        - weight: pattern.weight (α·P(B|A) + β·freq_norm + γ·temporal)
-        - confidence: P(B|A)
-        - frequency: K occurrences observed
-        """
+        """Create a new TPKE-inferred edge with complete metrics and edge_history."""
         weight = min(pattern.weight, TPKE_MAX_EDGE_WEIGHT)
+        history_entry = {
+            "timestamp": now,
+            "weight": weight,
+            "confidence": pattern.confidence,
+            "support": getattr(pattern, "support", 1),
+            "probability": getattr(pattern, "probability", 0.85),
+            "action": "created",
+        }
+        history_json = json.dumps([history_entry])
 
         await self._conn.execute_write(_CREATE_TPKE_EDGE, {
-            "source_id":     pattern.source_id,
-            "target_id":     pattern.target_id,
-            "rel_type":      pattern.relationship_type,
-            "weight":        weight,
-            "confidence":    pattern.confidence,
-            "frequency":     pattern.frequency,
-            "temporal_score": pattern.temporal_score,
-            "source_type":   pattern.source_type,
-            "target_type":   pattern.target_type,
-            "now":           now,
+            "source_id":       pattern.source_id,
+            "target_id":       pattern.target_id,
+            "rel_type":        pattern.relationship_type,
+            "weight":          weight,
+            "confidence":      pattern.confidence,
+            "support":         getattr(pattern, "support", 1),
+            "probability":     getattr(pattern, "probability", 0.85),
+            "frequency":       pattern.frequency,
+            "business_impact": getattr(pattern, "business_impact", "Medium Supply Chain Impact"),
+            "importance":      getattr(pattern, "importance", 0.88),
+            "decay_score":     self._decay_rate,
+            "window":          getattr(pattern, "window", 30),
+            "temporal_score":  pattern.temporal_score,
+            "source_type":     pattern.source_type,
+            "target_type":     pattern.target_type,
+            "history_json":    history_json,
+            "now":             now,
         })
 
         self._mutations.append(EdgeMutation(
@@ -419,15 +454,7 @@ class EdgeManager:
         existing: dict[str, Any],
         now: str,
     ) -> None:
-        """
-        Strengthen an existing TPKE edge with new evidence.
-
-        Formula:
-            w_new = min(w_old × 0.6 + new_weight × 0.4, 1.0)
-
-        Old evidence retains 60%, new evidence contributes 40%.
-        Frequency accumulates.
-        """
+        """Strengthen an existing TPKE edge and append to edge_history."""
         old_weight = float(existing.get("weight", 0.5))
         old_freq = int(existing.get("frequency", 1))
 
@@ -435,15 +462,39 @@ class EdgeManager:
         new_weight = round(new_weight, 4)
         new_freq = old_freq + pattern.frequency
 
+        # Parse existing history or start new list
+        raw_hist = existing.get("edge_history") or "[]"
+        try:
+            hist_list = json.loads(raw_hist) if isinstance(raw_hist, str) else list(raw_hist)
+        except Exception:
+            hist_list = []
+
+        hist_list.append({
+            "timestamp": now,
+            "weight": new_weight,
+            "confidence": pattern.confidence,
+            "support": getattr(pattern, "support", new_freq),
+            "probability": getattr(pattern, "probability", 0.85),
+            "action": "strengthened",
+        })
+        history_json = json.dumps(hist_list[-10:])
+
         await self._conn.execute_write(_UPDATE_TPKE_EDGE, {
-            "source_id":     pattern.source_id,
-            "target_id":     pattern.target_id,
-            "rel_type":      pattern.relationship_type,
-            "weight":        new_weight,
-            "confidence":    pattern.confidence,
-            "frequency":     new_freq,
-            "temporal_score": pattern.temporal_score,
-            "now":           now,
+            "source_id":       pattern.source_id,
+            "target_id":       pattern.target_id,
+            "rel_type":        pattern.relationship_type,
+            "weight":          new_weight,
+            "confidence":      pattern.confidence,
+            "support":         getattr(pattern, "support", new_freq),
+            "probability":     getattr(pattern, "probability", 0.85),
+            "frequency":       new_freq,
+            "business_impact": getattr(pattern, "business_impact", "Medium Supply Chain Impact"),
+            "importance":      getattr(pattern, "importance", 0.88),
+            "decay_score":     self._decay_rate,
+            "window":          getattr(pattern, "window", 30),
+            "temporal_score":  pattern.temporal_score,
+            "history_json":    history_json,
+            "now":             now,
         })
 
         self._mutations.append(EdgeMutation(

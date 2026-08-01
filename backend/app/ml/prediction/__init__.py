@@ -240,3 +240,9 @@ class LogisticsAgent:
     def predict_single(self, record: dict[str, Any], version_id: str | None = None) -> PredictionRecord:
         return self.engine.predict_single(record, IntelligenceType.LOGISTICS, version_id)
 
+
+# Lazy import helper to avoid circular dependency
+def get_collaborative_pipeline(registry: ModelRegistry | None = None):
+    from app.ml.prediction.collaborative_pipeline import CollaborativeAgentPipeline
+    return CollaborativeAgentPipeline(registry)
+

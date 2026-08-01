@@ -17,12 +17,12 @@ import { useBusinessAlerts, SUPPLY_CHAIN_QUERY_KEYS } from '../../hooks/useSuppl
 import Logo from '../ui/Logo'
 
 const PAGES = [
-  { id: 'overview',     path: '/',             label: 'Overview' },
-  { id: 'dataset',      path: '/dataset',      label: 'Dataset' },
-  { id: 'forecast',     path: '/forecast',     label: 'Forecast' },
-  { id: 'graph',        path: '/graph',        label: 'Supply Chain Network' },
-  { id: 'risk',         path: '/risk',         label: 'Risk & Root Cause' },
-  { id: 'reports',      path: '/reports',      label: 'Executive Reports' },
+  { id: 'overview',     path: '/',             label: 'Live Operations' },
+  { id: 'forecast',     path: '/forecast',     label: 'Forecast Center' },
+  { id: 'risk',         path: '/risk',         label: 'Root Cause Center' },
+  { id: 'graph',        path: '/graph',        label: 'Knowledge Intelligence' },
+  { id: 'dataset',      path: '/dataset',      label: 'Data Engineering' },
+  { id: 'reports',      path: '/reports',      label: 'System & Reports' },
 ]
 
 export default function AppShell() {

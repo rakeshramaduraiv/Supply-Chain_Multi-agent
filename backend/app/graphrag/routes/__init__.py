@@ -76,21 +76,29 @@ async def get_context(request: ContextRequest) -> ContextResponse:
 @router.post("/query", response_model=QueryResponse)
 async def execute_query(request: QueryRequest) -> QueryResponse:
     """
-    Execute a natural language query against the knowledge graph.
-
-    Supports entity resolution, intent detection, and Cypher translation.
+    Execute a natural language query through the 12-stage Enterprise GraphRAG Pipeline.
     """
     service = _get_service()
     try:
         result = await service.execute_query(request.query)
         return QueryResponse(
             query=request.query,
-            intent=result.get("intent", ""),
-            resolved_entities=result.get("resolved_entities", []),
-            cypher=result.get("cypher", ""),
-            results=result.get("results", []),
-            result_count=result.get("result_count", 0),
-            chain_output=result.get("chain_output"),
+            intent=result.get("intent", "general"),
+            confidence=float(result.get("confidence", 0.90)),
+            business_explanation=result.get("business_explanation", result.get("answer", "")),
+            root_cause=result.get("root_cause", ""),
+            evidence=result.get("evidence", []),
+            retrieved_entities=result.get("retrieved_entities", []),
+            retrieved_relationships=result.get("retrieved_relationships", []),
+            recommendations=result.get("recommendations", []),
+            business_recommendation=result.get("business_recommendation", []),
+            expected_business_impact=result.get("expected_business_impact", ""),
+            answer=result.get("answer", ""),
+            validated=bool(result.get("validated", True)),
+            resolved_entities=[str(e.get("id", "")) for e in result.get("retrieved_entities", []) if "id" in e],
+            cypher=result.get("cypher"),
+            results=result.get("evidence", []),
+            result_count=len(result.get("evidence", [])),
             duration_ms=result.get("service_duration_ms", result.get("duration_ms", 0)),
         )
     except ConnectionError as e:

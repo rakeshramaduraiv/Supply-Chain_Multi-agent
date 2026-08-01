@@ -99,18 +99,18 @@ class TPKEEngine:
 
     async def run(
         self,
-        forecast_data: list[dict[str, Any]],
-        actual_data: list[dict[str, Any]],
+        forecast_data: list[dict[str, Any]] | None = None,
+        actual_data: list[dict[str, Any]] | None = None,
+        rca_report: dict[str, Any] | None = None,
         triggered_by: str = "system",
     ) -> EvolutionReport:
         """
         Execute full TPKE evolution cycle.
 
         Args:
-            forecast_data: List of records with keys:
-                entity_id, entity_type, predicted_value, forecast_date, metadata
-            actual_data: List of records with keys:
-                entity_id, entity_type, actual_value, date
+            forecast_data: List of forecast records
+            actual_data: List of actual records
+            rca_report: RCA Analysis report containing causal chains & contributors
             triggered_by: User or system identifier
 
         Returns:
@@ -120,16 +120,24 @@ class TPKEEngine:
         run_id = f"tpke_{int(time.time())}"
         now = datetime.now(timezone.utc)
 
+        forecasts = forecast_data or []
+        actuals = actual_data or []
+
         logger.info(
             f"TPKE run {run_id}: "
-            f"{len(forecast_data)} forecasts, {len(actual_data)} actuals"
+            f"{len(forecasts)} forecasts, {len(actuals)} actuals, rca_report={bool(rca_report)}"
         )
 
         # Step 1: Compute deviations and classify into named event types
-        events = self._compute_and_classify_events(forecast_data, actual_data)
+        events = self._compute_and_classify_events(forecasts, actuals)
 
-        # Step 2: Detect causal A → B patterns (K gate + θ gate + sliding window)
+        # Step 2: Detect causal A → B patterns from deviations
         patterns = self._detector.detect_patterns(events, reference_time=now)
+
+        # Step 2b: Extract patterns from Root Cause Analysis causal chains
+        if rca_report:
+            rca_patterns = self._detector.extract_patterns_from_rca_chains(rca_report)
+            patterns.extend(rca_patterns)
 
         # Step 3: Apply edge decay to all existing TPKE edges
         decay_result = await self._edge_manager.decay(reference_time=now)

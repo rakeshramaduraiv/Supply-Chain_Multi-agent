@@ -389,3 +389,7 @@ async def get_shortest_path(
     except Exception as e:
         logger.error(f"Shortest path failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+from app.graph.prediction_integration import routes as pred_routes
+router.include_router(pred_routes.router)

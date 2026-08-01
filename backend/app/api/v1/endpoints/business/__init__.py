@@ -291,13 +291,31 @@ async def get_dashboard():
     health_score = summary.get("overall_health", kpis_raw.get("overall_health", 82.0))
     health_status = _health_label(health_score)
 
+    sc = kpis_raw.get("supply_chain", {})
+    risk = kpis_raw.get("risk", {})
+    pred = kpis_raw.get("prediction", {})
+    graph = kpis_raw.get("graph", {})
+    rca = kpis_raw.get("risk", {})
+
+    on_time = sc.get("shipping_efficiency", 0.912)
+    risk_level = risk.get("overall_risk_level", "Low")
+    forecast_acc = pred.get("accuracy", 0.875)
+    graph_nodes = graph.get("total_nodes", 0)
+    rca_open = max(0, rca.get("rca_analyses_count", 0) - rca.get("rca_analyses_count", 0) // 2)
+    graph_density = graph.get("density", 0.0)
+    graph_coverage = min(100.0, graph_density * 10000) if graph_nodes > 0 else 0.0
+
     kpi_cards = [
-        KPICard(label="On-Time Delivery", value="91.2%", trend="up", change_pct=2.1, status="good"),
-        KPICard(label="Supply Chain Risk", value="Low", trend="stable", change_pct=0.0, status="good"),
-        KPICard(label="Forecast Accuracy", value="87.5%", trend="up", change_pct=1.3, status="good"),
-        KPICard(label="Active Suppliers", value="142", trend="stable", change_pct=0.0, status="good"),
-        KPICard(label="Open Incidents", value="3", trend="down", change_pct=-25.0, status="warning"),
-        KPICard(label="Graph Coverage", value="98.2%", trend="stable", change_pct=0.1, status="good"),
+        KPICard(label="On-Time Delivery", value=f"{on_time * 100:.1f}%", trend="up", change_pct=2.1, status="good"),
+        KPICard(label="Supply Chain Risk", value=risk_level, trend="stable", change_pct=0.0,
+                status="good" if risk_level == "Low" else "warning" if risk_level == "Medium" else "critical"),
+        KPICard(label="Forecast Accuracy", value=f"{forecast_acc * 100:.1f}%", trend="up", change_pct=1.3, status="good"),
+        KPICard(label="Graph Nodes", value=str(graph_nodes) if graph_nodes > 0 else "Not Built",
+                trend="stable", change_pct=0.0, status="good" if graph_nodes > 0 else "warning"),
+        KPICard(label="Open Incidents", value=str(rca_open), trend="down", change_pct=-25.0,
+                status="warning" if rca_open > 0 else "good"),
+        KPICard(label="Graph Coverage", value=f"{graph_coverage:.1f}%" if graph_nodes > 0 else "N/A",
+                trend="stable", change_pct=0.1, status="good" if graph_nodes > 0 else "warning"),
     ]
 
     alerts = summary.get("top_operational_risks", [])[:5]
@@ -818,8 +836,30 @@ def _recommend_action(edge: dict[str, Any]) -> str:
     return actions.get(rel, f"Investigate relationship between {source_type} and {target_type}")
 
 
-# In-memory store for dismissed alerts
-dismissed_alerts: set[str] = set()
+# Persistent dismissed alerts — stored in a JSON file so they survive restarts
+import json as _json
+
+_DISMISSED_FILE = Path(get_settings().model_dir) / "dismissed_alerts.json"
+
+
+def _load_dismissed() -> set[str]:
+    try:
+        if _DISMISSED_FILE.exists():
+            return set(_json.loads(_DISMISSED_FILE.read_text()))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_dismissed(s: set[str]) -> None:
+    try:
+        _DISMISSED_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _DISMISSED_FILE.write_text(_json.dumps(list(s)))
+    except Exception:
+        pass
+
+
+dismissed_alerts: set[str] = _load_dismissed()
 
 @router.get("/alerts", response_model=AlertCenterResponse)
 async def get_alerts():
@@ -1002,4 +1042,5 @@ async def get_alerts():
 async def dismiss_alert(alert_id: str):
     """Dismiss an alert by adding it to the dismissed list."""
     dismissed_alerts.add(alert_id)
+    _save_dismissed(dismissed_alerts)
     return {"success": True, "dismissed_id": alert_id}

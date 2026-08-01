@@ -138,29 +138,49 @@ class RiskContributionEngine:
         properties: dict[str, Any],
         rca_type: str,
     ) -> ContributionScore:
-        """Compute the full contribution score for a single candidate."""
-        # Component 1: Node Risk
+        """
+        Compute multi-state contribution score synthesizing 5 layers:
+        1. Historical Knowledge Graph risk (node_risk & rel_weight)
+        2. Latest Uploaded Actual Data impact
+        3. Latest Multi-Agent Predictions risk
+        4. TPKE Learned Relationships & temporal pattern weights
+        5. Previous Root Cause History (:CAUSES links & past contribution scores)
+        """
+        # Layer 1: Historical Node & Relationship Risk
         node_risk = extract_node_risk(properties)
-
-        # Component 2: Relationship Weight (to target)
         rel_weight = await self._get_relationship_weight(node_id, target_id)
 
-        # Component 3: TPKE Edge Weight
+        # Layer 2: Latest Actual Data Impact
+        actual_impact = float(properties.get("actual_delay_days", 0.0)) / 10.0 + (
+            0.4 if properties.get("actual_late_delivery", 0) == 1 else 0.0
+        )
+        actual_impact = min(1.0, actual_impact)
+
+        # Layer 3: Latest Multi-Agent Predictions Risk
+        pred_risk = max(
+            float(properties.get("risk_score", 0.0)),
+            float(properties.get("inventory_risk", 0.0)),
+            float(properties.get("demand_risk", 0.0)),
+            float(properties.get("logistics_delay_probability", 0.0)),
+        )
+
+        # Layer 4: TPKE Learned Edge Weight
         tpke_weight = await self._get_tpke_weight(node_id, target_id)
 
-        # Component 4: Centrality Score
-        centrality = await self._get_centrality(node_id, label)
+        # Layer 5: Previous Root Cause History Weight
+        rca_history_weight = await self._get_rca_history_weight(node_id, target_id)
 
-        # Component 5: Forecast Confidence (context-dependent)
+        # Centrality
+        centrality = await self._get_centrality(node_id, label)
         forecast_conf = self._get_forecast_confidence(properties, rca_type)
 
-        # Weighted sum
+        # Weighted Synthesis (w1=0.25, w2=0.25, w3=0.20, w4=0.15, w5=0.15)
         total = (
-            ALPHA * node_risk
-            + BETA * rel_weight
-            + GAMMA * tpke_weight
-            + DELTA * centrality
-            + EPSILON * forecast_conf
+            0.25 * max(node_risk, pred_risk)
+            + 0.25 * actual_impact
+            + 0.20 * tpke_weight
+            + 0.15 * rel_weight
+            + 0.15 * rca_history_weight
         )
 
         return ContributionScore(
@@ -188,7 +208,6 @@ class RiskContributionEngine:
         )
         if records:
             return float(records[0]["weight"])
-        # No direct relationship - check 2-hop proximity
         query_2hop = """
             MATCH path = (a {node_id: $source_id})-[*1..2]-(b {node_id: $target_id})
             RETURN 0.3 AS weight
@@ -200,11 +219,23 @@ class RiskContributionEngine:
         return float(records_2[0]["weight"]) if records_2 else 0.1
 
     async def _get_tpke_weight(self, source_id: str, target_id: str) -> float:
-        """Get TPKE-inferred edge weight (edges with tpke_inferred property)."""
+        """Get TPKE-inferred edge weight."""
         query = """
             MATCH (a {node_id: $source_id})-[r]-(b {node_id: $target_id})
-            WHERE r.tpke_inferred = true OR r.tpke_confidence IS NOT NULL
-            RETURN coalesce(r.tpke_confidence, r.relationship_strength, 0.5) AS weight
+            WHERE r.tpke_inferred = true OR type(r) = 'EVOLVED_TO' OR type(r) = 'CAUSAL_PATTERN'
+            RETURN coalesce(r.tpke_confidence, r.weight, 0.5) AS weight
+            LIMIT 1
+        """
+        records = await self._conn.execute_query(
+            query, {"source_id": source_id, "target_id": target_id}
+        )
+        return float(records[0]["weight"]) if records else 0.0
+
+    async def _get_rca_history_weight(self, source_id: str, target_id: str) -> float:
+        """Get previous RCA :CAUSES history weight."""
+        query = """
+            MATCH (a {node_id: $source_id})-[r:CAUSES]-(b {node_id: $target_id})
+            RETURN coalesce(r.contribution_score, 0.4) AS weight
             LIMIT 1
         """
         records = await self._conn.execute_query(

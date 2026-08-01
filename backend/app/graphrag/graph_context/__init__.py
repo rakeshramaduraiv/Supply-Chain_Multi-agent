@@ -76,6 +76,18 @@ class GraphContextService:
         self._record_history("get_context", entity_id, context_type, timer.duration_ms)
         return result
 
+    async def get_unified_context(
+        self, entity_id: str, entity_label: str, query: str = ""
+    ) -> dict[str, Any]:
+        """Get 6-module unified context payload synthesized from 5 platform layers."""
+        with PerformanceTimer("get_unified_context") as timer:
+            from app.graphrag.context_builder.service import ContextBuilderService
+            service = ContextBuilderService(self._retrieval._conn)
+            payload = await service.build_unified_context(entity_id, entity_label, query)
+            res = payload.to_dict()
+        res["duration_ms"] = timer.duration_ms
+        return res
+
     async def get_forecast_context(
         self, entity_id: str, entity_label: str
     ) -> dict[str, Any]:
@@ -102,60 +114,15 @@ class GraphContextService:
     # --- Query Interface ---
 
     async def query(self, query_text: str) -> dict[str, Any]:
-        """Execute a natural language query against the knowledge graph."""
-        with PerformanceTimer("query") as timer:
-            try:
-                result = await self._query_engine.execute_natural_language(query_text)
-            except Exception as e:
-                logger.warning(f"Natural language query engine offline, returning grounded simulation: {e}")
-                q_lower = query_text.lower()
-                intent = "general"
-                resolved = []
-                results = []
-                
-                if "risk" in q_lower or "stress" in q_lower or "vulnerability" in q_lower:
-                    intent = "risk"
-                    resolved = ["Supplier_04"]
-                    results = [{"node": {"node_id": "Supplier_04", "risk_score": 0.85, "label": "Supplier"}}]
-                elif "performance" in q_lower or "delay" in q_lower or "late" in q_lower or "sla" in q_lower:
-                    intent = "performance"
-                    resolved = ["Carrier_02"]
-                    results = [{"node": {"node_id": "Carrier_02", "shipping_efficiency_score": 0.68, "label": "Shipment"}}]
-                elif "route" in q_lower or "path" in q_lower or "connect" in q_lower:
-                    intent = "path"
-                    resolved = ["Supplier_04", "Warehouse_01"]
-                    results = [{
-                        "path_nodes": [
-                            {"label": "Supplier", "node_id": "Supplier_04"},
-                            {"label": "Shipment", "node_id": "Carrier_02"},
-                            {"label": "Warehouse", "node_id": "Warehouse_01"}
-                        ]
-                    }]
-                else:
-                    intent = "general"
-                    resolved = ["Product_12"]
-                    results = [{"node": {"node_id": "Product_12", "risk_score": 0.15, "label": "Product"}}]
-
-                result = {
-                    "query": query_text,
-                    "intent": intent,
-                    "resolved_entities": resolved,
-                    "cypher": "MATCH (n {node_id: $id})-[r]->(m) RETURN n, r, m",
-                    "results": results,
-                    "result_count": len(results),
-                }
-
-            # Build chain output for LLM-ready response
-            if result.get("results"):
-                chain_output = await self._chain.build_query_chain(
-                    query_text,
-                    {"intent": result["intent"], "entities": result["resolved_entities"]},
-                    result["results"],
-                )
-                result["chain_output"] = chain_output
+        """Execute query through the 12-stage Enterprise GraphRAG Pipeline."""
+        with PerformanceTimer("enterprise_graphrag_pipeline") as timer:
+            from app.graphrag.pipeline import EnterpriseGraphRAGPipeline
+            pipeline = EnterpriseGraphRAGPipeline(self._retrieval._conn)
+            pipeline_res = await pipeline.execute(query_text)
+            result = pipeline_res.to_dict()
 
         result["total_duration_ms"] = timer.duration_ms
-        self._record_history("query", query_text, "natural_language", timer.duration_ms)
+        self._record_history("query", query_text, result.get("intent", "general"), timer.duration_ms)
         return result
 
     async def query_structured(

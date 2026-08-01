@@ -30,7 +30,7 @@ from app.ml.prediction import PredictionEngine, DemandAgent, InventoryAgent, Sup
 from app.ml.registry import ModelRegistry
 from app.ml.training import TrainingOrchestrator
 from app.ml.utils import FEATURE_CONFIGS, IntelligenceType
-from app.api.v1.endpoints.ws import broadcast_event
+from app.api.v1.endpoints.ml import coordinator
 from app.schemas import BaseResponse
 from app.schemas.ml import (
     EvaluateRequest,
@@ -73,24 +73,37 @@ def _resolve_intelligence_type(value: str) -> IntelligenceType:
 
 
 def _load_processed_dataset() -> pd.DataFrame:
-    """Load the most recently processed dataset from disk."""
+    """Load the processed master dataset from disk (parquet preferred, CSV fallback)."""
     settings = get_settings()
     data_dir = Path(settings.upload_dir)
 
-    # Look for processed CSV files
-    candidates = sorted(data_dir.glob("*_processed.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not candidates:
-        # Fallback: look for any CSV
-        candidates = sorted(data_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    # Primary: parquet saved by initialization pipeline
+    parquet_path = data_dir / "processed_master.parquet"
+    if parquet_path.exists():
+        df = pd.read_parquet(parquet_path)
+        logger.info(f"Loaded dataset: processed_master.parquet ({len(df)} rows)")
+        return df
 
-    if not candidates:
+    # Fallback: any parquet
+    parquet_candidates = sorted(data_dir.glob("*.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if parquet_candidates:
+        df = pd.read_parquet(parquet_candidates[0])
+        logger.info(f"Loaded dataset: {parquet_candidates[0].name} ({len(df)} rows)")
+        return df
+
+    # Last resort: CSV
+    csv_candidates = sorted(data_dir.glob("*_processed.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not csv_candidates:
+        csv_candidates = sorted(data_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    if not csv_candidates:
         raise HTTPException(
             status_code=404,
-            detail="No processed dataset found. Upload and process data first.",
+            detail="No processed dataset found. Place DataCoSupplyChainDataset.csv in data/raw/ and restart.",
         )
 
-    df = pd.read_csv(candidates[0])
-    logger.info(f"Loaded dataset: {candidates[0].name} ({len(df)} rows)")
+    df = pd.read_csv(csv_candidates[0])
+    logger.info(f"Loaded dataset: {csv_candidates[0].name} ({len(df)} rows)")
     return df
 
 
@@ -196,6 +209,7 @@ async def predict(request: PredictRequest, file: UploadFile = File(...)):
         }
         agent = agent_map[intel_type]
         result = agent.predict(df, request.version_id)
+        await auto_sync_predictions(df)
 
         return BaseResponse(
             data=PredictionResultSchema(
@@ -236,6 +250,7 @@ async def predict_from_dataset(request: PredictRequest):
         }
         agent = agent_map[intel_type]
         result = agent.predict(df, request.version_id)
+        await auto_sync_predictions(df)
 
         return BaseResponse(
             data=PredictionResultSchema(
@@ -280,6 +295,7 @@ async def generate_forecast(request: ForecastRequest):
         )
 
         await broadcast_event("Forecast Generated", {"intelligence_type": request.intelligence_type})
+        await auto_sync_predictions(df)
 
         return BaseResponse(
             data=ForecastResultSchema(**result.to_dict()),
@@ -467,3 +483,6 @@ async def get_training_history(
         data=TrainingHistorySchema(entries=entries, total_entries=len(entries)),
         message=f"Training history: {len(entries)} entries",
     )
+
+
+router.include_router(coordinator.router)

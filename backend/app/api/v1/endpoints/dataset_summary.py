@@ -28,6 +28,13 @@ _cache: dict | None = None
 _analytics_cache: dict | None = None
 
 
+def clear_dataset_cache():
+    """Invalidate summary & analytics cache to reload real-time uploaded data."""
+    global _cache, _analytics_cache
+    _cache = None
+    _analytics_cache = None
+
+
 def _load_parquet() -> pd.DataFrame | None:
     parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
     if not parquet_path.exists():

@@ -21,6 +21,7 @@ from app.rca.schemas import (
     RCASubgraphResponse,
 )
 from app.rca.services import RCAService
+from app.graph.rca_integration import auto_sync_rca
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,10 @@ async def analyze(request: RCAAnalyzeRequest) -> RCAReportResponse:
         )
         if not result.get("success"):
             raise HTTPException(status_code=400, detail=result.get("error", "Analysis failed"))
+
+        # Automatically write :CAUSES relationships & contribution scores into Neo4j
+        await auto_sync_rca(result)
+
         return RCAReportResponse(report=result["report"])
     except ConnectionError as e:
         logger.warning(f"RCA graph unavailable: {e}")
@@ -147,3 +152,24 @@ async def get_latest() -> RCALatestResponse:
     if not result.get("success"):
         return RCALatestResponse(success=False, error=result.get("error"))
     return RCALatestResponse(report=result.get("report"))
+
+
+@router.post("/counterfactual/evaluate")
+async def evaluate_counterfactual(
+    target_id: str = Query(default="SUP_001"),
+    baseline_risk: float = Query(default=0.38),
+) -> dict[str, Any]:
+    """Evaluate multi-supplier counterfactual scenarios (Supplier A, B, C, D)."""
+    from app.rca.counterfactual import MultiSupplierCounterfactualEngine
+    engine = MultiSupplierCounterfactualEngine()
+    result = engine.evaluate_supplier_scenarios(target_entity_id=target_id, baseline_risk=baseline_risk)
+    return {"success": True, "data": result.to_dict()}
+
+
+@router.get("/counterfactual/scenarios")
+async def get_counterfactual_scenarios() -> dict[str, Any]:
+    """Get historical evaluated counterfactual scenarios."""
+    from app.rca.counterfactual import MultiSupplierCounterfactualEngine
+    engine = MultiSupplierCounterfactualEngine()
+    result = engine.evaluate_supplier_scenarios(target_entity_id="SUP_001", baseline_risk=0.38)
+    return {"success": True, "scenarios": result.scenarios_evaluated, "optimal_supplier": result.optimal_supplier}

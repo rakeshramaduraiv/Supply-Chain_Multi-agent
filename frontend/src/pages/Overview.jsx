@@ -55,6 +55,7 @@ export default function Overview() {
   if (!s.ready) {
     return (
       <div className="page active">
+        <ClosedLoopStepper />
         <InfoBox type="warn">System not initialized. Place DataCoSupplyChainDataset.csv in data/raw/ and run initialization.</InfoBox>
       </div>
     )

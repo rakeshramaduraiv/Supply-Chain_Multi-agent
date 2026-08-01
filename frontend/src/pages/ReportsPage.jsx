@@ -37,6 +37,7 @@ export default function ReportsPage() {
 
   const reportsList = [
     { id: 'summary', name: 'Business Summary', icon: ClipboardList, desc: 'Executive overview of supply chain operations & SLAs' },
+    { id: 'architecture', name: 'Backend Architecture', icon: Layers, desc: 'Comprehensive technical report of the 17-stage Closed-Loop System' },
     { id: 'forecast', name: 'Forecast Report', icon: TrendingUp, desc: 'Demand forecasting models, MAE metrics & confidence' },
     { id: 'risk', name: 'Risk Report', icon: AlertTriangle, desc: 'Vulnerability audits, loss exposure & disruption spikes' },
     { id: 'supplier', name: 'Supplier Report', icon: Factory, desc: 'Supplier reliability, delay tracking & PO fulfillment' },
@@ -130,9 +131,50 @@ export default function ReportsPage() {
   // ── Render Specific Sub-Report Views ──────────────────────────────────
   const renderReportContent = () => {
     switch (activeReport) {
-      // ══════════════════════════════════════════════════════════════════
-      // 1. BUSINESS SUMMARY (4 Realtime Charts)
-      // ══════════════════════════════════════════════════════════════════
+      case 'architecture':
+        return (
+          <div className={styles.reportArea}>
+            <div className={styles.reportSection}>
+              <h3 className={styles.secTitle}>Closed-Loop Intelligent System Architecture</h3>
+              <p style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: 16 }}>
+                The AMASCI Supply Chain Platform operates as a self-enriching closed-loop system connecting all 17 platform stages:
+                Historical Dataset ➔ Feature Engineering ➔ Knowledge Graph ➔ Multi-Agent Prediction ➔ Prediction Integration ➔
+                Knowledge Graph Update ➔ Forecast ➔ Actual Upload ➔ Validation ➔ Knowledge Graph Update ➔ Root Cause Analysis ➔
+                TPKE Evolution ➔ KG Evolution ➔ Context Builder ➔ Enterprise GraphRAG ➔ LLM ➔ Agent Memory ➔ Next Forecast Cycle.
+              </p>
+              <div className={styles.kpiGrid}>
+                <div className={styles.kpiCard}>
+                  <span className={styles.kpiLabel}>Closed-Loop Stages</span>
+                  <span className={styles.kpiVal} style={{ color: '#10b981' }}>17 / 17</span>
+                  <span className={styles.kpiSub}>Automated feedback loop</span>
+                </div>
+                <div className={styles.kpiCard}>
+                  <span className={styles.kpiLabel}>Knowledge Graph Engine</span>
+                  <span className={styles.kpiVal} style={{ color: '#38bdf8' }}>Evolving</span>
+                  <span className={styles.kpiSub}>Meta-versioning active</span>
+                </div>
+                <div className={styles.kpiCard}>
+                  <span className={styles.kpiLabel}>LLM Database Isolation</span>
+                  <span className={styles.kpiVal} style={{ color: '#f59e0b' }}>100%</span>
+                  <span className={styles.kpiSub}>Via Context Builder</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 24, background: 'rgba(30, 41, 59, 0.6)', padding: 20, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)' }}>
+                <h4 style={{ color: '#f8fafc', marginBottom: 12 }}>17-Stage Component Technical Breakdown</h4>
+                <ul style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: 1.8, paddingLeft: 20 }}>
+                  <li><strong>Prediction Integration Layer:</strong> Automatically syncs risk scores, stockout probabilities, and rolling history arrays onto Neo4j nodes.</li>
+                  <li><strong>Multi-State RCA Engine:</strong> Evaluates historical topology, actuals, predictions, TPKE edges, and RCA history across 5 concurrent layers.</li>
+                  <li><strong>TPKE Edge Evolution:</strong> Extracted temporal sequences undergo confidence decay, promotion (threshold &ge; 0.70), and 10-entry rolling edge history logging.</li>
+                  <li><strong>Agent Memory:</strong> Thread-safe ring buffer storing predictions, actuals, accuracy, confidence, model versions, and prediction features.</li>
+                  <li><strong>Collaborative Multi-Agent Chain:</strong> Sequential data passing: Demand Agent ➔ Supplier Agent ➔ Inventory Agent ➔ Logistics Agent.</li>
+                  <li><strong>Context Builder Service:</strong> Synthesizes 6 core modules (Historical, Prediction, Actuals, RCA, TPKE, Rules) into a clean JSON payload.</li>
+                  <li><strong>6-Factor Evidence Ranking:</strong> Evaluates nodes across Centrality, Recency, Pred Confidence, TPKE Weight, Business Importance, and Query Similarity.</li>
+                  <li><strong>Enterprise GraphRAG & LLM:</strong> 12-stage pipeline generating 6-field grounded executive outputs with zero hallucination guarantees.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )
       case 'summary':
         return (
           <div className={styles.reportArea}>

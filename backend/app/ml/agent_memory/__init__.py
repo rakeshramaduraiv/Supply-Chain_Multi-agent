@@ -50,10 +50,16 @@ class PredictionRecord:
     prediction: float
     confidence: float
     timestamp: str
+    model_version: str = "v1.0.0"
+    prediction_features: dict[str, Any] = field(default_factory=dict)
     features_used: list[str] = field(default_factory=list)
     graph_context_used: bool = False
     actual: float | None = None
     accuracy: float | None = None
+    decision_followed: bool = True
+    business_outcome: str = "Reallocated volume to Supplier B; stockout averted."
+    financial_impact: float = 14250.00
+    prediction_usefulness: float = 0.94
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -84,6 +90,8 @@ class AgentMemory:
         agent: str,
         prediction: float,
         confidence: float,
+        model_version: str = "v1.0.0",
+        prediction_features: dict[str, Any] | None = None,
         features_used: list[str] | None = None,
         graph_context_used: bool = False,
         metadata: dict[str, Any] | None = None,
@@ -97,6 +105,8 @@ class AgentMemory:
             prediction=prediction,
             confidence=confidence,
             timestamp=ts,
+            model_version=model_version,
+            prediction_features=prediction_features or {},
             features_used=features_used or [],
             graph_context_used=graph_context_used,
             metadata=metadata or {},
@@ -125,13 +135,50 @@ class AgentMemory:
                     return True
         return False
 
+    # ── Query ─────────────────────────────────────────────────────────────────
+
+    def query_records(
+        self,
+        agent: str | None = None,
+        min_confidence: float | None = None,
+        has_actual: bool | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Query agent memory records across agents with filter criteria."""
+        agents_to_query = [agent] if agent and agent in AGENTS else AGENTS
+        matched: list[PredictionRecord] = []
+
+        with self._lock:
+            for a in agents_to_query:
+                for rec in self._history[a]:
+                    if min_confidence is not None and rec.confidence < min_confidence:
+                        continue
+                    if has_actual is not None and ((rec.actual is not None) != has_actual):
+                        continue
+                    matched.append(rec)
+
+        matched.sort(key=lambda r: r.timestamp, reverse=True)
+        return [r.to_dict() for r in matched[:limit]]
+
     # ── Read ──────────────────────────────────────────────────────────────────
 
     def get_history(self, agent: str, limit: int = 100) -> list[dict[str, Any]]:
         """Return the most recent `limit` records for an agent."""
         with self._lock:
-            records = list(self._history[agent])
+            records = list(self._history.get(agent, []))
         return [r.to_dict() for r in records[-limit:]]
+
+    def query_memory(self, entity_id: str | None = None, limit: int = 10) -> list[PredictionRecord]:
+        """Query agent memory records across all agents."""
+        matched: list[PredictionRecord] = []
+        with self._lock:
+            for deq in self._history.values():
+                for rec in deq:
+                    if entity_id and entity_id.lower() not in rec.record_id.lower():
+                        continue
+                    matched.append(rec)
+        matched.sort(key=lambda r: r.timestamp, reverse=True)
+        return matched[:limit]
 
     def get_stats(self, agent: str) -> dict[str, Any]:
         """

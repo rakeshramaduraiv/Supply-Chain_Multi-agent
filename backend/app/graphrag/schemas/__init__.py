@@ -69,12 +69,23 @@ class ContextResponse(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    """Response for query execution."""
+    """Response for query execution with Enterprise GraphRAG schema."""
     success: bool = True
     query: str
     intent: str = ""
+    confidence: float = 0.90
+    business_explanation: str = ""
+    root_cause: str = ""
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    retrieved_entities: list[dict[str, Any]] = Field(default_factory=list)
+    retrieved_relationships: list[dict[str, Any]] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    business_recommendation: list[str] = Field(default_factory=list)
+    expected_business_impact: str = ""
+    answer: str = ""
+    validated: bool = True
     resolved_entities: list[str] = Field(default_factory=list)
-    cypher: str = ""
+    cypher: str | None = None
     results: list[dict[str, Any]] = Field(default_factory=list)
     result_count: int = 0
     chain_output: dict[str, Any] | None = None

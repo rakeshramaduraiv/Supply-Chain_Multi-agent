@@ -17,13 +17,23 @@ from app.rca.routes import router as rca_router
 from app.dashboard.routes import router as dashboard_router
 from app.initialization.routes import router as initialization_router
 from app.tpke.routes import router as tpke_router
+from app.graph.prediction_integration.routes import router as prediction_integration_router
 from app.api.v1.endpoints.business import router as business_router
+
+from app.graphrag.context_builder.routes import router as context_builder_router
+from app.graphrag.prompt_routes import router as prompt_composer_router
+from app.api.v1.endpoints.decision_routes import router as decision_router
+from app.ml.agent_memory.routes import router as agent_memory_router
 
 api_router = APIRouter()
 
 # --- Health & System ---
 api_router.include_router(health.router, prefix="")
 api_router.include_router(ws.router, prefix="")
+api_router.include_router(context_builder_router, prefix="")
+api_router.include_router(prompt_composer_router, prefix="")
+api_router.include_router(decision_router, prefix="")
+api_router.include_router(agent_memory_router, prefix="")
 
 # --- Data Engineering ---
 api_router.include_router(data_engineering.router, prefix="/data")
@@ -36,9 +46,11 @@ api_router.include_router(ml_router, prefix="")
 
 # --- Knowledge Graph ---
 api_router.include_router(graph_router, prefix="")
+api_router.include_router(prediction_integration_router, prefix="/graph")
 
 # --- GraphRAG Intelligence ---
 api_router.include_router(graphrag_router, prefix="")
+
 
 # --- Root Cause Analysis ---
 api_router.include_router(rca_router, prefix="")

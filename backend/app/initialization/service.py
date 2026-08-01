@@ -325,40 +325,70 @@ class InitializationService:
     def _build_knowledge_graph(self, df: pd.DataFrame) -> dict[str, Any]:
         """
         Build the Knowledge Graph from processed data.
-        Uses synchronous extraction since graph build is a one-time operation.
-        Returns node/relationship counts.
+        Attempts a full Neo4j MERGE build; falls back to entity extraction only.
         """
         try:
-            from app.graph.extractor import EntityExtractor
+            from app.graph.builder import GraphBuilder
+            from app.graph.connection import get_connection_manager
+            import asyncio
 
-            extractor = EntityExtractor()
-            entities = extractor.extract_all(df)
+            conn = get_connection_manager()
+            builder = GraphBuilder(conn)
 
-            # Return counts for metadata (actual Neo4j build happens async in startup)
-            total_nodes = sum(len(v) for v in entities.get("nodes", {}).values())
-            total_rels = len(entities.get("relationships", []))
+            # Run async graph build synchronously inside the init pipeline
+            loop = asyncio.new_event_loop()
+            try:
+                build_result = loop.run_until_complete(builder.build_full_graph(df))
+            finally:
+                loop.close()
 
-            # Persist extracted entities for async graph build
+            nodes_created = build_result.get("nodes_created", 0)
+            rels_created = build_result.get("relationships_created", 0)
+
+            # Persist metadata for startup reference
             import json
             entities_path = Path(settings.upload_dir) / "graph_entities.json"
             entities_path.parent.mkdir(parents=True, exist_ok=True)
+            entities_path.write_text(json.dumps({
+                "nodes_created": nodes_created,
+                "relationships_created": rels_created,
+                "ready_for_build": False,  # already built
+                "status": "built",
+            }, indent=2))
 
-            # Serialize entity counts (full entities are too large for JSON)
-            entities_meta = {
+            return {
+                "nodes_created": nodes_created,
+                "relationships_created": rels_created,
+                "status": "built",
+            }
+
+        except Exception as neo4j_err:
+            logger.warning(f"Neo4j graph build failed ({neo4j_err}), falling back to entity extraction")
+
+        # Fallback: extract counts only (Neo4j offline)
+        try:
+            from app.graph.extractor import EntityExtractor
+            import json
+
+            extractor = EntityExtractor()
+            entities = extractor.extract_all(df)
+            total_nodes = sum(len(v) for v in entities.get("nodes", {}).values())
+            total_rels = len(entities.get("relationships", []))
+
+            entities_path = Path(settings.upload_dir) / "graph_entities.json"
+            entities_path.parent.mkdir(parents=True, exist_ok=True)
+            entities_path.write_text(json.dumps({
                 "node_counts": {k: len(v) for k, v in entities.get("nodes", {}).items()},
                 "relationship_count": total_rels,
-                "ready_for_build": True,
-            }
-            entities_path.write_text(json.dumps(entities_meta, indent=2))
+                "ready_for_build": True,  # needs POST /graph/build
+                "status": "extracted",
+            }, indent=2))
 
             return {
                 "nodes_created": total_nodes,
                 "relationships_created": total_rels,
                 "status": "extracted",
             }
-        except ImportError:
-            logger.warning("Graph extractor not available, skipping graph build")
-            return {"nodes_created": 0, "relationships_created": 0, "status": "skipped"}
         except Exception as e:
-            logger.error(f"Knowledge graph build failed: {e}")
+            logger.error(f"Knowledge graph extraction failed: {e}")
             return {"nodes_created": 0, "relationships_created": 0, "status": "failed", "error": str(e)}

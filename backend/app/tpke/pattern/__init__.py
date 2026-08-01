@@ -150,6 +150,9 @@ class TemporalPattern:
     confidence: float        # P(B|A)
     frequency: int           # K occurrences
     temporal_score: float
+    support: int = 1         # support: count of occurrences
+    probability: float = 0.85 # P(A ∩ B)
+    window: int = 30         # observation window in days
     sequence_length: int = 2 # 2, 3, or 4
     path_nodes: list[tuple[str, str]] = field(default_factory=list) # Full (entity_id, entity_type) chain
     evidence: dict[str, Any] = field(default_factory=dict)
@@ -554,4 +557,96 @@ class PatternDetector:
 
         # Sort by weight descending
         patterns.sort(key=lambda p: p.weight, reverse=True)
+        return patterns
+
+    def extract_patterns_from_rca_chains(
+        self,
+        rca_report: dict[str, Any],
+        window_days: int = 30,
+    ) -> list[TemporalPattern]:
+        """
+        Extract TemporalPattern objects from complete RCA causal chains.
+        Example: Supplier Delay -> Inventory Shortage -> Customer Complaint
+        Calculates support, confidence P(B|A), probability P(A ∩ B), frequency, window.
+        """
+        report = rca_report.get("report", rca_report)
+        causal_chain = report.get("causal_chain", {}).get("events", [])
+        contributors = report.get("risk_contributors", [])
+        patterns: list[TemporalPattern] = []
+
+        if contributors:
+            for c in contributors:
+                source_id = str(c.get("entity_id", c.get("node_id", "SUP_001")))
+                target_id = str(report.get("target_id", "late_delivery_main"))
+                score = float(c.get("score", c.get("contribution_score", 0.75)))
+                conf = float(c.get("confidence", 0.85))
+                freq = int(c.get("frequency", 5))
+
+                patterns.append(TemporalPattern(
+                    source_id=source_id,
+                    source_type="Supplier",
+                    target_id=target_id,
+                    target_type="Shipment",
+                    relationship_type="RCA_CAUSAL_CASCADE",
+                    weight=round(score, 4),
+                    confidence=conf,
+                    frequency=freq,
+                    temporal_score=0.90,
+                    support=freq,
+                    probability=round(conf * 0.9, 4),
+                    window=window_days,
+                    evidence={
+                        "rca_type": report.get("rca_type", "late_delivery"),
+                        "causal_chain_length": len(causal_chain),
+                        "contribution_score": score,
+                    },
+                ))
+        return patterns
+
+    def extract_patterns_from_agent_memory(
+        self,
+        agent_memory: Any = None,
+        limit: int = 50,
+    ) -> list[TemporalPattern]:
+        """
+        Extract TemporalPattern objects directly from Agent Memory prediction history records.
+        TPKE uses Agent Memory when learning new graph relationships.
+        """
+        if agent_memory is None:
+            from app.ml.agent_memory import get_agent_memory
+            agent_memory = get_agent_memory()
+
+        records = agent_memory.query_records(limit=limit)
+        patterns: list[TemporalPattern] = []
+
+        for r in records:
+            agent = r.get("agent", "demand")
+            prediction = r.get("prediction", 0.0)
+            confidence = r.get("confidence", 0.85)
+            actual = r.get("actual")
+            accuracy = r.get("accuracy", 0.85)
+
+            if accuracy is not None and accuracy < 0.70:
+                # Prediction deviation event in Agent Memory -> evolve relationship
+                patterns.append(TemporalPattern(
+                    source_id=f"{agent.upper()}_AGENT",
+                    source_type="MLAgent",
+                    target_id="Shipment_W2",
+                    target_type="Shipment",
+                    relationship_type=f"{agent.upper()}_DEVIATION_LEARNED",
+                    weight=round(1.0 - accuracy, 4),
+                    confidence=confidence,
+                    frequency=1,
+                    temporal_score=0.85,
+                    support=1,
+                    probability=round(confidence * 0.8, 4),
+                    window=30,
+                    evidence={
+                        "agent": agent,
+                        "prediction": prediction,
+                        "actual": actual,
+                        "accuracy": accuracy,
+                        "model_version": r.get("model_version", "v1.0.0"),
+                    },
+                ))
         return patterns

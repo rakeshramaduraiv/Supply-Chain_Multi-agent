@@ -16,8 +16,8 @@
  *  POST /api/v1/data/upload/actual     — upload actuals for validation
  */
 
-import { useState, useMemo, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, Cell, ReferenceLine,
@@ -50,6 +50,129 @@ const BAND_COLORS = {
   critical: '#d63031',
 }
 
+const AGENTS = [
+  {
+    key: 'demand',
+    name: 'Demand Prediction Agent',
+    purpose: 'Forecast future product demand.',
+    model: 'LightGBM Regressor',
+    features: ['Product', 'Category', 'Sales', 'Quantity', 'Order Date', 'Region'],
+    target: 'Future Demand',
+    outputLabel: 'Demand Forecast',
+    task: 'regression',
+    graphNode: 'Product',
+  },
+  {
+    key: 'inventory',
+    name: 'Inventory Risk Agent',
+    purpose: 'Predict inventory shortages.',
+    model: 'LightGBM Classifier',
+    features: ['Warehouse', 'Inventory', 'Sales', 'Quantity'],
+    target: 'Inventory Risk',
+    outputLabel: 'Inventory Risk',
+    task: 'classification',
+    graphNode: 'Warehouse',
+  },
+  {
+    key: 'supplier',
+    name: 'Supplier Risk Agent',
+    purpose: 'Predict supplier reliability.',
+    model: 'LightGBM Classifier',
+    features: ['Supplier', 'Delivery Delay', 'Shipping Mode', 'Profit'],
+    target: 'Supplier Risk',
+    outputLabel: 'Supplier Risk',
+    task: 'classification',
+    graphNode: 'Supplier',
+  },
+  {
+    key: 'logistics',
+    name: 'Logistics Delay Agent',
+    purpose: 'Predict transportation delays.',
+    model: 'LightGBM Classifier',
+    features: ['Shipping Mode', 'Warehouse', 'Region', 'Delivery Status'],
+    target: 'Delivery Delay',
+    outputLabel: 'Delay Probability',
+    task: 'classification',
+    graphNode: 'Region',
+  },
+]
+
+const FEATURE_MEANINGS = {
+  order_month: 'Calendar month derived from sales order date.',
+  order_day_of_week: 'Day of week of the order placement.',
+  order_week_of_year: 'Week number within the calendar year.',
+  order_quarter: 'Fiscal quarter associated with the order.',
+  order_is_weekend: 'Flag for weekend orders.',
+  Sales: 'Revenue amount for the order line item.',
+  'Order Profit Per Order': 'Order-level profit after discounts and costs.',
+  'Product Price': 'Unit price of the product sold.',
+  'Order Item Discount': 'Discount applied to the order item.',
+  'Days for shipping (real)': 'Actual days taken to ship the order.',
+  'Days for shipment (scheduled)': 'Planned shipping duration.',
+  delivery_duration_days: 'End-to-end delivery duration in days.',
+  'Order Item Quantity': 'Quantity ordered for the product line.',
+  Late_delivery_risk: 'Risk label for late delivery or supplier failure.',
+}
+
+const PIPELINE_STEPS = [
+  {
+    id: 'dataset',
+    label: 'Historical Dataset',
+    input: 'Processed DataCo historical supply chain records.',
+    output: 'Cleaned, record-level master dataset.',
+    recordsField: 'total_orders',
+    execution: 'Backend dataset preparation',
+  },
+  {
+    id: 'feature',
+    label: 'Feature Engineering',
+    input: 'Raw master dataset.',
+    output: 'Engineered demand, inventory, supplier and logistics features.',
+    recordsField: 'total_orders',
+    execution: 'Backend feature pipeline',
+  },
+  {
+    id: 'selection',
+    label: 'Feature Selection',
+    input: 'Engineered features.',
+    output: 'Agent-specific feature subsets for each model.',
+    recordsField: 'total_orders',
+    execution: 'Backend feature selection',
+  },
+  {
+    id: 'model',
+    label: 'LightGBM Models',
+    input: 'Selected features and training splits.',
+    output: 'Trained agent models with performance metrics.',
+    recordsField: 'model_count',
+    execution: 'Backend model training',
+  },
+  {
+    id: 'prediction',
+    label: 'Prediction',
+    input: 'Latest feature batch.',
+    output: 'Demand forecasts and risk scores.',
+    recordsField: 'total_forecasts',
+    execution: 'Backend prediction generation',
+  },
+  {
+    id: 'integration',
+    label: 'Prediction Integration Layer',
+    input: 'Agent predictions and metadata.',
+    output: 'Structured intelligence expressions for graph ingestion.',
+    recordsField: 'total_forecasts',
+    execution: 'Backend integration service',
+  },
+  {
+    id: 'graph',
+    label: 'Knowledge Graph',
+    input: 'Business entities plus AI predictions.',
+    output: 'Graph nodes enriched with intelligence.',
+    recordsField: 'graph_nodes',
+    execution: 'Neo4j ingestion layer',
+  },
+]
+
 // ── Tooltip styling ──────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null
@@ -80,34 +203,29 @@ const safe = (v, d = 0) => (v == null || isNaN(v)) ? d : v
 /** Derive risk level string from 0-1 score */
 const riskLabel = v => v >= 0.65 ? 'critical' : v >= 0.45 ? 'high' : v >= 0.25 ? 'medium' : 'low'
 
-/** Build historical + forecast series from monthly_trend + auto_forecast */
-function buildHistoricalForecastSeries(monthlyTrend, forecastConf, highRiskCount, totalForecasts) {
+/** Build historical trend series and add backend demand forecast when available */
+function buildHistoricalForecastSeries(monthlyTrend, demandForecast) {
   if (!monthlyTrend?.length) return []
   const series = monthlyTrend.map(m => ({
-    period: m.period.slice(0, 7),       // "2016-01"
+    period: m.period.slice(0, 7),
     historical: m.orders,
     forecast: null,
+    forecastLow: null,
+    forecastHigh: null,
     lateRate: Math.round(safe(m.late_rate) * 100),
   }))
 
-  // Append a synthetic "next period" forecast point
-  if (series.length > 0 && totalForecasts > 0) {
-    const lastEntry = series[series.length - 1]
-    const trend = series.length >= 3
-      ? (series[series.length - 1].historical - series[series.length - 3].historical) / 2
-      : 0
-    const base = lastEntry.historical + trend
-    const confidence = safe(forecastConf, 0.75)
-    series[series.length - 1].forecast = lastEntry.historical   // overlap at boundary
+  if (demandForecast?.predicted_value != null) {
     series.push({
-      period: '2018-02',
+      period: demandForecast.period || 'Forecast',
       historical: null,
-      forecast: Math.round(base * (0.95 + Math.random() * 0.1)),  // ±5% confidence band
-      forecastHigh: Math.round(base * (1 + (1 - confidence) * 0.2)),
-      forecastLow:  Math.round(base * (1 - (1 - confidence) * 0.2)),
-      lateRate: Math.round(highRiskCount / Math.max(totalForecasts, 1) * 100),
+      forecast: Number(demandForecast.predicted_value),
+      forecastLow: Number(demandForecast.lower_bound ?? demandForecast.predicted_value),
+      forecastHigh: Number(demandForecast.upper_bound ?? demandForecast.predicted_value),
+      lateRate: null,
     })
   }
+
   return series
 }
 
@@ -185,7 +303,6 @@ function buildRecommendations(categoryForecasts, agentResults) {
   for (const r of topRisk) {
     const lvl = riskLabel(safe(r.combined_risk, 0))
     problems.push({
-      icon: lvl === 'critical' ? '🔴' : lvl === 'high' ? '🟠' : '🟡',
       title: `${r.category} — ${r.region}`,
       desc: `Combined risk ${pct(r.combined_risk)} across ${r.order_count} orders. ` +
             `Demand risk: ${pct(r.demand_risk ?? 0)}, Logistics: ${pct(r.logistics_risk ?? 0)}.`,
@@ -195,7 +312,7 @@ function buildRecommendations(categoryForecasts, agentResults) {
       priority: lvl === 'critical' ? 'CRITICAL' : lvl === 'high' ? 'HIGH' : 'MEDIUM',
       text: lvl === 'critical'
         ? `Immediately review ${r.category} supply in ${r.region}. Risk exceeds threshold.`
-        : `Monitor ${r.category} inventory levels in ${r.region} for next 14 days.`,
+        : `Monitor ${r.category} inventory levels in ${r.region} for the next forecast cycle.`,
       category: r.category.slice(0, 14),
     })
   }
@@ -205,7 +322,6 @@ function buildRecommendations(categoryForecasts, agentResults) {
     const s = agentResults.supplier
     if (safe(s.predicted_risk, 0) >= 0.45) {
       problems.push({
-        icon: '🏭',
         title: 'Supplier Risk Elevated',
         desc: `ML model predicts ${pct(s.predicted_risk)} supplier-side delivery risk. ` +
               `Confidence: ${pct(s.confidence)}.`,
@@ -315,11 +431,44 @@ export default function ForecastPage() {
     onError: (err) => toast.error(err.message || 'Upload failed'),
   })
 
+  const [selectedAgentKey, setSelectedAgentKey] = useState('demand')
+  const [selectedFeature, setSelectedFeature] = useState('order_month')
+  const [selectedStage, setSelectedStage] = useState('dataset')
+  const [searchText, setSearchText] = useState('')
+
+  const graphStatsQuery = useQuery({
+    queryKey: ['graphStats'],
+    queryFn: () => api.getGraphStats().then(r => r.data),
+    staleTime: 60_000,
+    retry: false,
+  })
+
+  const featureImportanceQueries = useQueries({
+    queries: AGENTS.map(agent => ({
+      queryKey: ['featureImportance', agent.key],
+      queryFn: () => api.getFeatureImportance(agent.key).then(r => r.data),
+      staleTime: 300_000,
+      enabled: !!modelsRaw,
+    })),
+  })
+
+  const featureImportanceMap = useMemo(
+    () => AGENTS.reduce((acc, agent, index) => {
+      acc[agent.key] = featureImportanceQueries[index]?.data || null
+      return acc
+    }, {}),
+    [featureImportanceQueries]
+  )
+
   // ── Derived data ─────────────────────────────────────────────────────────
   const f         = forecastRaw  || {}
   const analytics = analyticsRaw || {}
   const summary   = summaryRaw   || {}
   const models    = modelsRaw?.data || modelsRaw || {}
+
+  const selectedAgent = AGENTS.find(agent => agent.key === selectedAgentKey) || AGENTS[0]
+  const selectedAgentResult = (f.agent_results || {})[selectedAgentKey] || {}
+  const selectedAgentModel = models[selectedAgentKey] || {}
 
   const ready             = f.ready === true
   const agentResults      = f.agent_results       || {}
@@ -339,11 +488,6 @@ export default function ForecastPage() {
   const totalOrders  = safe(summary.total_orders, 0)
   const avgReliability = safe(summary.avg_supplier_reliability, 0)
 
-  // Expected metrics (derived from forecast confidence bands)
-  const expectedLate      = ready ? Math.round(totalOrders * 0.02 * (1 + highRisk / Math.max(totalFC, 1))) : 0
-  const expectedShortage  = ready ? Math.round(highRisk * 2.5) : 0
-  const expectedSupplier  = ready ? Math.round(agentResults?.supplier?.predicted_risk ?? 0 * 100) : 0
-
   // Overall forecast accuracy from training metrics
   const modelAccuracies = Object.values(trainingMetrics)
     .map(v => safe(v.metrics?.accuracy ?? v.metrics?.r2, 0))
@@ -352,10 +496,15 @@ export default function ForecastPage() {
     ? Math.round(modelAccuracies.reduce((s, v) => s + v, 0) / modelAccuracies.length * 100)
     : 0
 
+  const demandForecastValue = safe(agentResults.demand?.predicted_value, null)
+  const inventoryRiskValue = safe(agentResults.inventory?.predicted_risk, null)
+  const supplierRiskValue = safe(agentResults.supplier?.predicted_risk, null)
+  const logisticsRiskValue = safe(agentResults.logistics?.predicted_risk, null)
+
   // Chart data (memoised)
   const historicalForecastSeries = useMemo(
-    () => buildHistoricalForecastSeries(monthlyTrend, overallConf, highRisk, totalFC),
-    [monthlyTrend, overallConf, highRisk, totalFC]
+    () => buildHistoricalForecastSeries(monthlyTrend, agentResults.demand),
+    [monthlyTrend, agentResults.demand]
   )
 
   const forecastBreakdownData = useMemo(
@@ -415,12 +564,10 @@ export default function ForecastPage() {
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <div className="page-head">
         <div>
-          <div className="page-title">Business Forecasting Center</div>
+          <div className="page-title">Forecast & Multi-Agent Intelligence</div>
           <div className="page-sub">
-            {ready
-              ? `Forecast ${f.forecast_period} · Generated ${f.generated_at?.slice(0, 10)} · ${totalFC} category–region segments`
-              : 'Initialising forecast engine…'
-            }
+            AI-powered forecasting and risk intelligence from specialized backend agents.
+            {ready && ` Forecast ${f.forecast_period} · Generated ${f.generated_at?.slice(0, 10)} · ${totalFC} category–region segments`}
           </div>
         </div>
         <div className="page-actions">
@@ -445,14 +592,12 @@ export default function ForecastPage() {
           className={`${styles.tabBtn}${activeTab === 'forecast' ? ' ' + styles.active : ''}`}
           onClick={() => setActiveTab('forecast')}
         >
-          <span className={styles.tabIcon}>📊</span>
           Forecast Analysis
         </button>
         <button
           className={`${styles.tabBtn}${activeTab === 'validation' ? ' ' + styles.active : ''}`}
           onClick={() => setActiveTab('validation')}
         >
-          <span className={styles.tabIcon}>✅</span>
           Validation
           {validationResult && (
             <span className="badge bdg-low" style={{ fontSize: 9, padding: '1px 5px' }}>New</span>
@@ -529,77 +674,69 @@ export default function ForecastPage() {
 
           {/* ── KPI Row ──────────────────────────────────────────────── */}
           <div className={styles.kpiRow}>
-            {/* 1. Overall Forecast Accuracy */}
+            {/* 1. Demand Forecast */}
             <div className={`${styles.kpiCard} ${styles.blue}`}>
-              <div className={styles.kpiLabel}>Overall Forecast Accuracy</div>
+              <div className={styles.kpiLabel}>Demand Forecast</div>
+              <div className={`${styles.kpiValue} ${demandForecastValue > 0 ? styles.success : styles.warning}`}>
+                {demandForecastValue != null ? `${demandForecastValue.toLocaleString(undefined, { maximumFractionDigits: 1 })}` : '—'}
+              </div>
+              <div className={styles.kpiSub}>
+                {ready ? 'Predicted future demand units' : 'Awaiting demand model output'}
+              </div>
+            </div>
+ 
+            {/* 2. Inventory Risk */}
+            <div className={`${styles.kpiCard} ${styles.green}`}>
+              <div className={styles.kpiLabel}>Inventory Risk</div>
+              <div className={`${styles.kpiValue} ${inventoryRiskValue >= 0.65 ? styles.danger : inventoryRiskValue >= 0.35 ? styles.warning : styles.success}`}>
+                {inventoryRiskValue != null ? `${(inventoryRiskValue * 100).toFixed(1)}%` : '—'}
+              </div>
+              <div className={styles.kpiSub}>
+                {ready ? 'Predicted stockout probability' : 'Inventory risk model pending'}
+              </div>
+            </div>
+ 
+            {/* 3. Supplier Risk */}
+            <div className={`${styles.kpiCard} ${styles.red}`}>
+              <div className={styles.kpiLabel}>Supplier Risk</div>
+              <div className={`${styles.kpiValue} ${supplierRiskValue >= 0.65 ? styles.danger : supplierRiskValue >= 0.35 ? styles.warning : styles.success}`}>
+                {supplierRiskValue != null ? `${(supplierRiskValue * 100).toFixed(1)}%` : '—'}
+              </div>
+              <div className={styles.kpiSub}>
+                {ready ? 'Predicted supplier reliability risk' : 'Supplier model pending'}
+              </div>
+            </div>
+ 
+            {/* 4. Delivery Delay Risk */}
+            <div className={`${styles.kpiCard} ${styles.orange}`}>
+              <div className={styles.kpiLabel}>Delivery Delay Risk</div>
+              <div className={`${styles.kpiValue} ${logisticsRiskValue >= 0.65 ? styles.danger : logisticsRiskValue >= 0.35 ? styles.warning : styles.success}`}>
+                {logisticsRiskValue != null ? `${(logisticsRiskValue * 100).toFixed(1)}%` : '—'}
+              </div>
+              <div className={styles.kpiSub}>
+                {ready ? 'Transport delay probability' : 'Logistics risk model pending'}
+              </div>
+            </div>
+ 
+            {/* 5. Forecast Confidence */}
+            <div className={`${styles.kpiCard} ${styles.purple}`}>
+              <div className={styles.kpiLabel}>Forecast Confidence</div>
+              <div className={`${styles.kpiValue} ${overallConf >= 0.7 ? styles.success : styles.warning}`}>
+                {ready ? `${(overallConf * 100).toFixed(1)}%` : '—'}
+              </div>
+              <div className={styles.kpiSub}>
+                Ensemble confidence across agents
+              </div>
+            </div>
+ 
+            {/* 6. Overall Model Accuracy */}
+            <div className={`${styles.kpiCard} ${styles.orange}`}>
+              <div className={styles.kpiLabel}>Overall Model Accuracy</div>
               <div className={`${styles.kpiValue} ${overallAccuracy >= 80 ? styles.success : overallAccuracy >= 60 ? styles.warning : styles.danger}`}>
                 {overallAccuracy > 0 ? `${overallAccuracy}%` : '—'}
               </div>
               <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${styles.trendUp}`}>↑ ML</span>
-                from {modelAccuracies.length} trained models
-              </div>
-            </div>
-
-            {/* 2. Forecast Confidence */}
-            <div className={`${styles.kpiCard} ${styles.green}`}>
-              <div className={styles.kpiLabel}>Forecast Confidence</div>
-              <div className={`${styles.kpiValue} ${overallConf >= 0.7 ? styles.success : styles.warning}`}>
-                {ready ? `${(overallConf * 100).toFixed(0)}%` : '—'}
-              </div>
-              <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${styles.trendFlat}`}>→</span>
-                ensemble model consensus
-              </div>
-            </div>
-
-            {/* 3. Predicted High Risk Orders */}
-            <div className={`${styles.kpiCard} ${styles.red}`}>
-              <div className={styles.kpiLabel}>Predicted High Risk Orders</div>
-              <div className={`${styles.kpiValue} ${highRisk > 5 ? styles.danger : styles.warning}`}>
-                {highRisk}
-              </div>
-              <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${highRisk > 5 ? styles.trendDown : styles.trendFlat}`}>
-                  {highRisk > 5 ? '↑' : '→'}
-                </span>
-                of {totalFC} segments ≥ 65% risk
-              </div>
-            </div>
-
-            {/* 4. Expected Late Deliveries */}
-            <div className={`${styles.kpiCard} ${styles.orange}`}>
-              <div className={styles.kpiLabel}>Expected Late Deliveries</div>
-              <div className={`${styles.kpiValue} ${styles.warning}`}>
-                {ready ? `${latePct.toFixed(1)}%` : '—'}
-              </div>
-              <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${styles.trendDown}`}>↑</span>
-                {lateCount.toLocaleString()} historical late orders
-              </div>
-            </div>
-
-            {/* 5. Expected Inventory Shortage */}
-            <div className={`${styles.kpiCard} ${styles.purple}`}>
-              <div className={styles.kpiLabel}>Expected Inventory Shortage</div>
-              <div className={`${styles.kpiValue} ${expectedShortage > 10 ? styles.danger : styles.warning}`}>
-                {expectedShortage}
-              </div>
-              <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${styles.trendFlat}`}>→</span>
-                segments with stockout risk
-              </div>
-            </div>
-
-            {/* 6. Expected Supplier Issues */}
-            <div className={`${styles.kpiCard} ${styles.orange}`}>
-              <div className={styles.kpiLabel}>Expected Supplier Issues</div>
-              <div className={`${styles.kpiValue} ${avgReliability < 0.7 ? styles.danger : styles.warning}`}>
-                {ready ? `${((1 - avgReliability) * 100).toFixed(1)}%` : '—'}
-              </div>
-              <div className={styles.kpiSub}>
-                <span className={`${styles.kpiTrend} ${styles.trendUp}`}>↑</span>
-                supplier unreliability rate
+                {modelAccuracies.length > 0 ? `${modelAccuracies.length} agent models trained` : 'No training metrics available'}
               </div>
             </div>
           </div>
@@ -715,7 +852,7 @@ export default function ForecastPage() {
                   </ResponsiveContainer>
                 ) : (
                   <div className={styles.notReady}>
-                    <div className={styles.notReadyIcon}>📦</div>
+                    <div className={styles.notReadyIcon}>No data</div>
                     <div className={styles.notReadyTitle}>No breakdown data</div>
                     <div className={styles.notReadyDesc}>Category forecasts unavailable — ensure models are trained</div>
                   </div>
@@ -867,7 +1004,7 @@ export default function ForecastPage() {
           {/* ── Validation Banner (after upload) ─────────────────────── */}
           {validationResult && (
             <div className={styles.validationBanner}>
-              <div className={styles.validationBannerIcon}>✅</div>
+              <div className={styles.validationBannerIcon} />
               <div>
                 <div className={styles.validationBannerTitle}>
                   Validation Complete — {validationResult.overall_accuracy?.toFixed(1)}% Accuracy
@@ -935,7 +1072,7 @@ export default function ForecastPage() {
                 >
                   {uploadMut.isPending
                     ? <><span className="spinner" /> Validating & Computing Metrics…</>
-                    : '⚡ Upload & Validate'
+                    : 'Upload & Validate'
                   }
                 </button>
 
@@ -1120,7 +1257,7 @@ export default function ForecastPage() {
                 <div className="card">
                   <div className="card-body">
                     <div className={styles.notReady}>
-                      <div className={styles.notReadyIcon}>📋</div>
+                      <div className={styles.notReadyIcon}></div>
                       <div className={styles.notReadyTitle}>No Validation Data Yet</div>
                       <div className={styles.notReadyDesc}>
                         Upload actual monthly outcomes to compute accuracy metrics, error distribution,
@@ -1143,35 +1280,35 @@ export default function ForecastPage() {
                 const steps = [
                   {
                     id: 'forecast_generated',
-                    emoji: '🤖',
+                    symbol: '1',
                     label: 'Forecast Generated',
                     date: f.generated_at?.slice(0, 10) || '—',
                     desc: 'ML models ran',
                   },
                   {
                     id: 'actual_uploaded',
-                    emoji: '📤',
+                    symbol: '2',
                     label: 'Actual Uploaded',
                     date: validationResult ? new Date().toISOString().slice(0, 10) : 'Pending',
                     desc: 'CSV ingested',
                   },
                   {
                     id: 'accuracy_calculated',
-                    emoji: '📐',
+                    symbol: '3',
                     label: 'Accuracy Calculated',
                     date: validationMetrics ? new Date().toISOString().slice(0, 10) : 'Pending',
                     desc: 'MAPE · RMSE · MAE',
                   },
                   {
                     id: 'knowledge_updated',
-                    emoji: '🧠',
+                    symbol: '4',
                     label: 'Knowledge Updated',
                     date: validationMetrics ? 'Queued' : 'Pending',
                     desc: 'TPKE evolution',
                   },
                   {
                     id: 'next_forecast_ready',
-                    emoji: '🚀',
+                    symbol: '5',
                     label: 'Next Forecast Ready',
                     date: 'Auto-generated',
                     desc: '2018-03 period',
@@ -1198,7 +1335,7 @@ export default function ForecastPage() {
                             <div className={`${styles.workflowCircle} ${
                               isDone ? styles.done : isActive ? styles.active : styles.pending
                             }`}>
-                              {isDone ? '✓' : s.emoji}
+                              {isDone ? '✓' : s.symbol}
                             </div>
                             <div className={`${styles.workflowLabel} ${
                               isDone ? styles.done : isActive ? styles.active : ''

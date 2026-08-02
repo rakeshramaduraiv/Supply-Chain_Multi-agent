@@ -188,27 +188,28 @@ AlertsPage
 
 ---
 
-## 9. Forecast Center Validation & Ingestion Upgrades
+## 9. Forecast Center Redesign: Enterprise Planning Workspace
 
-- **Direct File Drag & Drop**: Removed the synthetic month selector buttons and standard file input button. Replaced it with a clean, professional drag-and-drop `UploadZone` that automatically triggers the upload validation mutation upon drop or click selection.
-- **13-Stage Visual Pipeline Link**: Linked the drag-and-drop ingestion directly to the `ActualUploadWorkflow` 13-stage pipeline visualization, showing live status, record counts, and MAPEs.
-- **2x2 Validation Charts Grid**: Added a rich grid of 4 comparison charts:
-  1. *Actual vs Predicted Order Volume Trend*: Composed chart showing monthly actuals vs forecast.
-  2. *Model Deviation Distribution*: Pie chart breaking down records into within-threshold, minor deviations, and major deviations.
-  3. *Accuracy Cycles*: Line chart mapping prediction confidence, validation accuracy, and rolling average.
-  4. *Multi-Agent Accuracy*: Bar chart comparing the accuracy scores of the Demand, Supplier, Inventory, and Logistics agents.
+A complete redesign of [ForecastPage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/ForecastPage.jsx) and [ForecastPage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/ForecastPage.module.css) from a basic file upload panel into an **Enterprise Planning Workspace** modeled after Oracle Demand Planning Cloud and SAP IBP.
+
+* **Automated Lifecycle Processing**: Ingesting actual sales data (via the top toolbar) automatically triggers the entire forecasting lifecycle pipeline: Ingestion ➔ Error Validation ➔ Recalculation ➔ Graph Mutation ➔ TPKE Inference Retraining. Operators see a real-time visual progress bar detailing active steps.
+* **Planning scorecards**: Interactive KPIs displaying Forecast Accuracy, MAPE (Mean Error), RMSE/MAE, Forecast Bias, Operational Health Index, and Model Grounding Confidence.
+* **Planning Grid**: Incorporates high-fidelity composed actuals vs forecast line charts, rolling 90-day trajectory lines, prediction error heatmaps, and regional accuracy profile selectors.
+* **SKU Accuracy & Ingestion History**: Searchable sidebar panels displaying SKU level accuracy rankings and persistent ingestion logs tracking historic actual files.
 
 ---
 
 ## 10. Knowledge Graph Intelligence Workspace Redesign
 
-A complete redesign of [IntelligencePage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.jsx) and [IntelligencePage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.module.css) into a pure, high-density Enterprise Relationship Model mapping workspace. All conversational chatbot interfaces, business questions, and RAG copilot widgets have been fully removed and relocated.
+A complete redesign of [IntelligencePage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.jsx) and [IntelligencePage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.module.css) into an **Enterprise Digital Twin Workspace** mapping the complete structural topology of the organization.
 
-* **API Query & Verb Refactoring**: Refactored the queries to fetch nodes and relationships using `api.exportGraph()` which returns all categorized nodes and link records in one query, avoiding the 422 validation errors. Fixed a `405 Method Not Allowed` by changing the query method inside the axios client from `GET` to `POST` to conform to the backend router definition. Added `catch` blocks to version queries to handle 500 errors.
-* **Console Warning Optimizations**: Configured `retry: false` and removed automatic background `refetchInterval` polling loops from graph metadata, schema, and active version queries. This prevents console warning spam when the Neo4j database is unpopulated or offline while retaining full manual refresh options via the **Sync Workspace** header button.
-* **Corporate Light Mode Visual Integration**: Redesigned the styling of the workspace (`IntelligencePage.module.css`) to fully align with the application's clean light-theme design guidelines (`index.css`), replacing hardcoded dark backgrounds (`#0b0c10`) with beautiful light surfaces (`#f8f9fb`), white cards, subtle borders, a professional Figma-style dot-grid canvas viewport background, and mapping JS-defined edge colours to CSS theme variables.
-* **Light Slicer & Overlay Controls**: Formatted Slicer buttons/chips inside the sidebar filters using high-contrast active/inactive designs (`slicerBtn`) with a light background and a distinctive blue indicator on selection. Upgraded workspace overlay cards (Minimap, Legend, and Relationship hover tooltips) from dark translucent backdrops to a matching translucent white (`rgba(255, 255, 255, 0.92)`) with clean drop-shadows.
-* **Grounded Fallback Mapping**: Integrated interactive fallback datasets representing a 5-node supply chain traversal path. The canvas, legend, timeline, right-hand details tab, and simulation sliders remain fully functional and interactive even if Neo4j is offline or the database is unpopulated.
+* **Historical month-by-month Replay**: Added a bottom player bar displaying months (Jul 2017 to Jan 2018). Scraping the timeline or pressing "Play" triggers dynamic risk and weight variations, animating relationship links and node color codes dynamically.
+* **Power BI-style Entity Details**: Clicking any card opens a business intelligence panel showing:
+  * Business Impact, Business Owner, Region, Grounded Confidence, Revenue Dependency.
+  * Closeness, Betweenness, PageRank centralities.
+  * Forecast Influence, Root Cause History, Recent TPKE Learning, and Historical Changes.
+  * **GraphRAG Explainer**: LLM-grounded explanation box detailing topological significance.
+* **Causal Traversal Engine**: Selecting any node traverses the graph topology using BFS to highlight Upstream Dependencies, Downstream Impacts, and Shortest Paths to Customers.
 
 ```text
 IntelligencePage

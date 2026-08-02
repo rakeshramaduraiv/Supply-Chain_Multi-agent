@@ -187,14 +187,17 @@ const ALL_INCIDENTS = [
 ]
 
 const GUIDED_STEPS = [
-  { stepNum: 1, label: 'Executive Summary', icon: FileText },
-  { stepNum: 2, label: 'Business Impact', icon: DollarSign },
-  { stepNum: 3, label: 'Evidence Ranking', icon: Layers },
-  { stepNum: 4, label: 'Knowledge Graph', icon: Network },
-  { stepNum: 5, label: 'Propagation Timeline', icon: GitBranch },
-  { stepNum: 6, label: 'Counterfactual Sim', icon: Zap },
-  { stepNum: 7, label: 'AI Copilot Briefing', icon: Brain },
-  { stepNum: 8, label: 'Decision Center', icon: Lightbulb },
+  { stepNum: 1, label: 'Incident Overview', icon: Shield },
+  { stepNum: 2, label: 'AI Executive Summary', icon: FileText },
+  { stepNum: 3, label: 'Business Impact', icon: DollarSign },
+  { stepNum: 4, label: 'Evidence Ranking', icon: Layers },
+  { stepNum: 5, label: 'Propagation Map', icon: GitBranch },
+  { stepNum: 6, label: 'Knowledge Graph Path', icon: Network },
+  { stepNum: 7, label: 'Counterfactual Sim', icon: Zap },
+  { stepNum: 8, label: 'LLM Investigation', icon: Brain },
+  { stepNum: 9, label: 'Recommendations', icon: Lightbulb },
+  { stepNum: 10, label: 'Decision Approval', icon: CheckCircle2 },
+  { stepNum: 11, label: 'Executive Report', icon: FileSpreadsheet },
 ]
 
 const QUICK_PROMPTS = [
@@ -595,32 +598,48 @@ export default function RiskPage() {
           {/* Workflow Content Panels */}
           <div className={s.wizardBodyContent}>
 
-            {/* STEP 1: Executive Summary */}
+            {/* STEP 1: Incident Overview */}
             {activeStep === 1 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><FileText size={14} color="var(--blue)" /> Step 1: Grounded Executive Briefing</div>
+                <div className={s.stepHeaderTitle}><Shield size={14} color="var(--blue)" /> Step 1: Incident Triage & Specification Checklist</div>
                 <div className={s.stepBriefContainer}>
-                  <div className={s.executiveBriefingTitle}>Incident Briefing Memo</div>
-                  <p className={s.briefingText}>
-                    {report.executive_overview || `The AMASCI AI Investigator executed a 12-stage grounded analysis across 180,519 historical orders, Neo4j Knowledge Graph v1.4.2, and multi-agent prediction layers. The primary disruption driver is a capacity bottleneck at ${inc.name}, propagating across ${(propFlow.length || 4)} downstream operational stages in the ${inc.region} logistics network.`}
-                  </p>
-
+                  <div className={s.executiveBriefingTitle}>{inc.name} Specification</div>
                   <div className={s.executiveBriefingDetails}>
-                    <div className={s.ebRow}><span className={s.ebKey}>What Happened:</span><span className={s.ebVal}>{inc.type} disruption detected at {inc.name} affecting {inc.region} SCM operations.</span></div>
-                    <div className={s.ebRow}><span className={s.ebKey}>Primary Root Cause:</span><span className={s.ebVal}>{report.primary_root_cause || 'Capacity constraint and transit delay at primary transport node.'}</span></div>
-                    <div className={s.ebRow}><span className={s.ebKey}>Financial Exposure:</span><span className={s.ebVal} style={{ color: 'var(--rose)', fontWeight: 800 }}>${(impact.financial_loss || inc.financialLoss).toLocaleString()} total risk</span></div>
-                    <div className={s.ebRow}><span className={s.ebKey}>Expected Downstream Delay:</span><span className={s.ebVal}>{inc.expectedDelay} Days expected delay at warehouse fulfillment</span></div>
-                    <div className={s.ebRow}><span className={s.ebKey}>Confidence Assessment:</span><span className={s.ebVal} style={{ color: 'var(--blue)', fontWeight: 800 }}>{impact.confidence || inc.confidence} grounded confidence</span></div>
-                    <div className={s.ebRow}><span className={s.ebKey}>Business Importance:</span><span className={s.ebVal}>{inc.businessCriticality}</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Incident Type:</span><span className={s.ebVal}>{inc.type} Disruption</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Operational Severity:</span><span className={s.ebVal} style={{ color: inc.severity === 'Critical' ? 'var(--rose)' : 'var(--orange)', fontWeight: 800 }}>{inc.severity} Severity</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Current Status:</span><span className={s.ebVal}><span className={`${s.tag} ${inc.status === 'Resolved' ? s.tagGreen : s.tagAmber}`}>{inc.status}</span></span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Started Time:</span><span className={s.ebVal}>{inc.startedTime}</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Logistics Region:</span><span className={s.ebVal}>{inc.region}</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Affected Supplier:</span><span className={s.ebVal}>{inc.affectedSupplier}</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Affected Warehouse:</span><span className={s.ebVal}>{inc.affectedWarehouse}</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Target Forecast Drop:</span><span className={s.ebVal}>-{inc.forecastDrop}% accuracy degradation</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Grounded Graph Status:</span><span className={s.ebVal} style={{ color: 'var(--emerald)' }}>Active Twin Synchronized (PageRank: 0.084)</span></div>
+                    <div className={s.ebRow}><span className={s.ebKey}>Prediction Engine:</span><span className={s.ebVal}>{inc.predictionSource}</span></div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: Business Impact Dashboard */}
+            {/* STEP 2: AI Executive Summary */}
             {activeStep === 2 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><DollarSign size={14} color="var(--rose)" /> Step 2: Business Impact Dashboard</div>
+                <div className={s.stepHeaderTitle}><FileText size={14} color="var(--blue)" /> Step 2: Grounded Executive Briefing Memo</div>
+                <div className={s.stepBriefContainer}>
+                  <div className={s.executiveBriefingTitle}>AI Incident Investigation Summary</div>
+                  <p className={s.briefingText}>
+                    {report.executive_overview || `The AMASCI AI Investigator executed a 12-stage grounded analysis across 180,519 historical orders, Neo4j Knowledge Graph v1.4.2, and multi-agent prediction layers. The primary disruption driver is a capacity bottleneck at ${inc.name}, propagating across ${(propFlow.length || 4)} downstream operational stages in the ${inc.region} logistics network.`}
+                  </p>
+                  <div style={{ background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '10px', lineHeight: 1.5, color: '#334155', marginTop: 12 }}>
+                    <strong>Downstream Business Consequences:</strong> Inability to meet buffer capacity at {inc.affectedWarehouse} threatens orders for key customer accounts in the {inc.region} logistics zone. Prediction confidence is evaluated at {inc.confidence} based on real-time transactional logs.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: Business Impact Dashboard */}
+            {activeStep === 3 && (
+              <div className={s.stepPane}>
+                <div className={s.stepHeaderTitle}><DollarSign size={14} color="var(--rose)" /> Step 3: Business Impact Dashboard</div>
                 <div className={s.kpiGrid}>
                   {[
                     { label: 'Revenue Exposure', value: '$' + (impact.revenue_impact || Math.round(inc.financialLoss * 0.85)).toLocaleString(), color: 'var(--rose)', icon: DollarSign },
@@ -648,10 +667,10 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 3: Evidence Ranking */}
-            {activeStep === 3 && (
+            {/* STEP 4: Evidence Ranking */}
+            {activeStep === 4 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><Layers size={14} color="var(--indigo)" /> Step 3: Ranked Causal Evidence Matrix</div>
+                <div className={s.stepHeaderTitle}><Layers size={14} color="var(--indigo)" /> Step 4: Ranked Causal Evidence Matrix</div>
                 <div className={s.evidenceCardGrid}>
                   {(evidenceList.length > 0 ? evidenceList : [
                     { rank: 1, source: 'Knowledge Graph Degree', evidence: 'High centrality Carrier Ground Transport (Degree: 18)', confidence: 98.2, impact: 'High', node: 'n_ship' },
@@ -667,7 +686,7 @@ export default function RiskPage() {
                       onMouseLeave={() => setEvidenceHighlightNode(null)}
                       onClick={() => {
                         setEvidenceHighlightNode(ev.node)
-                        setActiveStep(4) // Move to graph view
+                        setActiveStep(6) // Move to graph view
                       }}
                     >
                       <div className={s.evidenceCardHeader}>
@@ -686,10 +705,41 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 4: Interactive Knowledge Graph */}
-            {activeStep === 4 && (
+            {/* STEP 5: Propagation Map */}
+            {activeStep === 5 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><Network size={14} color="var(--indigo)" /> Step 4: Knowledge Graph Subgraph Investigation</div>
+                <div className={s.stepHeaderTitle}><GitBranch size={14} color="var(--orange)" /> Step 5: Disruption Propagation Timeline Map</div>
+                <div className={s.propTimeline}>
+                  {(propFlow.length > 0 ? propFlow : [
+                    { node: inc.affectedSupplier, type: 'Supplier Origin', time: 'T+0h', severity: 'High', confidence: '98%', impact: '$142,000' },
+                    { node: 'Inbound Carrier Freight', type: 'Transit Shipment', time: 'T+12h', severity: 'High', confidence: '96%', impact: '$210,000' },
+                    { node: inc.affectedWarehouse, type: 'Distribution Center', time: 'T+24h', severity: 'Critical', confidence: '94%', impact: '$380,000' },
+                    { node: 'Central Buffer Inventory', type: 'Inventory Holding', time: 'T+36h', severity: 'Medium', confidence: '91%', impact: '$95,000' },
+                    { node: 'Market Customer Segments', type: 'Customer Delivery SLA', time: 'T+48h', severity: 'Medium', confidence: '89%', impact: '$120,000' },
+                  ]).map((n, i, arr) => (
+                    <div key={i} className={s.propStep}>
+                      <div className={s.propDot} style={{ background: n.severity === 'Critical' ? 'var(--rose)' : n.severity === 'High' ? 'var(--orange)' : 'var(--amber)' }} />
+                      {i < arr.length - 1 && <div className={s.propLine} />}
+                      <div className={s.propCard}>
+                        <div className={s.propTime}>{n.time}</div>
+                        <div className={s.propName}>{n.node}</div>
+                        <div className={s.propType}>{n.type}</div>
+                        <div className={s.propImpactRow}>
+                          <span style={{ color: 'var(--rose)', fontWeight: 800 }}>Exposure: {n.impact}</span>
+                          <span className={`${s.tag} ${n.severity === 'Critical' ? s.tagRose : s.tagAmber}`}>{n.severity}</span>
+                        </div>
+                        <div className={s.propConf}>Confidence: {n.confidence}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* STEP 6: Interactive Knowledge Graph Path */}
+            {activeStep === 6 && (
+              <div className={s.stepPane}>
+                <div className={s.stepHeaderTitle}><Network size={14} color="var(--indigo)" /> Step 6: Knowledge Graph Subgraph Investigation</div>
 
                 <div className={s.graphToolbar}>
                   <button className={`${s.graphToolBtn} ${graphTraceMode === 'All' ? s.graphToolBtnActive : ''}`} onClick={() => setGraphTraceMode('All')}>All Links</button>
@@ -752,41 +802,10 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 5: Propagation Timeline */}
-            {activeStep === 5 && (
+            {/* STEP 7: Counterfactual Simulator */}
+            {activeStep === 7 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><GitBranch size={14} color="var(--orange)" /> Step 5: Disruption Propagation Timeline</div>
-                <div className={s.propTimeline}>
-                  {(propFlow.length > 0 ? propFlow : [
-                    { node: inc.affectedSupplier, type: 'Supplier Origin', time: 'T+0h', severity: 'High', confidence: '98%', impact: '$142,000' },
-                    { node: 'Inbound Carrier Freight', type: 'Transit Shipment', time: 'T+12h', severity: 'High', confidence: '96%', impact: '$210,000' },
-                    { node: inc.affectedWarehouse, type: 'Distribution Center', time: 'T+24h', severity: 'Critical', confidence: '94%', impact: '$380,000' },
-                    { node: 'Central Buffer Inventory', type: 'Inventory Holding', time: 'T+36h', severity: 'Medium', confidence: '91%', impact: '$95,000' },
-                    { node: 'Market Customer Segments', type: 'Customer Delivery SLA', time: 'T+48h', severity: 'Medium', confidence: '89%', impact: '$120,000' },
-                  ]).map((n, i, arr) => (
-                    <div key={i} className={s.propStep}>
-                      <div className={s.propDot} style={{ background: n.severity === 'Critical' ? 'var(--rose)' : n.severity === 'High' ? 'var(--orange)' : 'var(--amber)' }} />
-                      {i < arr.length - 1 && <div className={s.propLine} />}
-                      <div className={s.propCard}>
-                        <div className={s.propTime}>{n.time}</div>
-                        <div className={s.propName}>{n.node}</div>
-                        <div className={s.propType}>{n.type}</div>
-                        <div className={s.propImpactRow}>
-                          <span style={{ color: 'var(--rose)', fontWeight: 800 }}>Exposure: {n.impact}</span>
-                          <span className={`${s.tag} ${n.severity === 'Critical' ? s.tagRose : s.tagAmber}`}>{n.severity}</span>
-                        </div>
-                        <div className={s.propConf}>Confidence: {n.confidence}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* STEP 6: Counterfactual Simulator */}
-            {activeStep === 6 && (
-              <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><Zap size={14} color="var(--emerald)" /> Step 6: Counterfactual Simulator</div>
+                <div className={s.stepHeaderTitle}><Zap size={14} color="var(--emerald)" /> Step 7: Counterfactual Simulator</div>
                 <div className={s.simGrid}>
                   <div className={s.simControls}>
                     {[
@@ -830,28 +849,46 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 7: AI Copilot Briefing */}
-            {activeStep === 7 && (
+            {/* STEP 8: LLM Investigation Grounded Console */}
+            {activeStep === 8 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><Brain size={14} color="var(--blue)" /> Step 7: GraphRAG Investigation Briefing</div>
-                <div className={s.briefBriefing}>
-                  <p>The AI Investigation Copilot is docked to the right of your screen at all times during your session, allowing you to ask queries. Below are some quick investigation starters you can send to the Copilot:</p>
-                  <div className={s.aiQuickPromptsGrid}>
-                    {QUICK_PROMPTS.map((pr, idx) => (
-                      <button key={idx} className={s.promptQuickCard} onClick={() => handleSendCopilot(pr)}>
-                        <strong>{pr}</strong>
-                        <span>Send to right-docked AI ➔</span>
-                      </button>
+                <div className={s.stepHeaderTitle}><Brain size={14} color="var(--blue)" /> Step 8: Integrated SCM Causal Investigator</div>
+                <div className={s.inlineChatContainer}>
+                  <div className={s.inlineChatScroll}>
+                    {copilotHistory.map((h, i) => (
+                      <div key={i} className={`${s.inlineMessageRow} ${h.role === 'user' ? s.inlineMessageUser : s.inlineMessageAi}`}>
+                        <div className={s.inlineMessageAvatar}>
+                          {h.role === 'user' ? <Users size={11} /> : <Brain size={11} color="var(--blue)" />}
+                        </div>
+                        <div className={s.inlineMessageText}>{h.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={s.inlineChatInputArea}>
+                    <input
+                      value={copilotQuery}
+                      onChange={e => setCopilotQuery(e.target.value)}
+                      placeholder="Ask investigator: Why this cause? What happens if delay is reduced?..."
+                      className={s.inlineChatInput}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSendCopilot() }}
+                    />
+                    <button className={s.inlineChatSendBtn} onClick={() => handleSendCopilot()}>
+                      <Send size={11} />
+                    </button>
+                  </div>
+                  <div className={s.aiQuickPromptsRow} style={{ marginTop: 8 }}>
+                    {QUICK_PROMPTS.slice(0, 3).map((pr, idx) => (
+                      <button key={idx} className={s.quickChip} onClick={() => handleSendCopilot(pr)}>{pr}</button>
                     ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 8: Executive Decision Center */}
-            {activeStep === 8 && (
+            {/* STEP 9: Recommendations Dashboard */}
+            {activeStep === 9 && (
               <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><Lightbulb size={14} color="var(--orange)" /> Step 8: Executive Recommendations & Decision Center</div>
+                <div className={s.stepHeaderTitle}><Lightbulb size={14} color="var(--orange)" /> Step 9: Optimal Strategy & Alternatives</div>
                 <div className={s.optimalContainer}>
                   <div className={s.lbl} style={{ color: 'var(--blue)' }}>Optimal AI Strategy Recommendation</div>
                   <div className={s.recOptimalTitle}>{optimal.name || 'Shift 20% Volume to Secondary Ground Carrier'}</div>
@@ -880,24 +917,41 @@ export default function RiskPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
 
+            {/* STEP 10: Decision Approval Switch */}
+            {activeStep === 10 && (
+              <div className={s.stepPane}>
+                <div className={s.stepHeaderTitle}><CheckSquare size={14} color="var(--indigo)" /> Step 10: Authorization & Operations Approval</div>
                 <div className={s.approvalBox}>
                   <div className={s.approvalCheckboxRow}>
                     <input type="checkbox" id="signDirective" checked={approvedAction} onChange={e => setApprovedAction(e.target.checked)} />
-                    <label htmlFor="signDirective">Authorize Executive Operations Directive for Reallocation</label>
+                    <label htmlFor="signDirective" style={{ fontSize: '11px', fontWeight: 800, color: '#334155', cursor: 'pointer' }}>
+                      Authorize Executive Operations Directive for SCM Volume Reallocation
+                    </label>
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                     <button className={s.approveBtn} disabled={!approvedAction} onClick={() => alert('Operational re-routing directive signed and sent to carriers.')}>
                       Approve & Re-route SCM Node
                     </button>
-                    <button className={s.rejectBtn}>Reject</button>
+                    <button className={s.rejectBtn}>Reject Action Plan</button>
                   </div>
                 </div>
+              </div>
+            )}
 
-                <div className={s.exportOptionsRow}>
-                  <button className={s.hdrBtn} onClick={() => alert('PowerPoint file created in export folder.')}><FileText size={12} /> Export PowerPoint</button>
-                  <button className={s.hdrBtn} onClick={() => alert('PDF document exported successfully.')}><FileSpreadsheet size={12} /> Export PDF</button>
-                  <button className={s.hdrBtn} onClick={() => setExportModalOpen(true)}><Download size={12} /> Generate Executive Report</button>
+            {/* STEP 11: Decision Export Executive Report */}
+            {activeStep === 11 && (
+              <div className={s.stepPane}>
+                <div className={s.stepHeaderTitle}><FileSpreadsheet size={14} color="var(--blue)" /> Step 11: Export Executive Presentation & JSON Audit Pack</div>
+                <div className={s.briefBriefing}>
+                  <p>Prepare the compliance reports and board presentation summaries for other departments. You can generate PowerPoint decks, PDF summaries, or a raw JSON package containing all simulated values:</p>
+                  <div className={s.exportOptionsRow} style={{ marginTop: '12px' }}>
+                    <button className={s.hdrBtn} onClick={() => alert('PowerPoint file created in export folder.')}><FileText size={12} /> Export PowerPoint Slides</button>
+                    <button className={s.hdrBtn} onClick={() => alert('PDF document exported successfully.')}><FileSpreadsheet size={12} /> Export PDF Report</button>
+                    <button className={s.hdrBtn} onClick={() => setExportModalOpen(true)}><Download size={12} /> Download JSON Decision Package</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -909,8 +963,8 @@ export default function RiskPage() {
             <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.max(1, s - 1))} disabled={activeStep === 1}>
               <ChevronLeft size={13} /> Back
             </button>
-            <span className={s.wizardIndexTracker}>Step {activeStep} of 8</span>
-            <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.min(8, s + 1))} disabled={activeStep === 8}>
+            <span className={s.wizardIndexTracker}>Step {activeStep} of 11</span>
+            <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.min(11, s + 1))} disabled={activeStep === 11}>
               Next <ChevronRight size={13} />
             </button>
           </div>

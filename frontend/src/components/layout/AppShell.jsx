@@ -5,10 +5,10 @@ import { api } from '../../api/client'
 import Overview from '../../pages/Overview'
 import ForecastPage from '../../pages/ForecastPage'
 import GraphPage from '../../pages/GraphPage'
+import IntelligencePage from '../../pages/IntelligencePage'
 import RiskPage from '../../pages/RiskPage'
 import EntityPage from '../../pages/EntityPage'
 import ReportsPage from '../../pages/ReportsPage'
-import DecisionJournal from '../../pages/DecisionJournal'
 import { useSharedParams } from '../../hooks/useSharedParams'
 import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 import { ChevronRight, Home, Bell, X, Trash2, AlertTriangle, AlertCircle, CheckCircle, Info, Brain } from 'lucide-react'
@@ -23,7 +23,6 @@ const PAGES = [
   { id: 'risk',         path: '/risk',         label: 'Root Cause Center' },
   { id: 'graph',        path: '/graph',        label: 'Knowledge Intelligence' },
   { id: 'reports',      path: '/reports',      label: 'System & Reports' },
-  { id: 'journal',      path: '/journal',      label: 'Decision Journal' },
 ]
 
 export default function AppShell() {
@@ -260,11 +259,10 @@ export default function AppShell() {
           <Routes>
             <Route path="/"             element={<Overview />} />
             <Route path="/forecast"     element={<ForecastPage />} />
-            <Route path="/graph"        element={<GraphPage />} />
+            <Route path="/graph"        element={<IntelligencePage />} />
             <Route path="/risk"         element={<RiskPage />} />
             <Route path="/entities"     element={<EntityPage />} />
             <Route path="/reports"      element={<ReportsPage />} />
-            <Route path="/journal"      element={<DecisionJournal />} />
             {/* Fallback */}
             <Route path="*"             element={<Navigate to="/" replace />} />
           </Routes>

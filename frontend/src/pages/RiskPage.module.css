@@ -1,337 +1,1101 @@
-/* RiskPage.module.css — Enterprise AI Supply Chain Investigator Workspace */
+/* ═══════════════════════════════════════════════════════════════════════════
+   RiskPage.module.css
+   AMASCI — Executive RCA Center Workspace (Light Theme)
+   ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── PAGE LAYOUT ── */
 .page {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 44px);
   overflow: hidden;
-  background: var(--s0);
-  font-family: var(--font);
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
 }
 
+/* ── HEADER ── */
 .header {
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--b);
-  background: var(--s1);
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
   flex-shrink: 0;
   z-index: 10;
 }
-
-.headerIconWrap {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  flex-shrink: 0;
-  background: rgba(214,48,49,0.08);
-  border: 1px solid rgba(214,48,49,0.2);
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logoBox {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .headerTitle {
-  font-size: 16px;
+  font-size: 13.5px;
   font-weight: 800;
-  color: var(--tp);
-  letter-spacing: -0.3px;
+  color: #0f172a;
+  letter-spacing: -0.2px;
 }
-
 .headerSub {
-  font-size: 11px;
-  color: var(--tm);
-  margin-top: 2px;
+  font-size: 9px;
+  color: #64748b;
 }
-
 .headerRight {
   display: flex;
-  gap: 8px;
   align-items: center;
-  margin-left: auto;
+  gap: 8px;
+}
+.groundingBadge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #10b981;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+}
+.hdrBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all .1s;
+}
+.hdrBtn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.02);
 }
 
-.body {
+/* ── WORKSPACE SHELL ── */
+.workspaceShell {
   display: flex;
   flex: 1;
   overflow: hidden;
   min-height: 0;
 }
 
-.leftPanel {
-  width: 280px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--b);
-  background: var(--s1);
+/* ── LEFT SIDEBAR (Investigation Queue) ── */
+.leftSidebar {
+  width: 300px;
+  border-right: 1px solid #e2e8f0;
+  background: #ffffff;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   overflow: hidden;
 }
-
-.leftHeader {
-  padding: 14px;
-  border-bottom: 1px solid var(--b);
-  flex-shrink: 0;
+.sidebarHeader {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
 }
-
-.listArea {
+.sidebarTitle {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.badgeCounter {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+.sidebarFilters {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+}
+.searchField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  padding: 5px 10px;
+}
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 10.5px;
+  color: #0f172a;
+  flex: 1;
+  min-width: 0;
+}
+.clearBtn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+.sidebarSelect {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 9px;
+  outline: none;
+}
+.queueScroll {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
-}
-
-.issueCard {
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--b);
-  background: var(--s0);
-  margin-bottom: 6px;
-  cursor: pointer;
-  transition: all 120ms;
-}
-
-.issueCardActive {
-  border-color: var(--blue);
-  background: rgba(59, 130, 246, 0.04);
-}
-
-.canvas {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ── 12-STAGE VISUAL INVESTIGATION STEPPER ── */
-.stepperCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 10px;
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.stepperHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.stepperGrid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 4px;
-  overflow-x: auto;
-}
-
-.stepperBox {
-  background: var(--s0);
-  border: 1px solid var(--b);
-  border-radius: 6px;
-  padding: 6px 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 3px;
-  font-size: 8.5px;
-}
-
-.stepperBoxActive {
-  border-color: var(--blue);
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--blue);
-}
-
-/* ── AI INVESTIGATION ASSISTANT CHAT ── */
-.chatContainer {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  height: 380px;
-  overflow: hidden;
-}
-
-.chatHeader {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--b);
-  background: var(--s2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chatMessages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.msgUser {
-  align-self: flex-end;
-  background: var(--blue);
-  color: white;
-  padding: 8px 14px;
-  border-radius: 12px 12px 0 12px;
-  font-size: 11.5px;
-  max-width: 80%;
-}
-
-.msgAssistant {
-  align-self: flex-start;
-  background: var(--s0);
-  border: 1px solid var(--b);
-  color: var(--tp);
-  padding: 12px 16px;
-  border-radius: 12px 12px 12px 0;
-  font-size: 11.5px;
-  max-width: 90%;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.promptChips {
+/* ── QUEUE CARDS ── */
+.queueCard {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 10px 10px 14px;
+  cursor: pointer;
+  transition: all .12s;
+  overflow: hidden;
+}
+.queueCardStripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+}
+.queueCard:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+.queueCardActive {
+  border-color: #3b82f6;
+  box-shadow: 0 3px 12px rgba(59, 130, 246, 0.08);
+}
+.queueCardHdr {
   display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.queueCardName {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+}
+.queueCardRisk {
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.queueCardMeta {
+  font-size: 8.5px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.queueCardMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+  border-top: 1px dotted #e2e8f0;
+  padding-top: 6px;
+}
+.qKpiLabel {
+  font-size: 7px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.qKpiVal {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #334155;
+  display: block;
+}
+.queueCardFoot {
+  display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  overflow-x: auto;
-  border-top: 1px solid var(--b);
-  background: var(--s1);
 }
 
-.chip {
-  padding: 4px 10px;
-  border-radius: 14px;
-  background: var(--s0);
-  border: 1px solid var(--b);
+/* ── STYLED TAGS ── */
+.tag {
+  font-size: 7.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.tagGreen { background: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.15); }
+.tagAmber { background: rgba(245, 158, 11, 0.08); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15); }
+.tagRose { background: rgba(244, 63, 94, 0.08); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.15); }
+
+/* ── CENTER WORKSPACE ── */
+.centerWorkspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px;
+  min-width: 0;
+}
+
+/* ── EXECUTIVE OVERVIEW CARD ── */
+.executiveOverviewCard {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+}
+.execHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.execTitleBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.incidentNameHeader {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #0f172a;
+}
+.startedLabel {
+  font-size: 8.5px;
+  color: #64748b;
+}
+.pill {
+  font-size: 8px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+.pillRose { background: rgba(244, 63, 94, 0.08); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.15); }
+.pillAmber { background: rgba(245, 158, 11, 0.08); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15); }
+
+.execMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+.lbl {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+  letter-spacing: .02em;
+}
+.val {
   font-size: 10.5px;
-  color: var(--ts);
+  font-weight: 800;
+  color: #334155;
+  display: block;
+}
+
+/* ── WIZARD WORKFLOW TABS ── */
+.wizardContainer {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+.wizardStepBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .1s;
+  white-space: nowrap;
+}
+.wizardStepBtn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.wizardActive {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-weight: 800;
+}
+.wizardDone {
+  color: #10b981;
+}
+.wizardStepIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wizardStepLabel {
+  font-size: 9.5px;
+}
+
+.wizardBodyContent {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 280px;
+}
+.stepPane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+.stepHeaderTitle {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+/* ── STEP 1: BRIEFING ── */
+.stepBriefContainer {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 14px;
+}
+.executiveBriefingTitle {
+  font-size: 9px;
+  font-weight: 800;
+  color: #3b82f6;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.briefingText {
+  font-size: 10.5px;
+  color: #334155;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.executiveBriefingDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 12px;
+}
+.ebRow {
+  display: flex;
+  font-size: 9.5px;
+}
+.ebKey {
+  width: 140px;
+  font-weight: 700;
+  color: #64748b;
+}
+.ebVal {
+  flex: 1;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* ── STEP 2: KPI GRID ── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.kpiCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+.kpiIconBox {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kpiContent {
+  display: flex;
+  flex-direction: column;
+}
+.kpiLabel {
+  font-size: 7.5px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+}
+.kpiValue {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* ── STEP 3: EVIDENCE CARDS ── */
+.evidenceCardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+.evidenceCard {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all .12s;
+  display: flex;
+  flex-direction: column;
+}
+.evidenceCard:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+.evidenceCardSelected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+.evidenceCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.evidenceRank {
+  font-size: 8px;
+  font-weight: 800;
+  color: #3b82f6;
+}
+.evidenceSource {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+.evidenceDesc {
+  font-size: 9.5px;
+  color: #64748b;
+  line-height: 1.4;
+  flex: 1;
+  margin-bottom: 10px;
+}
+.evidenceFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8px;
+  color: #64748b;
+  border-top: 1px dotted #e2e8f0;
+  padding-top: 6px;
+}
+.evidenceInteractLink {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+/* ── STEP 4: GRAPH ── */
+.graphToolbar {
+  display: flex;
+  gap: 4px;
+  background: #f8fafc;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+.graphToolBtn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+.graphToolBtn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+.graphToolBtnActive {
+  background: #3b82f6;
+  color: #ffffff;
+}
+.graphContainerBox {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  height: 290px;
+  position: relative;
+  overflow: hidden;
+}
+.graphSvg {
+  width: 100%;
+  height: 100%;
+}
+.reasonSection {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+.selectedNodeDetailRow {
+  font-size: 9.5px;
+}
+
+/* ── STEP 5: TIMELINE ── */
+.propTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 4px;
+}
+.propStep {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+.propDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 8px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.propLine {
+  position: absolute;
+  top: 18px;
+  left: 4.5px;
+  width: 1px;
+  height: calc(100% + 8px);
+  background: #cbd5e1;
+}
+.propCard {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  flex: 1;
+}
+.propTime {
+  font-size: 8px;
+  font-weight: 850;
+  color: #3b82f6;
+}
+.propName {
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.propType {
+  font-size: 8.5px;
+  color: #64748b;
+}
+.propImpactRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 9px;
+}
+.propConf {
+  font-size: 8px;
+  color: #64748b;
+}
+
+/* ── STEP 6: SIMULATOR ── */
+.simGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+}
+.simControls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sliderRow {
+  display: flex;
+  flex-direction: column;
+}
+.sliderLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.sliderVal {
+  color: #3b82f6;
+  font-weight: 800;
+}
+.slider {
+  width: 100%;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+.slider::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  appearance: none;
+}
+.simResults {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+.simKpiGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+.simKpi {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 6px;
+}
+.simSavings {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.15);
+  border-radius: 5px;
+  padding: 8px;
+}
+
+/* ── STEP 7: COPILOT BRIEF ── */
+.briefBriefing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aiQuickPromptsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.promptQuickCard {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all .1s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.promptQuickCard:hover {
+  border-color: #3b82f6;
+  background: #ffffff;
+}
+
+/* ── STEP 8: DECISION ── */
+.optimalContainer {
+  background: rgba(59, 130, 246, 0.04);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  padding: 10px;
+  border-radius: 6px;
+}
+.recOptimalTitle {
+  font-size: 11px;
+  font-weight: 900;
+  color: #3b82f6;
+}
+.recGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.recCard {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px;
+}
+.actionRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  padding: 4px 0;
+  border-bottom: 1px dotted #e2e8f0;
+}
+.approvalBox {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 10px;
+}
+.approvalCheckboxRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.approveBtn {
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 9.5px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  flex: 1;
+}
+.approveBtn:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+.rejectBtn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 9.5px;
+  font-weight: 700;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.exportOptionsRow {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+/* ── NAV WIZARD ROW ── */
+.wizardNavRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+  margin-top: 16px;
+}
+.wizardIndexTracker {
+  font-size: 9px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+/* ── RIGHT PANEL (ALWAYS DOCKED COPILOT) ── */
+.rightPanelCopilot {
+  width: 320px;
+  border-left: 1px solid #e2e8f0;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.chatContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f8fafc;
+}
+.aiChatMsgScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chatMsgUser {
+  align-self: flex-end;
+  background: #3b82f6;
+  color: #ffffff;
+  border-radius: 8px 8px 0 8px;
+  padding: 8px 10px;
+  max-width: 85%;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+}
+.chatMsgAi {
+  align-self: flex-start;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px 8px 8px 0;
+  padding: 8px 10px;
+  max-width: 85%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+.chatRole {
+  font-size: 7.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  color: inherit;
+  opacity: 0.7;
+}
+.chatText {
+  font-size: 9.5px;
+  line-height: 1.4;
+  margin: 0;
+}
+.typingIndicator {
+  font-size: 9px;
+  font-style: italic;
+  color: #64748b;
+}
+
+.sidebarPromptsStrip {
+  padding: 6px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+.promptChip {
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 7.5px;
+  font-weight: 700;
+  color: #64748b;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 120ms;
 }
-.chip:hover {
-  border-color: var(--blue);
-  color: var(--blue);
+.promptChip:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
 .chatInputRow {
   display: flex;
-  padding: 8px 12px;
-  border-top: 1px solid var(--b);
-  background: var(--s0);
-  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+  gap: 4px;
 }
-
-/* ── DISRUPTION PROPAGATION FLOW ── */
-.propagationCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 10px;
-  padding: 16px;
+.chatInput {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  outline: none;
+  font-size: 9.5px;
 }
-
-.propFlowGrid {
+.chatSendBtn {
+  width: 26px;
+  height: 26px;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 10px 0;
+  justify-content: center;
+}
+.chatSendBtn:hover {
+  background: #2563eb;
 }
 
-.propNode {
-  background: var(--s0);
-  border: 1px solid var(--b);
+/* ── 12-STAGE PIPELINE DRAWER ── */
+.pipelineDrawer {
+  position: absolute;
+  top: 48px;
+  right: 16px;
+  width: 320px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 10px 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+  z-index: 50;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 130px;
-  text-align: center;
+  max-height: 480px;
 }
-
-.propArrow {
-  color: #e67e22;
-  font-size: 16px;
+.pipelineDrawerHeader {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.drawerClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+}
+.pipelineScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.drawerStep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+}
+.drawerStepIdx {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 8px;
+  font-weight: 850;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.drawerStepName {
+  font-size: 9px;
   font-weight: 800;
+  color: #334155;
+}
+.drawerStepMeta {
+  font-size: 7.5px;
+  color: #64748b;
 }
 
-/* ── COUNTERFACTUAL INTERVENTION MATRIX ── */
-.cfCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 10px;
+/* ── MODALS ── */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modalBox {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  width: 440px;
   padding: 16px;
-}
-
-.cfTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-}
-
-.cfTable th {
-  text-align: left;
-  padding: 8px;
-  border-bottom: 1px solid var(--b);
-  color: var(--tm);
-  font-weight: 700;
-}
-
-.cfTable td {
-  padding: 8px;
-  border-bottom: 1px solid var(--b);
-  color: var(--tp);
-}
-
-/* ── STRUCTURED INVESTIGATION REPORT ── */
-.reportCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 12px;
-  padding: 20px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.12);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.reportGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
-
-.reportBox {
-  background: var(--s0);
-  border: 1px solid var(--b);
-  border-radius: 8px;
-  padding: 10px 14px;
+.modalHeader {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
 }
-
-/* ── DECISION INTELLIGENCE EXECUTIVE BANNER ── */
-.decisionCard {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 12px;
-  padding: 20px;
-  color: #f8fafc;
+.modalHeader button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+}
+.modalBody {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
+}
+.modalKpiRow {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 8px;
+  font-size: 9.5px;
+}
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
 }

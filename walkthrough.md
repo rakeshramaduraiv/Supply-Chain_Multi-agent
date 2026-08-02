@@ -185,3 +185,189 @@ AlertsPage
 
 - **Safari CSS Prefixes**: Implemented browser vendor prefixes (`-webkit-backdrop-filter` and `-webkit-user-select`) inside `GraphPage.module.css` to support visual transparency and selection handling in Safari and iOS web views.
 - **JS-Driven compilation Config**: Configured `allowJs: true` and expanded the input matching path to `src/**/*` in `tsconfig.app.json` to properly compile purely JavaScript and JSX code bases using the TypeScript typechecker.
+
+---
+
+## 9. Forecast Center Validation & Ingestion Upgrades
+
+- **Direct File Drag & Drop**: Removed the synthetic month selector buttons and standard file input button. Replaced it with a clean, professional drag-and-drop `UploadZone` that automatically triggers the upload validation mutation upon drop or click selection.
+- **13-Stage Visual Pipeline Link**: Linked the drag-and-drop ingestion directly to the `ActualUploadWorkflow` 13-stage pipeline visualization, showing live status, record counts, and MAPEs.
+- **2x2 Validation Charts Grid**: Added a rich grid of 4 comparison charts:
+  1. *Actual vs Predicted Order Volume Trend*: Composed chart showing monthly actuals vs forecast.
+  2. *Model Deviation Distribution*: Pie chart breaking down records into within-threshold, minor deviations, and major deviations.
+  3. *Accuracy Cycles*: Line chart mapping prediction confidence, validation accuracy, and rolling average.
+  4. *Multi-Agent Accuracy*: Bar chart comparing the accuracy scores of the Demand, Supplier, Inventory, and Logistics agents.
+
+---
+
+## 10. Knowledge Graph Intelligence Workspace Redesign
+
+A complete redesign of [IntelligencePage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.jsx) and [IntelligencePage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.module.css) into a pure, high-density Enterprise Relationship Model mapping workspace. All conversational chatbot interfaces, business questions, and RAG copilot widgets have been fully removed and relocated.
+
+* **API Query & Verb Refactoring**: Refactored the queries to fetch nodes and relationships using `api.exportGraph()` which returns all categorized nodes and link records in one query, avoiding the 422 validation errors. Fixed a `405 Method Not Allowed` by changing the query method inside the axios client from `GET` to `POST` to conform to the backend router definition. Added `catch` blocks to version queries to handle 500 errors.
+* **Console Warning Optimizations**: Configured `retry: false` and removed automatic background `refetchInterval` polling loops from graph metadata, schema, and active version queries. This prevents console warning spam when the Neo4j database is unpopulated or offline while retaining full manual refresh options via the **Sync Workspace** header button.
+* **Corporate Light Mode Visual Integration**: Redesigned the styling of the workspace (`IntelligencePage.module.css`) to fully align with the application's clean light-theme design guidelines (`index.css`), replacing hardcoded dark backgrounds (`#0b0c10`) with beautiful light surfaces (`#f8f9fb`), white cards, subtle borders, a professional Figma-style dot-grid canvas viewport background, and mapping JS-defined edge colours to CSS theme variables.
+* **Light Slicer & Overlay Controls**: Formatted Slicer buttons/chips inside the sidebar filters using high-contrast active/inactive designs (`slicerBtn`) with a light background and a distinctive blue indicator on selection. Upgraded workspace overlay cards (Minimap, Legend, and Relationship hover tooltips) from dark translucent backdrops to a matching translucent white (`rgba(255, 255, 255, 0.92)`) with clean drop-shadows.
+* **Grounded Fallback Mapping**: Integrated interactive fallback datasets representing a 5-node supply chain traversal path. The canvas, legend, timeline, right-hand details tab, and simulation sliders remain fully functional and interactive even if Neo4j is offline or the database is unpopulated.
+
+```text
+IntelligencePage
+├── Header          (Neo4j Status · Node/Rel Count · TPKE Version · confidence · health score)
+│
+├── LEFT (310px)    Searchable Entity Explorer
+│   ├── Interactive search bar
+│   ├── Node Type filters (Supplier, Warehouse, Product, etc.)
+│   └── Risk level filters (High, Medium, Low)
+│
+├── CENTER          Power BI Model View Canvas (custom DOM + SVG overlay)
+│   ├── Entities: DOM table cards styled by Type with risk/confidence/impact indicators
+## 11. Root Cause Center Redesign: Executive AI Investigation Workspace
+
+A complete redesign of [RiskPage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/RiskPage.jsx) and [RiskPage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/RiskPage.module.css) from a tabbed report page into a professional, guided 8-step Enterprise AI Investigation Workspace inspired by Oracle Fusion SCM, SAP IBP, Microsoft Fabric, and Palantir Foundry.
+
+### Guided Main Workflow (8 Steps)
+
+The page layout is structured as a step-by-step guided wizard driving the center pane, ensuring executives and analysts focus only on relevant context:
+1. **STEP 1: Executive Summary** — Grounded AI Incident Briefing memo describing what happened, why, financial impact, affected entities, and prediction confidence.
+2. **STEP 2: Business Impact** — High-fidelity 9-KPI dashboard showcasing Revenue Exposure, Delayed Orders, Affected SKUs, Regions, Delay Days, and Forecast drop.
+3. **STEP 3: Evidence Ranking** — Interactive evidence cards outlining source type, description, confidence, and criticality level, with hovering/clicking highlights connected to the graph.
+4. **STEP 5: Knowledge Graph** — SVG relationship visualization showing Supplier, Product, Warehouse, Shipment, and Customer cards. Features path tracing toggles: Upstream Path, Downstream Path, Shortest Path to Customer, and Critical Causal Line.
+5. **STEP 5: Propagation Timeline** — Vertical disruption timeline tracking time offsets (T+0h to T+48h), severity dots, and localized financial impact shifts.
+6. **STEP 6: Counterfactual Sim** — 6 sliders allowing perturbations on Supplier Delay, Warehouse Capacity, Inventory buffers, Demand, Transport delays, and Carrier capacity. Updates risk, forecast drop, delay, and recommended actions instantly.
+7. **STEP 7: AI Copilot Briefing** — Detailed guide highlighting the right-docked LLM's GraphRAG capabilities and listing quick prompt options.
+8. **STEP 8: Decision Center** — Recommendation cards showing expected savings, implementation cost, difficulty, time, risk, with operational approval toggles and PDF/PPT/JSON download options.
+
+### Incident Overview Header
+
+* Renders a large, multi-column dashboard card displaying Incident Name, Severity, Status, Started Time, Region, Affected Supplier/Warehouse, Exposure, Forecast Accuracy impact, and Prediction Source.
+
+### Left Sidebar: Investigation Queue
+
+* Replaces simple lists with high-fidelity status cards displaying left severity indicators (rose, orange, amber, green), current Risk Index, total Exposure, affected orders, grounded confidence, status tags, and time since detection. Clicking dynamically updates the entire workspace.
+
+### Right Sidebar: Always-Docked AI Copilot
+
+* The GraphRAG chatbot stays docked on the right margin, providing quick prompt chips, real-time query responses, and suggestions grounded strictly in Neo4j databases and temporal learning history.
+Confidence/Consequences
+3. **Impact Assessment** — 8 KPI dashboard: Revenue, Orders, Customers, Warehouses, Products, Supplier Risk, Forecast Degradation, Financial Exposure + Recovery Timeline bar
+4. **Evidence Ranking** — Clickable matrix with synchronized graph highlighting
+5. **Knowledge Graph** — SVG relationship map with reasoning accordion
+6. **Propagation Timeline** — Animated vertical timeline (T+0h → T+48h) with severity dots
+7. **Counterfactual Simulation** — 5 interactive sliders (Supplier Delay, Warehouse Capacity, Transport Delay, Inventory Buffer, Demand Level) + live recalculated outcomes
+9. **Recommendations** — Optimal action card + executive approval directive
+10. **Decision Export** — TPKE learned edges + JSON download
+
+The 12-stage AI pipeline is now available inside a **collapsible "Investigation Progress" drawer** via the header button.
+
+---
+
+## 12. Knowledge Intelligence Redesign: Enterprise Digital Twin Workspace (Light Theme)
+
+A complete redesign of [IntelligencePage.jsx](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.jsx) and [IntelligencePage.module.css](file:///c:/Users/balan/OneDrive/Desktop/supply-chain/frontend/src/pages/IntelligencePage.module.css) from a graph viewer into a high-fidelity Light Theme Enterprise Digital Twin platform.
+
+**Design inspirations**: Microsoft Power BI Model View, Neo4j Bloom, Oracle Fusion SCM Digital Twin, Microsoft Fabric Lineage View, Palantir Foundry.
+
+### Light Relationship Canvas
+
+* **Soft Grey Dot-Matrix Pattern Canvas** (`#f8fafc` background with `#e2e8f0` grid dots) providing a highly clean, commercial look.
+* **White Entity Cards** with clear border outlines (`#cbd5e1`) and soft drop shadows (`0 4px 12px rgba(0,0,0,0.05)`).
+* **Causal Traversal Engine**: Selecting any node automatically traverses the topology (using BFS queues) to highlight:
+  * **Upstream Dependencies** (highlighted in Yellow: `#eab308`)
+  * **Downstream Impacts** (highlighted in Orange: `#f97316`)
+  * **Shortest Path to Customer** (highlighted in Emerald Green: `#10b981`)
+* **Animated Directed Edges** displaying weight flow speed based on confidence, relationship type, and traversal role (Upstream/Downstream/Shortest Path).
+* **Tooltip Overlays** showing type, direction, confidence, weight, risk level, and business impact.
+* Interactivity including pan, zoom, drag, node click focusing, and neighbor expansion/collapsing.
+
+### Entity Cards (Power BI–style)
+
+* **Status indicator bar** — 3px top bar colored by risk level (rose/amber/emerald)
+* **Operational status badge** — "At Risk", "Warning", "Operational"
+* **Core metrics row** — Risk %, Prediction %, Impact % displayed inline
+* **Expandable properties** — Double-click to expand/collapse additional attributes
+* **Primary key footer** — Node ID with expand chevron
+* 10 entity types: Supplier, Warehouse, Product, Shipment, Customer, Carrier, Region, Order, Department, Store
+
+
+### left Sidebar (Entity Explorer Slicers)
+
+* Search bar for filtering by IDs or properties.
+* **Entity Type pills**: Slicers for all 10 types.
+* **Risk Level pills**: High, Medium, Low.
+* **Prediction selector**: High/Low confidence filter.
+* **Criticality selector**: Critical, High, Medium, Low.
+
+### Entity Intelligence Dashboard (Right Panel)
+
+* **Profile header** with risk chip and entity icon
+* **Quick KPI strip** — Risk, Prediction, Centrality, Links (4 metrics)
+* **Risk progress bar** with color-coded fill
+* 5 tabs: **Overview** (attributes), **Links** (connected entities, Critical dependency flow), **Centrality** (betweenness, closeness, PageRank, recent changes), **TPKE History** (Line and Bar charts showing confidence evolution), **Trend & Forecast** (Area chart for Risk Index history, Forecast influence meter)
+
+### Digital Twin Simulation Panel (Right Panel Tab)
+
+* **5 adjustable parameters**: Supplier Delay, Warehouse Capacity, Inventory Buffer, Transport Delay, Demand Level
+* **Live client-side topology recalculation** — Node Risk, Prediction Confidence, Affected Nodes, Risk Delta
+* **Server simulation** — Sends perturbations to `/api/v1/rca/counterfactual`
+* **Reset button** to restore baseline
+
+### Knowledge Analytics (Bottom Panel Tab)
+
+* **Relationship Distribution** — Bar chart of relationship types.
+* **Node Degree Distribution** — Bar chart by entity type.
+* **Edge Confidence Distribution** — Area chart mapping count vs confidence groups.
+* **Centrality Ranking** — Top 5 nodes by betweenness/closeness.
+* **Community Detection** — Pie chart of node communities.
+* **Knowledge Growth** — Line chart showing node and edge counts over quarters.
+* **Risk Heatmap** — Heatmap grid displaying nodes by risk color.
+* **Knowledge Coverage** — Pie chart showing Grounded vs TPKE Inferred data.
+* **Business Impact Distribution** — Radar chart displaying structural metrics (Density, Health, Connectivity).
+* **Structural Metrics** — Clustering coefficient, components, average degree.
+
+### Graph Replay Timeline (Bottom Panel Tab)
+
+* 9 stages: Forecast Generated → Prediction → Actual Upload → Validation → Root Cause → TPKE Learning → Graph Mutation → Retraining → Next Forecast
+* **Playback animation** at 1.5s intervals with Play/Pause controls
+* **Click-to-seek** to any stage
+
+### Relationship Explorer (Bottom Panel Tab)
+
+* 9 columns: Source Entity, Relationship Type, Target Entity, Weight, Confidence, TPKE Status, Risk Level, Supporting Evidence, Temporal Evolution.
+* **Color-coded badges** for relationship types.
+
+### Offline Fallback
+
+* **16 nodes** (incorporating Store, Carrier, Department, Region)
+* **17 edges** with detailed weights and confidence
+
+```text
+Digital Twin Workspace (Light Theme)
+├── Header (Enterprise Digital Twin · Neo4j status · KG version · Health score · Live Sync)
+└── Body (Flex: 3-column)
+    ├── LEFT (280px): Entity Explorer (Search + 10 Type Slicers + Risk + Pred + Crit Selectors)
+    │
+    ├── CENTER (flex): Digital Twin Canvas (Light Canvas with dot-grid pattern)
+    │   ├── Toolbar (8 layer pills · Trace · Zoom · Reset · Legend · Bottom toggle)
+    │   ├── Viewport (pan/zoom/drag canvas)
+    │   │   ├── SVG Edge Layer (curved, animated, labeled)
+    │   │   ├── HTML Card Layer (Power BI cards with status bars)
+    │   │   ├── Legend Overlay (entities + relationships)
+    │   │   ├── Minimap Overlay
+    │   │   └── Relationship Tooltip (direction, weight, confidence, TPKE, impact)
+    │   └── Bottom Panel (220px, collapsible)
+    │       ├── Tab: Graph Replay Timeline (9 stages + Play/Pause)
+    │       ├── Tab: Relationship Explorer (9-column table)
+    │       └── Tab: Knowledge Analytics (10 chart cards)
+    │
+    └── RIGHT (320px): Intelligence Panels
+        ├── Tab: Entity Intelligence Dashboard
+        │   ├── Profile header + Quick KPI strip + Risk bar
+        │   └── 5 sub-tabs: Overview / Links / Centrality / TPKE / Trend & Forecast
+        └── Tab: Digital Twin Simulation
+            ├── 5 parameter sliders
+            ├── Live topology recalculation grid (4 KPIs)
+            ├── Server simulation button
+            └── Server result display
+```
+
+

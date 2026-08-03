@@ -490,7 +490,7 @@ export default function RiskPage() {
               {searchQ && <button className={s.clearBtn} onClick={() => setSearchQ('')}>×</button>}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+            <div className={s.filterGrid}>
               <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} className={s.sidebarSelect}>
                 <option value="All">All Severity</option>
                 <option value="Critical">Critical</option>

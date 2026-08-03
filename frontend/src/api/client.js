@@ -36,6 +36,7 @@ export const api = {
   getDatasetAnalytics:  () => http.get('/api/v1/dataset/analytics'),
   getNextForecastPeriod:() => http.get('/api/v1/dataset/next-forecast-period'),
   getAutoForecast:      () => http.get('/api/v1/dataset/auto-forecast'),
+  getErrorDiagnostics:  (period) => http.get('/api/v1/dataset/error-diagnostics', { params: { period_start: period } }),
 
   // Dashboard
   getDashboard:       () => http.get('/api/v1/dashboard'),

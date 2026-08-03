@@ -169,12 +169,28 @@ async def upload_actual_dataset(
     except Exception as e:
         logger.warning(f"Automated RCA execution fallback: {e}")
 
-    # Step 5: Return Recommendations & metadata
+    # Step 4d: Auto-generate Next Month Forecast to close the cycle loop
+    from app.api.v1.endpoints.dataset_summary import _compute_auto_forecast, clear_dataset_cache
+    clear_dataset_cache()
+    next_forecast_data = _compute_auto_forecast()
+    next_period_info = {
+        "period_start": "2019-02-01",
+        "period_end": "2019-02-28",
+        "training_data_end": "2019-01-31",
+        "recommendation": "Next forecast active: February 2019"
+    }
+
+    # Step 5: Return Recommendations, metadata, and auto-generated next forecast
+    response_payload = UploadResponse(**metadata).model_dump()
+    response_payload["next_period"] = next_period_info
+    response_payload["next_forecast"] = next_forecast_data
+
     return BaseResponse(
         success=True,
-        message=f"Actual dataset uploaded, KG updated, & Closed-Loop cycle executed: {metadata['row_count']} rows processed",
-        data=UploadResponse(**metadata),
+        message=f"Actual dataset uploaded, KG updated, & Next Forecast (February 2019) auto-generated: {metadata['row_count']} rows processed",
+        data=response_payload,
     )
+
 
 
 @router.post(

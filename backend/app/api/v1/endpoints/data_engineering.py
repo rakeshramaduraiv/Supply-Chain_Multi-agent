@@ -119,6 +119,18 @@ async def upload_actual_dataset(
 
     _dataset_store[metadata["dataset_id"]] = metadata
 
+    df_actual = upload_service.load_dataset(metadata["dataset_id"])
+    ecle_res = None
+    try:
+        from app.services.enterprise_learning_engine import get_enterprise_learning_engine
+        engine = get_enterprise_learning_engine()
+        ecle_res = await engine.run_continuous_learning_cycle(
+            df_new=df_actual,
+            filename=file.filename or "actuals.csv",
+        )
+    except Exception as e_ecle:
+        logger.warning(f"Enterprise Continuous Learning Engine fallback: {e_ecle}")
+
     from app.api.v1.endpoints.dataset_summary import clear_dataset_cache
     clear_dataset_cache()
 

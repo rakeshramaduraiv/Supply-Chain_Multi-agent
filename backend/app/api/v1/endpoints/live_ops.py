@@ -37,6 +37,13 @@ _parquet_cache: pd.DataFrame | None = None
 _parquet_mtime: float = 0.0
 
 
+def clear_live_ops_cache():
+    """Invalidate live ops parquet cache."""
+    global _parquet_cache, _parquet_mtime
+    _parquet_cache = None
+    _parquet_mtime = 0.0
+
+
 def _load_parquet() -> pd.DataFrame | None:
     """Load or retrieve cached processed master parquet dataset."""
     global _parquet_cache, _parquet_mtime

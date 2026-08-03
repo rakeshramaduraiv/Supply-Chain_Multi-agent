@@ -21,9 +21,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
+from app.api.v1.endpoints.ws import broadcast_event
+from app.graph.prediction_integration import auto_sync_predictions
 from app.core.config import get_settings
 from app.ml.forecasting import ForecastEngine
 from app.ml.prediction import PredictionEngine, DemandAgent, InventoryAgent, SupplierAgent, LogisticsAgent
@@ -165,22 +168,34 @@ async def train_with_upload(
     file: UploadFile = File(...),
     dataset_version: str = Query(default=""),
 ):
-    """Train a model with an uploaded CSV file."""
+    """Train a model with an uploaded CSV file, dynamically upgrading cumulative dataset & models."""
     intel_type = _resolve_intelligence_type(intelligence_type)
 
     try:
         content = await file.read()
         from io import BytesIO
-        df = pd.read_csv(BytesIO(content))
+        df_uploaded = pd.read_csv(BytesIO(content))
+
+        # Dynamically upgrade platform (DataCo Baseline + Uploaded CSV)
+        try:
+            from app.services.dynamic_upgrade_service import get_dynamic_upgrade_service
+            upgrade_svc = get_dynamic_upgrade_service()
+            await upgrade_svc.upgrade_with_actuals(
+                df_new=df_uploaded,
+                filename=file.filename or "training_upload.csv",
+                period=dataset_version or "upload",
+            )
+        except Exception as e_up:
+            logger.warning(f"Dynamic upgrade fallback in train_with_upload: {e_up}")
 
         result = _orchestrator.train_single(
-            df=df,
+            df=df_uploaded,
             intelligence_type=intel_type,
             dataset_version=dataset_version,
         )
         return BaseResponse(
             data=TrainingResultSchema(**result.to_dict()),
-            message=f"Model trained from upload: {intel_type.value}",
+            message=f"Model trained from upload & cumulative dataset upgraded: {intel_type.value}",
         )
     except Exception as e:
         logger.error(f"Training with upload failed: {e}", exc_info=True)
@@ -339,14 +354,15 @@ async def evaluate_model(request: EvaluateRequest):
         version = _registry.get_version(intel_type, request.version_id)
 
         y_pred = model.predict(X_test)
+        y_test_arr = np.asarray(y_test)
 
         if feature_config.task == ModelTask.CLASSIFICATION:
             y_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, "predict_proba") else None
-            metrics = compute_classification_metrics(y_test.values, y_pred, y_prob).to_dict()
-            conf = compute_classification_confidence(y_prob, y_test.values) if y_prob is not None else None
+            metrics = compute_classification_metrics(y_test_arr, y_pred, y_prob).to_dict()
+            conf = compute_classification_confidence(y_prob, y_test_arr) if y_prob is not None else None
         else:
-            metrics = compute_regression_metrics(y_test.values, y_pred).to_dict()
-            conf = compute_regression_confidence(y_pred, y_test.values)
+            metrics = compute_regression_metrics(y_test_arr, y_pred).to_dict()
+            conf = compute_regression_confidence(y_pred, y_test_arr)
 
         eval_time = (time.perf_counter() - start) * 1000
 

@@ -130,6 +130,19 @@ async def upload_actual_data(
     df_actual = upload_service.load_dataset(metadata["dataset_id"])
     df_actual.columns = [c.strip() for c in df_actual.columns]
 
+    # Trigger 12-Stage Enterprise Continuous Learning Pipeline
+    ecle_res = None
+    try:
+        from app.services.enterprise_learning_engine import get_enterprise_learning_engine
+        engine = get_enterprise_learning_engine()
+        ecle_res = await engine.run_continuous_learning_cycle(
+            df_new=df_actual,
+            filename=file.filename or "actuals.csv",
+            period=period,
+        )
+    except Exception as e_ecle:
+        logger.warning(f"Enterprise Continuous Learning Engine fallback: {e_ecle}")
+
     records_loaded   = metadata["row_count"]
     records_matched  = 0
     total_error      = 0.0
@@ -156,9 +169,9 @@ async def upload_actual_data(
                     if entity_type == "Product":
                         for col in ("Product Card Id", "Product Name", "Category Name"):
                             if col in df_actual.columns:
-                                sub = df_actual[df_actual[col].astype(str) == str(entity_id)]
+                                sub = df_actual[df_actual[col].astype(str) == entity_id]
                                 if not sub.empty:
-                                    actual_val = float(sub["Order Item Quantity"].mean()) if "Order Item Quantity" in sub.columns else 0.0
+                                    actual_val = sub["Order Item Quantity"].mean() if "Order Item Quantity" in sub.columns else 0.0
                                     break
                     else:
                         lookup = {
@@ -168,9 +181,9 @@ async def upload_actual_data(
                         }
                         for col in lookup.get(entity_type, []):
                             if col in df_actual.columns:
-                                sub = df_actual[df_actual[col].astype(str) == str(entity_id)]
+                                sub = df_actual[df_actual[col].astype(str) == entity_id]
                                 if not sub.empty:
-                                    actual_val = float(sub["Late_delivery_risk"].mean()) if "Late_delivery_risk" in sub.columns else 0.0
+                                    actual_val = sub["Late_delivery_risk"].mean() if "Late_delivery_risk" in sub.columns else 0.0
                                     break
 
                     if actual_val is None:
@@ -200,7 +213,7 @@ async def upload_actual_data(
 
     # 2. Compute accuracy directly from CSV when no DB forecast available
     if records_matched == 0 and "Late_delivery_risk" in df_actual.columns:
-        late_rate        = float(df_actual["Late_delivery_risk"].mean())
+        late_rate        = df_actual["Late_delivery_risk"].mean()
         overall_accuracy = round(min(99.0, max(50.0, (1.0 - late_rate) * 100.0 * 0.95 + 5.0)), 2)
         records_matched  = records_loaded
         within_threshold = int(records_loaded * (1.0 - late_rate))
@@ -898,7 +911,7 @@ async def get_alerts():
                             created_at=datetime.now(timezone.utc).isoformat()
                         ))
                     # Generate late delivery alert
-                    elif r.entity_type == "Shipment" and (r.risk_flag or r.confidence_score < 0.65):
+                    elif r.entity_type == "Shipment" and (r.risk_flag or (r.confidence_score is not None and r.confidence_score < 0.65)):
                         all_alerts.append(AlertItem(
                             id=f"db_alert_late_{r.entity_id}",
                             name="Late Delivery Risk",
@@ -915,7 +928,7 @@ async def get_alerts():
                             created_at=datetime.now(timezone.utc).isoformat()
                         ))
                     # Generate supplier alert
-                    elif r.entity_type == "Supplier" and (r.risk_flag or r.confidence_score < 0.70):
+                    elif r.entity_type == "Supplier" and (r.risk_flag or (r.confidence_score is not None and r.confidence_score < 0.70)):
                         all_alerts.append(AlertItem(
                             id=f"db_alert_supplier_{r.entity_id}",
                             name="Supplier Reliability Drop",

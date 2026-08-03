@@ -33,6 +33,11 @@ def clear_dataset_cache():
     global _cache, _analytics_cache
     _cache = None
     _analytics_cache = None
+    try:
+        from app.api.v1.endpoints.live_ops import clear_live_ops_cache
+        clear_live_ops_cache()
+    except Exception:
+        pass
 
 
 def _load_parquet() -> pd.DataFrame | None:
@@ -520,7 +525,7 @@ def get_error_diagnostics(period_start: str = None):
     Joins forecast evaluations with DataCo actuals.
     Shows: Predicted vs Actual, Variance, Responsible Agent, Risk Level.
     """
-    df = _load_dataset()
+    df = _load_parquet()
     if df is None or len(df) == 0:
         return {"diagnostics": [], "count": 0}
 

@@ -79,23 +79,23 @@ const STALE = {
 
 // ─── Individual query hooks ───────────────────────────────────────────────────
 
-export function useDatasetSummary()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.datasetSummary,   queryFn: () => api.getDatasetSummary().then(r => r.data),   staleTime: STALE.normal }) }
-export function useDatasetAnalytics() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.datasetAnalytics, queryFn: () => api.getDatasetAnalytics().then(r => r.data), staleTime: STALE.normal }) }
-export function useAutoForecast()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.autoForecast,     queryFn: () => api.getAutoForecast().then(r => r.data),     staleTime: STALE.normal }) }
-export function useNextForecast()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.nextForecast,     queryFn: () => api.getNextForecastPeriod().then(r => r.data), staleTime: STALE.normal }) }
+export function useDatasetSummary()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.datasetSummary,   queryFn: () => api.getDatasetSummary().then(r => r.data),   staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useDatasetAnalytics() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.datasetAnalytics, queryFn: () => api.getDatasetAnalytics().then(r => r.data), staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useAutoForecast()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.autoForecast,     queryFn: () => api.getAutoForecast().then(r => r.data),     staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useNextForecast()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.nextForecast,     queryFn: () => api.getNextForecastPeriod().then(r => r.data), staleTime: 5_000, refetchInterval: 10_000 }) }
 
-export function useKpis()        { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.kpis,         queryFn: () => api.getKpis().then(r => r.data),          staleTime: STALE.normal }) }
-export function useDashboard()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.dashboard,    queryFn: () => api.getDashboard().then(r => r.data),      staleTime: STALE.normal }) }
-export function useExecSummary() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.execSummary,  queryFn: () => api.getExecSummary().then(r => r.data),    staleTime: STALE.normal }) }
-export function useTrends()      { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.trends,       queryFn: () => api.getTrends().then(r => r.data),         staleTime: STALE.normal }) }
-export function useForecastDash(){ return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.forecastDash, queryFn: () => api.getForecastDash().then(r => r.data),   staleTime: STALE.normal }) }
-export function useRiskDash()    { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.riskDash,     queryFn: () => api.getRiskDash().then(r => r.data),       staleTime: STALE.normal }) }
-export function useGraphDash()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphDash,    queryFn: () => api.getGraphDash().then(r => r.data),      staleTime: STALE.normal }) }
-export function useTpkeDash()    { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.tpkeDash,     queryFn: () => api.getTpkeDash().then(r => r.data),       staleTime: STALE.normal }) }
-export function useRcaDash()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.rcaDash,      queryFn: () => api.getRootcauseDash().then(r => r.data),  staleTime: STALE.normal }) }
+export function useKpis()        { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.kpis,         queryFn: () => api.getKpis().then(r => r.data),          staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useDashboard()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.dashboard,    queryFn: () => api.getDashboard().then(r => r.data),      staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useExecSummary() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.execSummary,  queryFn: () => api.getExecSummary().then(r => r.data),    staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useTrends()      { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.trends,       queryFn: () => api.getTrends().then(r => r.data),         staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useForecastDash(){ return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.forecastDash, queryFn: () => api.getForecastDash().then(r => r.data),   staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useRiskDash()    { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.riskDash,     queryFn: () => api.getRiskDash().then(r => r.data),       staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useGraphDash()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphDash,    queryFn: () => api.getGraphDash().then(r => r.data),      staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useTpkeDash()    { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.tpkeDash,     queryFn: () => api.getTpkeDash().then(r => r.data),       staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useRcaDash()     { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.rcaDash,      queryFn: () => api.getRootcauseDash().then(r => r.data),  staleTime: 5_000, refetchInterval: 10_000 }) }
 
-export function useGraphStats()  { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphStats,  queryFn: () => api.getGraphStats().then(r => r.data?.data || r.data), staleTime: STALE.normal }) }
-export function useGraphSchema() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphSchema, queryFn: () => api.getGraphSchema().then(r => r.data?.data || r.data), staleTime: STALE.slow  }) }
+export function useGraphStats()  { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphStats,  queryFn: () => api.getGraphStats().then(r => r.data?.data || r.data), staleTime: 5_000, refetchInterval: 10_000 }) }
+export function useGraphSchema() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.graphSchema, queryFn: () => api.getGraphSchema().then(r => r.data?.data || r.data), staleTime: STALE.slow }) }
 
 export function useTpkeSummary() { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.tpkeSummary, queryFn: () => api.getTpkeSummary().then(r => r.data), staleTime: STALE.normal }) }
 export function useTpkeEdges()   { return useQuery({ queryKey: SUPPLY_CHAIN_QUERY_KEYS.tpkeEdges,   queryFn: () => api.getTpkeEdges().then(r => r.data),   staleTime: STALE.normal }) }
@@ -331,7 +331,8 @@ export function useLiveOpsEntities(params = {}) {
   return useQuery({
     queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsEntities, params],
     queryFn: () => api.getLiveOpsEntities(params).then(r => r.data),
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
     placeholderData: keepPreviousData,
   })
 }
@@ -341,7 +342,8 @@ export function useLiveOpsEntityAnalytics(params = {}) {
     queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsAnalytics, params],
     queryFn: () => api.getLiveOpsEntityAnalytics(params).then(r => r.data),
     enabled: !!params.entity_id,
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
     placeholderData: keepPreviousData,
   })
 }
@@ -351,7 +353,8 @@ export function useLiveOpsRelationships(entityId) {
     queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsRels, entityId],
     queryFn: () => api.getLiveOpsRelationships(entityId).then(r => r.data),
     enabled: !!entityId,
-    staleTime: 15_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   })
 }
 

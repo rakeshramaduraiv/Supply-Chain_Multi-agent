@@ -33,6 +33,7 @@ TPKE edges in Neo4j:
     }]->(ProductB)
 """
 
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -183,10 +184,10 @@ class EdgeManager:
     - decay():   Time-based weight reduction on all TPKE edges
     """
 
-    def __init__(self, connection: Neo4jConnectionManager, session: AsyncSession):
+    def __init__(self, connection: Neo4jConnectionManager, session: AsyncSession | None = None):
         self._conn = connection
         self._session = session
-        self._tpke_service = TPKELogService(session)
+        self._tpke_service = TPKELogService(session) if session is not None else None
         self._settings = get_settings()
         self._decay_rate = self._settings.tpke_decay_rate
         self._mutations: list[EdgeMutation] = []
@@ -230,21 +231,22 @@ class EdgeManager:
                 )
 
         # Persist all mutations to PostgreSQL
-        for m in self._mutations:
-            await self._tpke_service.log_mutation(
-                action=m.action,
-                source_node_id=m.source_id,
-                source_node_type=m.source_type,
-                target_node_id=m.target_id,
-                target_node_type=m.target_type,
-                relationship_type=m.relationship_type,
-                confidence_before=m.weight_before,
-                confidence_after=m.weight_after,
-                frequency=m.frequency,
-                evidence={"triggered_by": triggered_by},
-                graph_version_id=graph_version_id,
-                triggered_by=triggered_by,
-            )
+        if self._tpke_service is not None:
+            for m in self._mutations:
+                await self._tpke_service.log_mutation(
+                    action=m.action,
+                    source_node_id=m.source_id,
+                    source_node_type=m.source_type,
+                    target_node_id=m.target_id,
+                    target_node_type=m.target_type,
+                    relationship_type=m.relationship_type,
+                    confidence_before=m.weight_before,
+                    confidence_after=m.weight_after,
+                    frequency=m.frequency,
+                    evidence={"triggered_by": triggered_by},
+                    graph_version_id=graph_version_id,
+                    triggered_by=triggered_by,
+                )
 
         logger.info(f"TPKE evolve: {len(self._mutations)} mutations applied")
         return self._mutations
@@ -354,19 +356,20 @@ class EdgeManager:
                 )
 
         # Persist decay mutations to PostgreSQL
-        for m in result.mutations:
-            await self._tpke_service.log_mutation(
-                action=m.action,
-                source_node_id=m.source_id,
-                source_node_type=m.source_type,
-                target_node_id=m.target_id,
-                target_node_type=m.target_type,
-                relationship_type=m.relationship_type,
-                confidence_before=m.weight_before,
-                confidence_after=m.weight_after,
-                frequency=m.frequency,
-                triggered_by="decay_engine",
-            )
+        if self._tpke_service is not None:
+            for m in result.mutations:
+                await self._tpke_service.log_mutation(
+                    action=m.action,
+                    source_node_id=m.source_id,
+                    source_node_type=m.source_type,
+                    target_node_id=m.target_id,
+                    target_node_type=m.target_type,
+                    relationship_type=m.relationship_type,
+                    confidence_before=m.weight_before,
+                    confidence_after=m.weight_after,
+                    frequency=m.frequency,
+                    triggered_by="decay_engine",
+                )
 
         logger.info(
             f"TPKE decay pass: {result.edges_decayed} decayed, "

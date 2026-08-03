@@ -266,6 +266,10 @@ function RelEdge({ edge, src, tgt, isSelected, isDimmed, layer, onSelect, onMous
   const isActual = relType === 'ACTUAL_RESULT'
   const animate = (layer === 'TPKE' && isTpke) || (layer === 'Prediction' && isPred) || (layer === 'Actual' && isActual) || isHighlightedPath || isShortestPathEdge || isDownstreamEdge || isUpstreamEdge
 
+  if (!src || !tgt || typeof src._x !== 'number' || typeof src._y !== 'number' || typeof tgt._x !== 'number' || typeof tgt._y !== 'number' || isNaN(src._x) || isNaN(src._y) || isNaN(tgt._x) || isNaN(tgt._y)) {
+    return null
+  }
+
   const sx = src._x + CARD_W / 2, sy = src._y + CARD_H / 2
   const tx = tgt._x + CARD_W / 2, ty = tgt._y + CARD_H / 2
 

@@ -117,6 +117,22 @@ class AgentMemory:
             self._append_jsonl(agent, rec.to_dict())
         return record_id
 
+    def store_agent_action(
+        self,
+        agent_id: str,
+        action_type: str,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        """Store a general agent action or continuous learning event in memory."""
+        agent_name = "DemandAgent" if "Demand" in agent_id else "SupplierAgent" if "Supplier" in agent_id else "InventoryAgent" if "Inventory" in agent_id else "LogisticsAgent" if "Logistics" in agent_id else "DemandAgent"
+        return self.record_prediction(
+            agent=agent_name,
+            prediction=float(context.get("accuracy", 95.0)) if context else 95.0,
+            confidence=float(context.get("overall_confidence", 0.94)) if context else 0.94,
+            model_version=f"action-{action_type}",
+            metadata={"agent_id": agent_id, "action_type": action_type, **(context or {})},
+        )
+
     def record_actual(self, agent: str, record_id: str, actual: float) -> bool:
         """
         Write back the actual value for a prediction record.

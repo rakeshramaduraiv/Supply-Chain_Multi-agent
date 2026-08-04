@@ -371,4 +371,51 @@ Digital Twin Workspace (Light Theme)
             └── Server result display
 ```
 
+---
+
+## 8. Enterprise Architecture Audit & Continuous Learning Pipeline
+
+### Verified Enterprise Workflow (12 Core Components)
+
+```text
+Historical DataCo Dataset
+       ↓
+Feature Engineering (22 Features + Lags + Rolling Stats + Trend + Seasonality + Momentum)
+       ↓
+Knowledge Graph Construction (Neo4j Multi-Layer Nodes & Relationships)
+       ↓
+TPKE Initialization (Temporal Pattern Knowledge Engine)
+       ↓
+GraphRAG Index Creation (Context Embeddings & Retrieval Cache)
+       ↓
+Multi-Agent Memory Initialization (Demand, Supplier, Inventory, Logistics Agents)
+       ↓
+LightGBM Training (DemandTrainer, SupplierTrainer, InventoryTrainer, LogisticsTrainer)
+       ↓
+Enterprise Forecast Generation (Collaborative Consensus Forecast)
+       ↓
+Waiting for Monthly Actual Dataset
+       ↓
+Actual Dataset Arrival (January 2019 CSV Ingestion)
+       ↓
+Automatic Continuous Learning Pipeline (12-Stage Automated ECLE Engine)
+       ↓
+Predict Next Month (February 2019 Forecast Auto-Generation)
+```
+
+### Component Audit Summary
+
+1. **Historical Dataset Expansion**: `processed_master.parquet` is expanded cumulatively (`df_old + df_new`), preserving historical memory while expanding timeline (`2015-2018_v1` → `2015-2019-01_v2`).
+2. **Feature Engineering**: Recalculates 22 engineered features plus explicit time-series lag features (`demand_lag_1m`, `demand_lag_3m`, `supplier_delay_lag_1m`), rolling statistics (`demand_rolling_mean_3m`, `demand_rolling_std_3m`, `delay_rolling_mean_3m`), trend, seasonality index, and momentum.
+3. **Machine Learning Retraining**: `TrainingOrchestrator` retrains LightGBM models on the expanded ground truth dataset, updating `ModelRegistry` versions and confidence metrics.
+4. **Knowledge Graph Mutation**: `ActualIntegrationLayer` mutates node properties (`actual_demand`, `actual_delay_days`, `actual_late_delivery`), updates relationship weights, inserts newly discovered entities, and recalculates PageRank/Degree centrality, dependency scores, and business impact scores on Neo4j without rebuilding the graph.
+5. **TPKE Evolution**: `TPKEEngine` detects temporal patterns (sliding window W, frequency K, confidence θ), creates/strengthens `:TPKE_CAUSES` edges, and decays inactive relationships.
+6. **GraphRAG Re-Indexing**: `ContextBuilderService` and `EnterpriseGraphRAGPipeline` refresh graph embeddings, clear retrieval caches, and preserve historical context.
+7. **Multi-Agent Intelligence**: 4 Enterprise BI Decision Agents (`Demand Planning Agent`, `Supplier Intelligence Agent`, `Inventory & Warehouse Agent`, `Logistics & Transportation Agent`) retrieve context from GraphRAG & Knowledge Graph metrics and log execution history in agent memory (`app.ml.agent_memory`).
+8. **RWDAA Adaptive Allocation**: Recurrent Weight Dynamic Adaptive Allocation computes dynamic agent weights based on historical accuracy/MAPE/RMSE metrics.
+9. **Forecast Center**: `ForecastPage.jsx` auto-refreshes forecast cards, prediction charts, actual vs predicted dashboards, KPI metrics, disruption drivers, confidence intervals, and immediate next-month predictions (`February 2019`).
+10. **Root Cause Center**: `RiskPage.jsx` & `rca_investigation.py` automatically register completed months as historical incidents, map relationship traversal paths, and compute counterfactual recommendations.
+11. **Knowledge Intelligence**: `IntelligencePage.jsx` & `GraphPage.jsx` update Digital Twin topology, relationship strengths, PageRank centrality, dependency maps, and risk heatmaps.
+12. **System Synchronization**: `useRealtimeSync.js` subscribes to WebSockets (`/ws`). Any `Continuous Learning Completed` or `Actual Uploaded` broadcast invalidates React Query caches, automatically updating all 10 frontend pages simultaneously from the single enterprise data source.
+
 

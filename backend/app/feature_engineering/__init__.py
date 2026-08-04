@@ -56,12 +56,23 @@ ENGINEERED_FEATURES = [
     "composite_risk_score",
     "delivery_gap",
     "period_monthly",
+    # Continuous Learning Time-Series & Lag Intelligence
+    "demand_lag_1m",
+    "demand_lag_3m",
+    "supplier_delay_lag_1m",
+    "demand_rolling_mean_3m",
+    "demand_rolling_std_3m",
+    "delay_rolling_mean_3m",
+    "demand_trend",
+    "seasonality_index",
+    "demand_momentum",
 ]
 
 
 class FeatureEngineeringPipeline:
     """
-    Transforms raw DataCo dataset into 22 ML-ready engineered features.
+    Transforms raw DataCo dataset into engineered features with continuous learning
+    lag, rolling, trend, seasonality, and momentum capabilities.
 
     Usage:
         pipeline = FeatureEngineeringPipeline()
@@ -72,7 +83,7 @@ class FeatureEngineeringPipeline:
         """
         Apply all feature engineering transformations.
 
-        Returns DataFrame with original columns + 22 engineered features.
+        Returns DataFrame with original columns + engineered features.
         """
         logger.info(f"Feature engineering: {len(df)} rows, {len(df.columns)} columns")
         result = df.copy()
@@ -83,9 +94,10 @@ class FeatureEngineeringPipeline:
         result = self._demand_features(result)
         result = self._supplier_features(result)
         result = self._risk_features(result)
+        result = self._continuous_learning_time_series_features(result)
 
         engineered_count = sum(1 for f in ENGINEERED_FEATURES if f in result.columns)
-        logger.info(f"Feature engineering complete: {engineered_count}/22 features created")
+        logger.info(f"Feature engineering complete: {engineered_count}/{len(ENGINEERED_FEATURES)} features created")
         return result
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -290,6 +302,86 @@ class FeatureEngineeringPipeline:
         )
 
         logger.info("Risk features: 3 created")
+        return df
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CONTINUOUS LEARNING TIME-SERIES & LAG INTELLIGENCE (9 features)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _continuous_learning_time_series_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Compute lag, rolling window, trend, seasonality, and momentum features across monthly dataset expansion."""
+        date_col = "order date (DateOrders)"
+        qty_col = "Order Item Quantity"
+        delay_col = "shipping_delay_days"
+
+        if date_col not in df.columns or qty_col not in df.columns:
+            df["demand_lag_1m"] = df.get(qty_col, 0)
+            df["demand_lag_3m"] = df.get(qty_col, 0)
+            df["supplier_delay_lag_1m"] = df.get(delay_col, 0.0)
+            df["demand_rolling_mean_3m"] = df.get(qty_col, 0.0)
+            df["demand_rolling_std_3m"] = 0.0
+            df["delay_rolling_mean_3m"] = df.get(delay_col, 0.0)
+            df["demand_trend"] = 0.0
+            df["seasonality_index"] = 1.0
+            df["demand_momentum"] = 0.0
+            return df
+
+        # Group by monthly period & category if available
+        cat_col = "Category Name" if "Category Name" in df.columns else "Department Name"
+        
+        # Ensure monthly period column exists
+        if "period_monthly" not in df.columns:
+            dates = pd.to_datetime(df[date_col], errors="coerce")
+            df["period_monthly"] = dates.dt.to_period("M").astype(str)
+
+        # Build monthly aggregations
+        if cat_col in df.columns:
+            monthly_agg = df.groupby(["period_monthly", cat_col]).agg(
+                m_qty=(qty_col, "sum"),
+                m_delay=(delay_col, "mean") if delay_col in df.columns else (qty_col, "count")
+            ).reset_index().sort_values(["period_monthly", cat_col])
+
+            monthly_agg["demand_lag_1m"] = monthly_agg.groupby(cat_col)["m_qty"].shift(1)
+            monthly_agg["demand_lag_3m"] = monthly_agg.groupby(cat_col)["m_qty"].shift(3)
+            monthly_agg["supplier_delay_lag_1m"] = monthly_agg.groupby(cat_col)["m_delay"].shift(1)
+            monthly_agg["demand_rolling_mean_3m"] = monthly_agg.groupby(cat_col)["m_qty"].transform(lambda x: x.rolling(3, min_periods=1).mean())
+            monthly_agg["demand_rolling_std_3m"] = monthly_agg.groupby(cat_col)["m_qty"].transform(lambda x: x.rolling(3, min_periods=1).std()).fillna(0)
+            monthly_agg["delay_rolling_mean_3m"] = monthly_agg.groupby(cat_col)["m_delay"].transform(lambda x: x.rolling(3, min_periods=1).mean())
+            monthly_agg["demand_trend"] = (monthly_agg["m_qty"] - monthly_agg["demand_rolling_mean_3m"]) / (monthly_agg["demand_rolling_mean_3m"] + 1e-5)
+            monthly_agg["demand_momentum"] = (monthly_agg["m_qty"] - monthly_agg["demand_lag_1m"].fillna(monthly_agg["m_qty"])) / (monthly_agg["demand_lag_1m"].fillna(monthly_agg["m_qty"]) + 1e-5)
+            
+            # Overall mean per category for seasonality
+            cat_means = monthly_agg.groupby(cat_col)["m_qty"].transform("mean")
+            monthly_agg["seasonality_index"] = np.where(cat_means > 0, monthly_agg["m_qty"] / cat_means, 1.0)
+
+            # Merge back to individual records
+            merge_cols = ["period_monthly", cat_col]
+            feature_cols = [
+                "demand_lag_1m", "demand_lag_3m", "supplier_delay_lag_1m",
+                "demand_rolling_mean_3m", "demand_rolling_std_3m", "delay_rolling_mean_3m",
+                "demand_trend", "seasonality_index", "demand_momentum"
+            ]
+            
+            # Drop existing feature_cols if already in df to prevent collisions
+            for col in feature_cols:
+                if col in df.columns:
+                    df = df.drop(columns=[col])
+
+            df = df.merge(monthly_agg[merge_cols + feature_cols], on=merge_cols, how="left")
+            for c in feature_cols:
+                df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+        else:
+            df["demand_lag_1m"] = df[qty_col].shift(1).fillna(df[qty_col])
+            df["demand_lag_3m"] = df[qty_col].shift(3).fillna(df[qty_col])
+            df["supplier_delay_lag_1m"] = df.get(delay_col, pd.Series(0, index=df.index)).shift(1).fillna(0)
+            df["demand_rolling_mean_3m"] = df[qty_col].rolling(3, min_periods=1).mean()
+            df["demand_rolling_std_3m"] = df[qty_col].rolling(3, min_periods=1).std().fillna(0)
+            df["delay_rolling_mean_3m"] = df.get(delay_col, pd.Series(0, index=df.index)).rolling(3, min_periods=1).mean()
+            df["demand_trend"] = 0.0
+            df["seasonality_index"] = 1.0
+            df["demand_momentum"] = 0.0
+
+        logger.info("Continuous Learning Time-Series & Lag features: 9 created")
         return df
 
 

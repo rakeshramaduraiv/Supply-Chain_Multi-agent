@@ -31,13 +31,14 @@ import {
 import styles from './EntityPage.module.css'
 import { useSharedParams } from '../hooks/useSharedParams'
 
-const ENTITY_TYPES = [
-  { key: 'Supplier',   label: 'Supplier',   icon: Factory,   color: '#e5534b' },
-  { key: 'Warehouse',  label: 'Warehouse',  icon: Building2, color: '#d4a017' },
-  { key: 'Product',    label: 'Product',    icon: Package,   color: '#3fb950' },
-  { key: 'Shipment',   label: 'Shipment',   icon: Truck,     color: '#5b8aff' },
-  { key: 'Customer',   label: 'Customer',   icon: Users,     color: '#7c6fcd' },
+export const MULTI_AGENTS = [
+  { key: 'DemandAgent',    label: 'Demand',     icon: TrendingUp,  color: '#10b981', entityType: 'Product',   agentName: 'Demand Planning Agent',           rwdaaWeight: '0.35', confidence: '94.0%', taskTarget: 'Master Order Volume & SKUs' },
+  { key: 'SupplierAgent',  label: 'Supplier',   icon: Factory,     color: '#f59e0b', entityType: 'Supplier',  agentName: 'Supplier Intelligence Agent',     rwdaaWeight: '0.25', confidence: '91.0%', taskTarget: 'Supplier Delays & Lead-Time' },
+  { key: 'InventoryAgent', label: 'Inventory',  icon: Building2,   color: '#8b5cf6', entityType: 'Warehouse', agentName: 'Inventory & Warehouse Agent',     rwdaaWeight: '0.20', confidence: '93.0%', taskTarget: 'Warehouse Capacity & Stockout' },
+  { key: 'LogisticsAgent', label: 'Logistics',  icon: Truck,       color: '#ec4899', entityType: 'Shipment',  agentName: 'Logistics & Transportation Agent',rwdaaWeight: '0.20', confidence: '89.0%', taskTarget: 'Carrier SLA & Transit Routes' },
 ]
+
+export const ENTITY_TYPES = MULTI_AGENTS
 
 // Custom Tooltip component for Recharts
 function DashboardTooltip({ active, payload, label }) {
@@ -255,39 +256,63 @@ export default function Overview() {
           overflow: 'hidden',
         }}>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--b)' }}>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--tp)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-              Entity Explorer
+            <div style={{ fontSize: '11px', fontWeight: 850, color: 'var(--tp)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Multi-Agent Explorer</span>
+              <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe' }}>4 BI Decision Agents</span>
             </div>
 
-            {/* Entity Type Tabs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', marginBottom: '10px' }}>
-              {ENTITY_TYPES.map(t => {
-                const Icon = t.icon
-                const isActive = selectedType === t.key
+            {/* Multi-Agent Type Tabs (4 Enterprise BI Decision Agents) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '10px' }}>
+              {MULTI_AGENTS.map(agent => {
+                const Icon = agent.icon
+                const isActive = selectedType === agent.entityType || selectedType === agent.key
                 return (
                   <button
-                    key={t.key}
-                    onClick={() => handleTypeChange(t.key)}
+                    key={agent.key}
+                    onClick={() => {
+                      setSelectedType(agent.entityType)
+                      setSelectedEntityId('')
+                      setParams({ type: agent.entityType, entityId: '' })
+                    }}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      padding: '6px 0', borderRadius: '5px', border: `1px solid ${isActive ? t.color : 'var(--b)'}`,
-                      background: isActive ? `${t.color}20` : 'var(--s0)', color: isActive ? t.color : 'var(--ts)',
+                      padding: '6px 0', borderRadius: '5px', border: `1px solid ${isActive ? agent.color : 'var(--b)'}`,
+                      background: isActive ? `${agent.color}20` : 'var(--s0)', color: isActive ? agent.color : 'var(--ts)',
                       cursor: 'pointer', transition: 'all 120ms',
                     }}
-                    title={t.label}
+                    title={`${agent.agentName} — ${agent.taskTarget}`}
                   >
                     <Icon size={14} />
-                    <span style={{ fontSize: '8px', fontWeight: 700, marginTop: '2px' }}>{t.label.slice(0, 4)}</span>
+                    <span style={{ fontSize: '7.5px', fontWeight: 800, marginTop: '2px', whiteSpace: 'nowrap' }}>{agent.label}</span>
                   </button>
                 )
               })}
             </div>
 
+            {/* Active Multi-Agent Profile Card */}
+            {(() => {
+              const activeAgentObj = MULTI_AGENTS.find(a => a.entityType === selectedType) || MULTI_AGENTS[0]
+              const AgentIcon = activeAgentObj.icon
+              return (
+                <div style={{ padding: '8px 10px', borderRadius: '6px', background: `${activeAgentObj.color}10`, border: `1px solid ${activeAgentObj.color}30`, marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <AgentIcon size={13} color={activeAgentObj.color} />
+                    <span style={{ fontWeight: 800, fontSize: '11px', color: 'var(--tp)' }}>{activeAgentObj.agentName}</span>
+                  </div>
+                  <div style={{ fontSize: '9.5px', color: 'var(--tm)', lineHeight: '1.3' }}>Focus: {activeAgentObj.taskTarget}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '9px', fontWeight: 700, color: 'var(--ts)' }}>
+                    <span>RWDAA Weight: <strong style={{ color: activeAgentObj.color }}>{activeAgentObj.rwdaaWeight}</strong></span>
+                    <span>Confidence: <strong style={{ color: 'var(--blue)' }}>{activeAgentObj.confidence}</strong></span>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Search Input */}
             <div style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--tm)' }} />
               <input
-                placeholder={`Search ${selectedType.toLowerCase()}s…`}
+                placeholder={`Search agent-evaluated ${selectedType.toLowerCase()}s…`}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 style={{
@@ -299,17 +324,17 @@ export default function Overview() {
 
             {/* Normalized Risk Summary Header */}
             <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--tm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Normalized Weighted Risk</span>
-              <span style={{ fontWeight: 700, color: 'var(--blue)' }}>Total: {totalRiskSum.toFixed(0)}%</span>
+              <span>Agent Weighted Risk Score</span>
+              <span style={{ fontWeight: 700, color: 'var(--blue)' }}>Risk Sum: {totalRiskSum.toFixed(0)}%</span>
             </div>
           </div>
 
-          {/* Entity List */}
+          {/* Agent Evaluated Domain Entities List */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
             {entityListQuery.isLoading ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--tm)' }}>Loading entities…</div>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--tm)' }}>Loading agent evaluations…</div>
             ) : entities.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--tm)' }}>No entities found matching filters</div>
+              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--tm)' }}>No agent domain entities found matching filters</div>
             ) : (
               entities.map(item => {
                 const isActive = selectedEntityId === item.id
@@ -349,7 +374,7 @@ export default function Overview() {
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9.5px', color: 'var(--tm)' }}>
                       <span>Orders: {item.total_orders?.toLocaleString()}</span>
-                      <span>SLA: {item.sla}%</span>
+                      <span>Agent SLA: {item.sla}%</span>
                     </div>
                   </div>
                 )

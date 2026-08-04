@@ -254,6 +254,7 @@ export function useIntelligencePageData() {
 
 /** Everything the Risk & Root Cause page needs */
 export function useRiskPageData() {
+  const datasetSummaryQ = useDatasetSummary()
   const analytics    = useDatasetAnalytics()
   const riskDash     = useRiskDash()
   const forecastDash = useForecastDash()
@@ -303,6 +304,7 @@ export function useRiskPageData() {
   const rcaTypeDist = rcaDash.data?.type_distribution || []
 
   return {
+    datasetSummary: datasetSummaryQ.data,
     analytics, riskDash, forecastDash, trends, rcaStats, rcaDash, rcaHistory, kpis,
     monthlyLabels, monthlyValues,
     riskTrendSeries, forecastAccuracySeries, rcaTypeDist,

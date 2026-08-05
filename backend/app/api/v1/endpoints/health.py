@@ -5,8 +5,12 @@ System health, readiness, and liveness probes.
 """
 
 import logging
+import uuid
 
 from fastapi import APIRouter, status
+
+# Generated once per process — changes every time the backend restarts
+_SESSION_ID = str(uuid.uuid4())
 
 from app.core.config import get_settings
 from app.schemas import HealthResponse
@@ -169,4 +173,4 @@ async def readiness() -> dict:
 )
 async def liveness() -> dict:
     """Kubernetes liveness probe."""
-    return {"status": "alive"}
+    return {"status": "alive", "session_id": _SESSION_ID}

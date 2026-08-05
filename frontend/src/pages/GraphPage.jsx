@@ -58,16 +58,70 @@ export default function GraphPage() {
   const qc = useQueryClient()
   const { entityId: sharedEntityId, setParams } = useSharedParams()
 
-  const [selectedVersion, setSelectedVersion] = useState('v1.4.2')
-  const [activeLayer, setActiveLayer]         = useState('current') // current | historical | prediction | reasoning
-  const [selectedNodeId, setSelectedNodeId]   = useState(sharedEntityId || 'supplier_main')
+  const [selectedVersion, setSelectedVersion] = useState(() => {
+    try {
+      const ctx = JSON.parse(localStorage.getItem('amasci_graph_focus') || '{}')
+      if (ctx.mode === 'tpke_evolution') return 'v1.3'
+      if (ctx.mode === 'kg_mutation')    return 'v1.4.2'
+    } catch {}
+    return 'v1.4.2'
+  })
+  const [activeLayer, setActiveLayer] = useState(() => {
+    try {
+      const ctx = JSON.parse(localStorage.getItem('amasci_graph_focus') || '{}')
+      if (ctx.layer) return ctx.layer
+    } catch {}
+    return 'current'
+  })
+  const [selectedNodeId, setSelectedNodeId] = useState(() => {
+    try {
+      const ctx = JSON.parse(localStorage.getItem('amasci_graph_focus') || '{}')
+      if (ctx.highlightNode) return ctx.highlightNode
+    } catch {}
+    return sharedEntityId || 'supplier_main'
+  })
   const [searchQuery, setSearchQuery]         = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
 
-  // Replay Controller state
+  // Replay Controller state — declared before useEffect that references setReplayStep
   const [isReplaying, setIsReplaying] = useState(false)
-  const [replayStep, setReplayStep]   = useState(4)
+  const [replayStep, setReplayStep]   = useState(() => {
+    try {
+      const ctx = JSON.parse(localStorage.getItem('amasci_graph_focus') || '{}')
+      if (ctx.mode === 'tpke_evolution') return 3
+      if (ctx.mode === 'kg_mutation')    return 4
+    } catch {}
+    return 4
+  })
   const [replaySpeed, setReplaySpeed] = useState(1)
+
+  // Forecast lifecycle focus context (written by ForecastPage Step 5/6)
+  const [graphFocusBanner, setGraphFocusBanner] = useState(null)
+
+  // On mount: read and consume focus context from ForecastPage
+  useEffect(() => {
+    const raw = localStorage.getItem('amasci_graph_focus')
+    if (!raw) return
+    try {
+      const ctx = JSON.parse(raw)
+      localStorage.removeItem('amasci_graph_focus')
+      if (ctx.layer)         setActiveLayer(ctx.layer)
+      if (ctx.highlightNode) setSelectedNodeId(ctx.highlightNode)
+      if (ctx.mode === 'kg_mutation') {
+        setSelectedVersion('v1.4.2')
+        setReplayStep(4)
+      } else if (ctx.mode === 'tpke_evolution') {
+        setSelectedVersion('v1.3')
+        setReplayStep(3)
+      }
+      setGraphFocusBanner(ctx)
+      if (ctx.scrollTo === 'tpke_evolution_section') {
+        setTimeout(() => {
+          document.getElementById('tpke-evolution-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 300)
+      }
+    } catch {}
+  }, [])
 
   // Central queries — use correct field names from useNetworkPageData()
   const {
@@ -218,6 +272,16 @@ export default function GraphPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Return to Forecast Lifecycle if navigated here from Step 5 or 6 */}
+            {graphFocusBanner && (
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
+                onClick={() => { setGraphFocusBanner(null); window.history.back() }}
+              >
+                ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5' : 'Step 6'})
+              </button>
+            )}
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => qc.invalidateQueries({ queryKey: ['supplyChain'] })}
@@ -259,6 +323,60 @@ export default function GraphPage() {
           </div>
         </div>
       </div>
+
+      {/* ── FORECAST LIFECYCLE FOCUS BANNER (Step 5 / Step 6) ── */}
+      {graphFocusBanner && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 16px',
+          background: graphFocusBanner.mode === 'kg_mutation'
+            ? 'linear-gradient(90deg, rgba(91,138,255,0.12) 0%, rgba(0,184,148,0.08) 100%)'
+            : 'linear-gradient(90deg, rgba(124,111,205,0.14) 0%, rgba(91,138,255,0.08) 100%)',
+          border: `1px solid ${graphFocusBanner.mode === 'kg_mutation' ? 'rgba(91,138,255,0.35)' : 'rgba(124,111,205,0.35)'}`,
+          borderRadius: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {graphFocusBanner.mode === 'kg_mutation'
+              ? <Network size={18} style={{ color: 'var(--blue)', flexShrink: 0 }} />
+              : <Layers size={18} style={{ color: '#7c6fcd', flexShrink: 0 }} />}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--tp)' }}>
+                {graphFocusBanner.mode === 'kg_mutation' ? '🔗 Knowledge Graph Mutation Applied' : '⚡ TPKE Edge Evolution Complete'}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--ts)', marginTop: 2 }}>
+                {graphFocusBanner.message}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {graphFocusBanner.mode === 'kg_mutation' ? (
+              <>
+                <span className="badge bdg-blue">Graph {graphFocusBanner.version}</span>
+                <span className="badge bdg-low">Reasoning Layer Active</span>
+                <span style={{ fontSize: '10px', color: 'var(--tm)' }}>
+                  Period: <strong style={{ color: 'var(--blue)' }}>{graphFocusBanner.period}</strong>
+                  {' · '}Node: <strong style={{ color: 'var(--blue)' }}>Carrier Ground Transport</strong> · Risk scores updated
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="badge" style={{ background: 'rgba(124,111,205,0.15)', color: '#7c6fcd' }}>TPKE {graphFocusBanner.version}</span>
+                <span className="badge bdg-low">Prediction Layer Active</span>
+                <span style={{ fontSize: '10px', color: 'var(--tm)' }}>
+                  Period: <strong style={{ color: '#7c6fcd' }}>{graphFocusBanner.period}</strong>
+                  {' · '}Node: <strong style={{ color: '#7c6fcd' }}>Supplier Air Transport</strong> · {activeVerObj.tpkeEdges} inferred edges
+                </span>
+              </>
+            )}
+            <button
+              className="btn btn-secondary btn-xs"
+              onClick={() => setGraphFocusBanner(null)}
+            >
+              <X size={11} /> Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 2. KNOWLEDGE GRAPH EVOLUTION TIMELINE & REPLAY BAR ── */}
       <div className={styles.timelineBar}>
@@ -469,7 +587,113 @@ export default function GraphPage() {
 
       </div>
 
-      {/* ── 4. BOTTOM ANALYTICS & RELATIONSHIP EXPLORER ── */}
+      {/* ── 4. TPKE EVOLUTION LAYER SECTION ── */}
+      <div id="tpke-evolution-section" style={{
+        background: 'linear-gradient(135deg, rgba(124,111,205,0.08) 0%, rgba(91,138,255,0.06) 100%)',
+        border: '1.5px solid rgba(124,111,205,0.3)',
+        borderRadius: 12, padding: '18px 20px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Layers size={18} style={{ color: '#7c6fcd' }} />
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--tp)' }}>TPKE Evolution Layer — Temporal Pattern Knowledge Engine</div>
+              <div style={{ fontSize: '10.5px', color: 'var(--tm)', marginTop: 2 }}>
+                Temporal edge decay · Pattern reinforcement · Causal confidence evolution across forecast cycles
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="badge" style={{ background: 'rgba(124,111,205,0.15)', color: '#7c6fcd' }}>TPKE {tpkeDashData.version || 'v2.1'}</span>
+            <span className="badge bdg-low">{activeVerObj.tpkeEdges} Inferred Edges</span>
+            <span className="badge bdg-blue">{activeVerObj.conf}% Confidence</span>
+          </div>
+        </div>
+
+        {/* TPKE Metrics Row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+          {[
+            { label: 'Total Inferred Edges', val: activeVerObj.tpkeEdges, color: '#7c6fcd' },
+            { label: 'Edge Confidence', val: `${activeVerObj.conf}%`, color: '#00b894' },
+            { label: 'Temporal Decay Rate', val: tpkeDashData.decay_rate != null ? `${(tpkeDashData.decay_rate * 100).toFixed(1)}%` : '8.5%', color: '#e67e22' },
+            { label: 'Pattern Cycles', val: tpkeDashData.evolution_cycles || activeVerObj.tpkeEdges > 0 ? Math.ceil(activeVerObj.tpkeEdges / 12) : 0, color: 'var(--blue)' },
+          ].map((m, i) => (
+            <div key={i} style={{ background: 'var(--s0)', border: '1px solid var(--b)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--tm)', textTransform: 'uppercase', fontWeight: 700 }}>{m.label}</div>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: m.color, marginTop: 2 }}>{m.val}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* TPKE Edge Evolution Timeline — dynamic from version history */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--tp)', marginBottom: 8 }}>Edge Evolution Across Graph Versions</div>
+          <div style={{ display: 'flex', gap: 0, alignItems: 'flex-end', height: 80 }}>
+            {GRAPH_VERSIONS.map((v, i) => {
+              const isActive = v.ver === selectedVersion
+              const maxEdges = Math.max(...GRAPH_VERSIONS.map(x => x.tpkeEdges), 1)
+              const barH = v.tpkeEdges > 0 ? Math.max(8, (v.tpkeEdges / maxEdges) * 70) : 4
+              return (
+                <div key={v.ver} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                  onClick={() => handleVersionSelect(v.ver)}>
+                  <div style={{ fontSize: '8px', color: isActive ? '#7c6fcd' : 'var(--tm)', fontWeight: isActive ? 800 : 400 }}>{v.tpkeEdges}</div>
+                  <div style={{
+                    width: '70%', height: barH,
+                    background: isActive ? '#7c6fcd' : 'rgba(124,111,205,0.3)',
+                    borderRadius: '3px 3px 0 0',
+                    border: isActive ? '1.5px solid #7c6fcd' : '1px solid rgba(124,111,205,0.2)',
+                    transition: 'all 0.2s',
+                  }} />
+                  <div style={{ fontSize: '8px', color: isActive ? '#7c6fcd' : 'var(--tm)', fontWeight: isActive ? 800 : 400 }}>{v.ver}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* TPKE Learned Patterns — from tpkeEdgeList (backend) or version-derived */}
+        <div>
+          <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--tp)', marginBottom: 8 }}>Learned Temporal Patterns</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
+            {(() => {
+              const patterns = tpkeEdgeList.length > 0
+                ? tpkeEdgeList.slice(0, 6).map(e => ({
+                    pattern: e.pattern || e.name || `${e.source_type || 'Node'} → ${e.target_type || 'Node'}`,
+                    confidence: e.confidence || e.weight || 0.88,
+                    action: e.action || e.relationship_type || 'Edge Reinforced',
+                    frequency: e.frequency || e.count || activeVerObj.tpkeEdges,
+                    version: e.version || activeVerObj.ver,
+                  }))
+                : [
+                    { pattern: 'Late Delivery → Inventory Shortage', confidence: 0.924, action: 'Edge Strengthened', frequency: activeVerObj.tpkeEdges, version: activeVerObj.ver },
+                    { pattern: 'Carrier Delay → Customer SLA Breach', confidence: 0.891, action: 'Edge Created', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.7), version: activeVerObj.ver },
+                    { pattern: 'Demand Spike → Warehouse Overload', confidence: 0.856, action: 'Confidence Updated', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.5), version: activeVerObj.ver },
+                    { pattern: 'Supplier Delay → Forecast Deviation', confidence: 0.812, action: 'Edge Decayed', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.4), version: activeVerObj.ver },
+                  ]
+              return patterns.map((p, i) => (
+                <div key={i} style={{
+                  background: 'var(--s0)', border: '1px solid var(--b)', borderRadius: 8, padding: '10px 12px',
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tp)' }}>{p.pattern}</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div style={{ flex: 1, height: 4, background: 'var(--b)', borderRadius: 2 }}>
+                      <div style={{ width: `${(p.confidence * 100).toFixed(0)}%`, height: '100%', background: '#7c6fcd', borderRadius: 2 }} />
+                    </div>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#7c6fcd' }}>{(p.confidence * 100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--tm)' }}>
+                    <span className="badge" style={{ background: 'rgba(124,111,205,0.12)', color: '#7c6fcd', fontSize: '8px' }}>{p.action}</span>
+                    <span>Freq: {p.frequency} · {p.version}</span>
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 5. BOTTOM ANALYTICS & RELATIONSHIP EXPLORER ── */}
       <div className={styles.bottomAnalytics}>
         <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tp)', marginBottom: '10px' }}>
           Knowledge Intelligence Relationship Explorer & Edge Distribution

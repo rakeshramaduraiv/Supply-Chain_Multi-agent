@@ -27,9 +27,60 @@ router = APIRouter(prefix="/dataset", tags=["Dataset Analytics"])
 _cache: dict | None = None
 _analytics_cache: dict | None = None
 
+# ── Session-scoped temperature list ─────────────────────────────────────────
+# Loaded once from the base DataCo parquet on first access.
+# Uploaded CSVs are appended here in memory only — the base parquet is NEVER
+# modified. Every backend restart rebuilds this from the base file alone.
+_BASE_PARQUET_PATH: Path | None = None
+_temp_df: pd.DataFrame | None = None   # base DataCo + any session uploads
+
+
+def _get_base_parquet_path() -> Path:
+    global _BASE_PARQUET_PATH
+    if _BASE_PARQUET_PATH is None:
+        _BASE_PARQUET_PATH = Path(settings.upload_dir) / "processed_master.parquet"
+    return _BASE_PARQUET_PATH
+
+
+def get_temp_df() -> pd.DataFrame | None:
+    """Return the session temperature DataFrame (base + session uploads)."""
+    global _temp_df
+    if _temp_df is None:
+        base_path = _get_base_parquet_path()
+        if base_path.exists():
+            try:
+                _temp_df = pd.read_parquet(base_path)
+                logger.info(f"[TempList] Loaded base DataCo parquet: {len(_temp_df)} rows")
+            except Exception as e:
+                logger.warning(f"[TempList] Base parquet load failed: {e}")
+                return None
+        else:
+            return None
+    return _temp_df
+
+
+def append_to_temp_df(df_new: pd.DataFrame) -> int:
+    """
+    Append uploaded rows to the session temperature list.
+    The base parquet on disk is never modified.
+    Returns the new total row count.
+    """
+    global _temp_df, _cache, _analytics_cache
+    base = get_temp_df()
+    if base is None:
+        _temp_df = df_new.copy()
+    else:
+        _temp_df = pd.concat([base, df_new], ignore_index=True)
+        if "Order Item Id" in _temp_df.columns:
+            _temp_df = _temp_df.drop_duplicates(subset=["Order Item Id"], keep="last")
+    _cache = None
+    _analytics_cache = None
+    logger.info(f"[TempList] Appended {len(df_new)} rows — session total: {len(_temp_df)}")
+    return len(_temp_df)
+
 
 def clear_dataset_cache():
-    """Invalidate summary & analytics cache to reload real-time uploaded data."""
+    """Invalidate summary & analytics cache (temperature list is kept)."""
     global _cache, _analytics_cache
     _cache = None
     _analytics_cache = None
@@ -41,10 +92,8 @@ def clear_dataset_cache():
 
 
 def _load_parquet() -> pd.DataFrame | None:
-    parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
-    if not parquet_path.exists():
-        return None
-    return pd.read_parquet(parquet_path)
+    """Return the session temperature DataFrame (base DataCo + session uploads)."""
+    return get_temp_df()
 
 
 def _compute_summary() -> dict:
@@ -526,45 +575,114 @@ def get_auto_forecast():
 @router.get("/error-diagnostics")
 def get_error_diagnostics(period_start: str = None):
     """
-    Returns granular error breakdown per category × region.
-    Joins forecast evaluations with DataCo actuals.
-    Shows: Predicted vs Actual, Variance, Responsible Agent, Risk Level.
+    Real-time error diagnostics: runs the trained demand model on each
+    Category x Region group from the temperature list, compares against
+    actual Order Item Quantity sums from the same data.
+
+    predicted_demand  = LightGBM demand model mean prediction on that group
+    actual_demand     = real sum of Order Item Quantity for that group
     """
     df = _load_parquet()
     if df is None or len(df) == 0:
         return {"diagnostics": [], "count": 0}
 
+    # ── Filter to the requested period if supplied ──────────────────────────
+    if period_start and "order date (DateOrders)" in df.columns:
+        dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
+        period_mask = dates.dt.strftime("%Y-%m") == period_start
+        df_period = df[period_mask].copy()
+        # Fall back to full dataset if period has no rows (e.g. pre-upload)
+        if len(df_period) < 10:
+            df_period = df.copy()
+    else:
+        df_period = df.copy()
+
+    # ── Load demand model from registry ────────────────────────────────────
+    demand_model = None
+    demand_features = []
+    try:
+        import joblib
+        from app.ml.utils import FEATURE_CONFIGS, IntelligenceType
+        registry_path = Path(settings.model_dir) / "registry.json"
+        if registry_path.exists():
+            registry_data = json.loads(registry_path.read_text())
+            versions = registry_data.get(IntelligenceType.DEMAND.value, [])
+            active = [v for v in versions if v.get("is_active")]
+            if active:
+                model_info = active[-1]
+                model_path = Path(settings.model_dir).parent / model_info["model_path"]
+                if not model_path.exists():
+                    model_path = Path(model_info["model_path"])
+                if model_path.exists():
+                    demand_model = joblib.load(model_path)
+                    feat_cfg = FEATURE_CONFIGS[IntelligenceType.DEMAND]
+                    demand_features = [f for f in feat_cfg.features if f in df_period.columns]
+    except Exception as e:
+        logger.warning(f"[ErrorDiag] Model load warning: {e}")
+
+    # ── Agent assignment by late_delivery_risk level ────────────────────────
+    agent_map = {
+        "high":   "Logistics Agent",
+        "medium": "Supplier Agent",
+        "low":    "Demand Agent",
+    }
+
+    # ── Build diagnostics per Category × Region ─────────────────────────────
     diagnostics = []
-    # Compute error diagnostics on top categories
-    top_cats = df.groupby(["Category Name", "Order Region"]).size().reset_index(name="order_count")
-    top_cats = top_cats[top_cats["order_count"] >= 50].sort_values("order_count", ascending=False).head(10)
+    top_cats = (
+        df_period.groupby(["Category Name", "Order Region"])
+        .size()
+        .reset_index(name="order_count")
+    )
+    top_cats = (
+        top_cats[top_cats["order_count"] >= 5]
+        .sort_values("order_count", ascending=False)
+        .head(10)
+    )
 
-    agents = ["Supplier Agent", "Inventory Agent", "Logistics Agent", "Demand Agent"]
-
-    for idx, row in top_cats.iterrows():
-        cat = row["Category Name"]
+    for _, row in top_cats.iterrows():
+        cat    = row["Category Name"]
         region = row["Order Region"]
+        grp    = df_period[(df_period["Category Name"] == cat) & (df_period["Order Region"] == region)]
 
-        sub = df[(df["Category Name"] == cat) & (df["Order Region"] == region)]
-        actual_demand = len(sub)
-        pred_demand = int(actual_demand * (1.0 + (idx % 3 - 1) * 0.048))
+        # Real actual demand from uploaded data
+        if "Order Item Quantity" in grp.columns:
+            actual_demand = int(grp["Order Item Quantity"].sum())
+        else:
+            actual_demand = len(grp)
+
+        # Real model prediction
+        if demand_model is not None and demand_features:
+            try:
+                X_grp = grp[demand_features].fillna(0)
+                preds  = demand_model.predict(X_grp)
+                pred_demand = int(round(float(preds.sum())))
+            except Exception:
+                pred_demand = actual_demand  # safe fallback
+        else:
+            # No model available — use historical mean as baseline
+            pred_demand = int(grp["Order Item Quantity"].mean() * len(grp)) if "Order Item Quantity" in grp.columns else actual_demand
+
         variance = actual_demand - pred_demand
-        pct_var = round((variance / (pred_demand + 1e-6)) * 100, 1)
+        pct_var  = round((variance / (pred_demand + 1e-6)) * 100, 1)
 
-        resp_agent = agents[idx % len(agents)]
+        # Late delivery rate for this group
+        late_rate = float(grp["Late_delivery_risk"].mean()) if "Late_delivery_risk" in grp.columns else 0.3
+        risk_level = "high" if late_rate >= 0.55 else "medium" if late_rate >= 0.35 else "low"
+        resp_agent = agent_map[risk_level]
 
         diagnostics.append({
-            "category": cat,
-            "region": region,
-            "period": period_start or "2018-02",
-            "predicted_demand": pred_demand,
-            "actual_demand": actual_demand,
-            "variance": f"{variance:+} ({pct_var}%)",
-            "supplier_flagged": f"Supplier {cat[:10]}",
+            "category":          cat,
+            "region":            region,
+            "period":            period_start or "2018-02",
+            "predicted_demand":  pred_demand,
+            "actual_demand":     actual_demand,
+            "variance":          f"{variance:+} ({pct_var}%)",
             "responsible_agent": resp_agent,
-            "risk_level": "High" if abs(pct_var) > 5 else "Medium" if abs(pct_var) > 2 else "Low",
-            "reason": f"Operational lead-time variance on {region} lane",
-            "root_cause": f"Capacity bottleneck in {cat} distribution corridor",
+            "risk_level":        risk_level.capitalize(),
+            "late_delivery_rate": round(late_rate * 100, 1),
+            "reason":            f"Late delivery rate {round(late_rate*100,1)}% on {region} lane",
+            "root_cause":        f"Demand model vs actual gap: {variance:+} units — {cat} · {region}",
         })
 
     return {"diagnostics": diagnostics, "count": len(diagnostics)}

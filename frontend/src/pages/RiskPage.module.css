@@ -130,11 +130,11 @@
   border: 1px solid var(--b, #e2e8f0);
 }
 .sidebarFilters {
-  padding: 12px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--b, #e2e8f0);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   background: var(--s0, #f8fafc);
   position: relative;
   z-index: 10;
@@ -148,6 +148,66 @@
 .filterGrid > select {
   flex: 1;
   min-width: 0;
+}
+
+/* ── SCROLLABLE FILTER SLIDE STRIPS ── */
+.filterSlideWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.filterSlideLabel {
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--tm, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 2px;
+}
+.filterSlide {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.filterSlide::-webkit-scrollbar {
+  display: none;
+}
+.filterChip {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--b, #cbd5e1);
+  background: var(--s1, #ffffff);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--ts, #475569);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .12s;
+  line-height: 1.2;
+}
+.filterChip:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59,130,246,0.04);
+}
+.filterChipActive {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+.filterChipYear {
+  background: var(--s1, #ffffff);
+  border-color: var(--b, #cbd5e1);
+  color: var(--ts, #475569);
+}
+.filterChipYearActive {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
 }
 .searchField {
   display: flex;
@@ -212,10 +272,151 @@
 .queueScroll {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  overflow-x: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── INCIDENT ACCORDION SLIDES ── */
+.incidentSlide {
+  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+  background: #ffffff;
+  transition: background .1s;
+}
+.incidentSlide:last-child { border-bottom: none; }
+.incidentSlide:hover { background: #fafbfc; }
+.incidentSlideActive {
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+}
+
+/* Header row — always visible, click to expand */
+.slideHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 9px 12px;
+  cursor: pointer;
+  min-height: 46px;
+  user-select: none;
+}
+.slideSeverityDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.slideHeaderText {
+  flex: 1;
+  min-width: 0;
+}
+.slideIncidentName {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.slideIncidentMeta {
+  font-size: 8px;
+  color: #64748b;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slideRiskBadge {
+  font-size: 10.5px;
+  font-weight: 900;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.slideChevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform .18s ease;
+}
+.slideChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Expandable body */
+.slideBody {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .22s ease;
+}
+.slideBodyOpen {
+  max-height: 320px;
+}
+.slideBodyInner {
+  padding: 0 12px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* 6-cell KPI grid */
+.slideKpiRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px dotted #e2e8f0;
+}
+.slideKpiBox {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  padding: 5px 7px;
+}
+.slideKpiLabel {
+  font-size: 7px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+  display: block;
+  letter-spacing: .03em;
+}
+.slideKpiVal {
+  font-size: 10px;
+  font-weight: 800;
+  color: #334155;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Tag row */
+.slideTagRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* Investigate button */
+.slideSelectBtn {
+  width: 100%;
+  padding: 7px;
+  border-radius: 5px;
+  border: 1px solid #3b82f6;
+  background: #3b82f6;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: center;
+  transition: background .1s;
+  letter-spacing: .01em;
+}
+.slideSelectBtn:hover { background: #2563eb; }
+.slideSelectBtnActive {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 /* ── QUEUE CARDS ── */

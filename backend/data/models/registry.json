@@ -847,6 +847,256 @@
         "verbose": -1
       },
       "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260805_071406_75f5b9",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260805_071406_75f5b9.joblib",
+      "created_at": "2026-08-05T07:14:06.702303+00:00",
+      "training_duration_ms": 13626.972300000489,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_week_of_year",
+        "order_quarter",
+        "order_is_weekend",
+        "Sales",
+        "Order Profit Per Order",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days"
+      ],
+      "metrics": {
+        "mae": 0.13979,
+        "rmse": 0.376382,
+        "mape": 9.201936,
+        "r2": 0.918885,
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260805_090818_c54d77",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260805_090818_c54d77.joblib",
+      "created_at": "2026-08-05T09:08:18.939523+00:00",
+      "training_duration_ms": 27727.843799977563,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_week_of_year",
+        "order_quarter",
+        "order_is_weekend",
+        "Sales",
+        "Order Profit Per Order",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days"
+      ],
+      "metrics": {
+        "mae": 0.13979,
+        "rmse": 0.376382,
+        "mape": 9.201936,
+        "r2": 0.918885,
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260805_163805_011f6f",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260805_163805_011f6f.joblib",
+      "created_at": "2026-08-05T16:38:05.420577+00:00",
+      "training_duration_ms": 57190.09620000725,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_week_of_year",
+        "order_quarter",
+        "order_is_weekend",
+        "Sales",
+        "Order Profit Per Order",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days"
+      ],
+      "metrics": {
+        "mae": 0.13979,
+        "rmse": 0.376382,
+        "mape": 9.201936,
+        "r2": 0.918885,
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260805_174829_242431",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260805_174829_242431.joblib",
+      "created_at": "2026-08-05T17:48:29.565482+00:00",
+      "training_duration_ms": 49856.197899993276,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_week_of_year",
+        "order_quarter",
+        "order_is_weekend",
+        "Sales",
+        "Order Profit Per Order",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days"
+      ],
+      "metrics": {
+        "mae": 0.13979,
+        "rmse": 0.376382,
+        "mape": 9.201936,
+        "r2": 0.918885,
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260805_183136_5a5407",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260805_183136_5a5407.joblib",
+      "created_at": "2026-08-05T18:31:36.918920+00:00",
+      "training_duration_ms": 16266.072800004622,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_week_of_year",
+        "order_quarter",
+        "order_is_weekend",
+        "Sales",
+        "Order Profit Per Order",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days"
+      ],
+      "metrics": {
+        "mae": 0.13979,
+        "rmse": 0.376382,
+        "mape": 9.201936,
+        "r2": 0.918885,
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
       "is_active": true,
       "description": ""
     }
@@ -1825,6 +2075,311 @@
         "verbose": -1
       },
       "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "inventory_v_20260805_071423_64388b",
+      "intelligence_type": "inventory",
+      "task": "classification",
+      "model_path": "data\\models\\inventory\\inventory_v_20260805_071423_64388b.joblib",
+      "created_at": "2026-08-05T07:14:23.595264+00:00",
+      "training_duration_ms": 16762.437699973816,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.963316,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "inventory_v_20260805_090840_10096f",
+      "intelligence_type": "inventory",
+      "task": "classification",
+      "model_path": "data\\models\\inventory\\inventory_v_20260805_090840_10096f.joblib",
+      "created_at": "2026-08-05T09:08:41.086964+00:00",
+      "training_duration_ms": 21957.83830000437,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.963316,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "inventory_v_20260805_163915_57f7a7",
+      "intelligence_type": "inventory",
+      "task": "classification",
+      "model_path": "data\\models\\inventory\\inventory_v_20260805_163915_57f7a7.joblib",
+      "created_at": "2026-08-05T16:39:15.869286+00:00",
+      "training_duration_ms": 69874.6639000019,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.963316,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "inventory_v_20260805_174923_387f64",
+      "intelligence_type": "inventory",
+      "task": "classification",
+      "model_path": "data\\models\\inventory\\inventory_v_20260805_174923_387f64.joblib",
+      "created_at": "2026-08-05T17:49:23.374904+00:00",
+      "training_duration_ms": 53567.38049999694,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.963316,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "inventory_v_20260805_183156_ae6d51",
+      "intelligence_type": "inventory",
+      "task": "classification",
+      "model_path": "data\\models\\inventory\\inventory_v_20260805_183156_ae6d51.joblib",
+      "created_at": "2026-08-05T18:31:56.667882+00:00",
+      "training_duration_ms": 19544.123100000434,
+      "features_used": [
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.963316,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
       "is_active": true,
       "description": ""
     }
@@ -2665,6 +3220,271 @@
         "n_samples": 36963
       },
       "dataset_version": "2015-2018-01_v2",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260805_071511_82ebe9",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260805_071511_82ebe9.joblib",
+      "created_at": "2026-08-05T07:15:11.620497+00:00",
+      "training_duration_ms": 47887.43649999378,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_month",
+        "order_quarter",
+        "order_day_of_week",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order",
+        "delivery_duration_days",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96779,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260805_090956_678bd4",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260805_090956_678bd4.joblib",
+      "created_at": "2026-08-05T09:09:56.893226+00:00",
+      "training_duration_ms": 75622.03230001614,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_month",
+        "order_quarter",
+        "order_day_of_week",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order",
+        "delivery_duration_days",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96779,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260805_164237_f5d7d9",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260805_164237_f5d7d9.joblib",
+      "created_at": "2026-08-05T16:42:38.009059+00:00",
+      "training_duration_ms": 201419.74009998376,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_month",
+        "order_quarter",
+        "order_day_of_week",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order",
+        "delivery_duration_days",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96779,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260805_175033_69038c",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260805_175033_69038c.joblib",
+      "created_at": "2026-08-05T17:50:33.534869+00:00",
+      "training_duration_ms": 69985.56339999777,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_month",
+        "order_quarter",
+        "order_day_of_week",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order",
+        "delivery_duration_days",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96779,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260805_183301_8ab3de",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260805_183301_8ab3de.joblib",
+      "created_at": "2026-08-05T18:33:01.260839+00:00",
+      "training_duration_ms": 64444.106299983105,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_month",
+        "order_quarter",
+        "order_day_of_week",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order",
+        "delivery_duration_days",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96779,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
       "hyperparameters": {
         "n_estimators": 300,
         "max_depth": 12,
@@ -3635,6 +4455,311 @@
         "n_samples": 36963
       },
       "dataset_version": "2015-2018-01_v2",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260805_071534_bc0452",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260805_071534_bc0452.joblib",
+      "created_at": "2026-08-05T07:15:34.183774+00:00",
+      "training_duration_ms": 22396.55340000172,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96192,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260805_091016_fa5a7a",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260805_091016_fa5a7a.joblib",
+      "created_at": "2026-08-05T09:10:16.783159+00:00",
+      "training_duration_ms": 19718.932799994946,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96192,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260805_164351_42129f",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260805_164351_42129f.joblib",
+      "created_at": "2026-08-05T16:43:51.799570+00:00",
+      "training_duration_ms": 73157.06269998918,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96192,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260805_175051_49e19e",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260805_175051_49e19e.joblib",
+      "created_at": "2026-08-05T17:50:51.448690+00:00",
+      "training_duration_ms": 17753.238199977204,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96192,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260805_183319_0d6400",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260805_183319_0d6400.joblib",
+      "created_at": "2026-08-05T18:33:19.298653+00:00",
+      "training_duration_ms": 17868.940399988787,
+      "features_used": [
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "delivery_duration_days",
+        "order_month",
+        "order_day_of_week",
+        "order_quarter",
+        "order_is_weekend",
+        "Order Item Quantity",
+        "Sales",
+        "Product Price",
+        "Order Item Discount",
+        "Order Profit Per Order"
+      ],
+      "metrics": {
+        "accuracy": 0.962097,
+        "precision": 0.935304,
+        "recall": 1.0,
+        "f1": 0.96657,
+        "roc_auc": 0.96192,
+        "confusion_matrix": [
+          [
+            15308,
+            1401
+          ],
+          [
+            0,
+            20254
+          ]
+        ],
+        "n_samples": 36963
+      },
+      "dataset_version": "retrain",
       "hyperparameters": {
         "objective": "binary",
         "metric": "binary_logloss",

@@ -224,7 +224,17 @@ const QUICK_PROMPTS = [
 export default function RiskPage() {
   const qc = useQueryClient()
   const { issueId, setParams } = useSharedParams()
-  const [selectedIssueId, setSelectedIssueId] = useState(issueId || 'supplier_delay_main')
+  // Read RCA focus written by ForecastPage Step 4 — auto-select the period's incident
+  const readRcaFocus = () => {
+    try { return JSON.parse(localStorage.getItem('amasci_rca_focus') || 'null') } catch { return null }
+  }
+
+  const [rcaFocus, setRcaFocus] = useState(readRcaFocus)
+
+  const [selectedIssueId, setSelectedIssueId] = useState(() => {
+    const focus = readRcaFocus()
+    return issueId || focus?.incidentId || 'supplier_delay_main'
+  })
   const [selectedType, setSelectedType] = useState('Supplier')
 
   // Forecast-derived incidents injected from ForecastPage after actuals upload
@@ -240,12 +250,49 @@ export default function RiskPage() {
   const [forecastIncidents, setForecastIncidents] = useState(readForecastIncidents)
 
   useEffect(() => {
-    const handler = () => setForecastIncidents(readForecastIncidents())
+    const handler = () => {
+      const fresh = readForecastIncidents()
+      setForecastIncidents(fresh)
+      // If RCA focus is set, auto-select the matching incident once it arrives
+      const focus = readRcaFocus()
+      if (focus?.incidentId) {
+        const match = fresh.find(i => i.id === focus.incidentId)
+        if (match) {
+          setSelectedIssueId(match.id)
+          setSelectedType(match.type || 'Product')
+          setFilterYear(focus.filterYear || 'All')
+          localStorage.removeItem('amasci_rca_focus')
+          setRcaFocus(null)
+        }
+      }
+    }
     window.addEventListener('amasci:forecast_incidents_updated', handler)
     return () => window.removeEventListener('amasci:forecast_incidents_updated', handler)
   }, [])
 
-  // Merge static incidents with forecast-derived ones (forecast ones appear at top)
+  // On mount: if RCA focus is set and the incident already exists, apply it immediately
+  useEffect(() => {
+    const focus = readRcaFocus()
+    if (!focus) return
+    const all = readForecastIncidents()
+    if (focus.incidentId) {
+      const match = all.find(i => i.id === focus.incidentId)
+      if (match) {
+        setSelectedIssueId(match.id)
+        setSelectedType(match.type || 'Product')
+        setFilterYear(focus.filterYear || 'All')
+        localStorage.removeItem('amasci_rca_focus')
+        setRcaFocus(null)
+        return
+      }
+    }
+    // No matching incident yet (e.g. deviation was below threshold) — just apply year filter
+    if (focus.filterYear) {
+      setFilterYear(focus.filterYear)
+      localStorage.removeItem('amasci_rca_focus')
+      setRcaFocus(null)
+    }
+  }, [])
   const ALL_INCIDENTS_LIVE = useMemo(() => {
     const staticIds = new Set(ALL_INCIDENTS.map(i => i.id))
     const fresh = forecastIncidents.filter(i => !staticIds.has(i.id))
@@ -258,8 +305,10 @@ export default function RiskPage() {
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterYear, setFilterYear] = useState('All')
 
-  // Guided Step State
+  const [expandedSlide, setExpandedSlide] = useState(null)
   const [activeStep, setActiveStep] = useState(1)
+
+  const toggleSlide = (id) => setExpandedSlide(prev => prev === id ? null : id)
 
   // 12-stage pipeline drawer
   const [pipelineDrawerOpen, setPipelineDrawerOpen] = useState(false)
@@ -408,6 +457,8 @@ export default function RiskPage() {
       const yearMatched = ALL_INCIDENTS_LIVE.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       if (yearMatched.length > 0) {
         list = yearMatched
+      } else if (forecastIncidents.some(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))) {
+        list = forecastIncidents.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       } else {
         // Dynamically map historical incidents for selected 2015-2018 year
         const seed = (parseInt(filterYear, 10) * 17) % 100
@@ -563,6 +614,16 @@ export default function RiskPage() {
 
         <div className={s.headerRight}>
           <span className={s.groundingBadge}><Activity size={10} /> Neo4j Connected</span>
+          {/* Return to Forecast Lifecycle if navigated here from Step 4 */}
+          {rcaFocus && (
+            <button
+              className={s.hdrBtn}
+              style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
+              onClick={() => { localStorage.removeItem('amasci_rca_focus'); setRcaFocus(null); window.history.back() }}
+            >
+              ← Return to Forecast Lifecycle (Step 5)
+            </button>
+          )}
           <button className={s.hdrBtn} onClick={() => setPipelineDrawerOpen(v => !v)}>
             <Layers size={12} /> {pipelineDrawerOpen ? 'Close' : 'View'} AI Pipeline (12 Stages)
           </button>
@@ -624,85 +685,128 @@ export default function RiskPage() {
               {searchQ && <button className={s.clearBtn} onClick={() => setSearchQ('')}>×</button>}
             </div>
 
-            <div style={{ marginBottom: 6 }}>
-              <select
-                value={filterYear}
-                onChange={e => setFilterYear(e.target.value)}
-                className={s.sidebarSelect}
-                style={{ width: '100%', fontWeight: 700, borderColor: filterYear !== 'All' ? 'var(--blue)' : 'var(--b2)', background: filterYear !== 'All' ? '#f0f7ff' : '#fff' }}
-              >
-                <option value="All">📅 All Historical Years (All Time)</option>
+            {/* Year filter — scrollable chip slide */}
+            <div className={s.filterSlideWrap}>
+              <span className={s.filterSlideLabel}>📅 Year</span>
+              <div className={s.filterSlide}>
+                <button
+                  className={`${s.filterChip} ${filterYear === 'All' ? s.filterChipActive : ''}`}
+                  onClick={() => setFilterYear('All')}
+                >
+                  All Time
+                </button>
                 {availableYears.map(y => (
-                  <option key={y.value} value={y.value}>
-                    📅 Year {y.label} {y.isLatest ? '⚡ (Latest Ingested Year)' : ''}
-                  </option>
+                  <button
+                    key={y.value}
+                    className={`${s.filterChip} ${filterYear === y.value ? s.filterChipYearActive : s.filterChipYear}`}
+                    onClick={() => setFilterYear(y.value)}
+                  >
+                    {y.label}{y.isLatest ? ' ⚡' : ''}
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
-            <div className={s.filterGrid}>
-              <select value={filterSeverity} onChange={e => setFilterSeverity(e.target.value)} className={s.sidebarSelect}>
-                <option value="All">All Severity</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-              </select>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={s.sidebarSelect}>
-                <option value="All">All Status</option>
-                <option value="Open RCA">Open RCA</option>
-                <option value="Investigating">Investigating</option>
-                <option value="Resolved">Resolved</option>
-              </select>
+            {/* Severity filter — scrollable chip slide */}
+            <div className={s.filterSlideWrap}>
+              <span className={s.filterSlideLabel}>⚠ Severity</span>
+              <div className={s.filterSlide}>
+                {['All', 'Critical', 'High', 'Medium'].map(sv => (
+                  <button
+                    key={sv}
+                    className={`${s.filterChip} ${
+                      filterSeverity === sv ? s.filterChipActive : ''
+                    }`}
+                    style={filterSeverity === sv ? {} : {
+                      borderColor: sv === 'Critical' ? 'rgba(239,68,68,0.3)' : sv === 'High' ? 'rgba(245,158,11,0.3)' : sv === 'Medium' ? 'rgba(234,179,8,0.3)' : undefined,
+                      color: sv === 'Critical' ? '#dc2626' : sv === 'High' ? '#d97706' : sv === 'Medium' ? '#ca8a04' : undefined,
+                    }}
+                    onClick={() => setFilterSeverity(sv)}
+                  >
+                    {sv === 'All' ? 'All Severity' : sv}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Status filter — scrollable chip slide */}
+            <div className={s.filterSlideWrap}>
+              <span className={s.filterSlideLabel}>◉ Status</span>
+              <div className={s.filterSlide}>
+                {['All', 'Open RCA', 'Investigating', 'Resolved'].map(st => (
+                  <button
+                    key={st}
+                    className={`${s.filterChip} ${filterStatus === st ? s.filterChipActive : ''}`}
+                    onClick={() => setFilterStatus(st)}
+                  >
+                    {st === 'All' ? 'All Status' : st}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className={s.queueScroll}>
             {filteredIncidents.map(i => {
-              const active = selectedIssueId === i.id
-              const high = i.severity === 'Critical' || i.severity === 'High'
-              let sevColor = 'var(--emerald)'
-              if (i.severity === 'Critical') sevColor = 'var(--rose)'
-              if (i.severity === 'High') sevColor = 'var(--orange)'
-              if (i.severity === 'Medium') sevColor = 'var(--amber)'
-
+              const isActive = selectedIssueId === i.id
+              const isOpen = expandedSlide === i.id
+              let sevColor = '#10b981'
+              if (i.severity === 'Critical') sevColor = '#ef4444'
+              if (i.severity === 'High') sevColor = '#f97316'
+              if (i.severity === 'Medium') sevColor = '#eab308'
               return (
-                <div key={i.id} className={`${s.queueCard} ${active ? s.queueCardActive : ''}`} onClick={() => handleIncidentSelect(i.id, i.type)}>
-                  <div className={s.queueCardStripe} style={{ background: sevColor }} />
-
-                  <div className={s.queueCardHdr}>
-                    <span className={s.queueCardName}>{i.name}</span>
-                    <span className={s.queueCardRisk} style={{ color: sevColor }}>{i.risk}</span>
+                <div key={i.id} className={`${s.incidentSlide} ${isActive ? s.incidentSlideActive : ''}`}>
+                  <div className={s.slideHeader} onClick={() => setExpandedSlide(prev => prev === i.id ? null : i.id)}>
+                    <span className={s.slideSeverityDot} style={{ background: sevColor }} />
+                    <div className={s.slideHeaderText}>
+                      <div className={s.slideIncidentName}>{i.name}</div>
+                      <div className={s.slideIncidentMeta}>{i.type} · {i.region} · {i.periodLabel || i.period}</div>
+                    </div>
+                    <span className={s.slideRiskBadge} style={{ color: sevColor }}>{i.risk}</span>
+                    <ChevronDown size={12} className={`${s.slideChevron} ${isOpen ? s.slideChevronOpen : ''}`} />
                   </div>
-
-                  <div className={s.queueCardMeta}>{i.type} · {i.region} · {i.timeSinceDetection}</div>
-
-                  <div className={s.queueCardMetrics}>
-                    <div>
-                      <span className={s.qKpiLabel}>Loss</span>
-                      <span className={s.qKpiVal}>${i.financialLoss.toLocaleString()}</span>
+                  <div className={`${s.slideBody} ${isOpen ? s.slideBodyOpen : ''}`}>
+                    <div className={s.slideBodyInner}>
+                      <div className={s.slideKpiRow}>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Loss</span>
+                          <span className={s.slideKpiVal} style={{ color: '#ef4444' }}>${i.financialLoss.toLocaleString()}</span>
+                        </div>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Orders</span>
+                          <span className={s.slideKpiVal}>{i.affectedOrders.toLocaleString()}</span>
+                        </div>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Conf</span>
+                          <span className={s.slideKpiVal} style={{ color: '#3b82f6' }}>{i.confidence}</span>
+                        </div>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Delay</span>
+                          <span className={s.slideKpiVal}>{i.expectedDelay}d</span>
+                        </div>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Customers</span>
+                          <span className={s.slideKpiVal}>{i.customers.toLocaleString()}</span>
+                        </div>
+                        <div className={s.slideKpiBox}>
+                          <span className={s.slideKpiLabel}>Drop</span>
+                          <span className={s.slideKpiVal} style={{ color: '#f97316' }}>-{i.forecastDrop}%</span>
+                        </div>
+                      </div>
+                      <div className={s.slideTagRow}>
+                        <span className={`${s.tag} ${i.status === 'Resolved' ? s.tagGreen : s.tagAmber}`}>{i.status}</span>
+                        <span className={s.tag} style={{ background: `${sevColor}15`, color: sevColor, border: `1px solid ${sevColor}30` }}>{i.severity}</span>
+                        {i._fromForecast && (
+                          <span style={{ fontSize: '8px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: 8, fontWeight: 800, border: '1px solid #93c5fd' }}>📈 Forecast</span>
+                        )}
+                      </div>
+                      <button
+                        className={`${s.slideSelectBtn} ${isActive ? s.slideSelectBtnActive : ''}`}
+                        onClick={() => handleIncidentSelect(i.id, i.type)}
+                      >
+                        {isActive ? '✓ Currently Investigating' : 'Open Investigation →'}
+                      </button>
                     </div>
-                    <div>
-                      <span className={s.qKpiLabel}>Orders</span>
-                      <span className={s.qKpiVal}>{i.affectedOrders}</span>
-                    </div>
-                    <div>
-                      <span className={s.qKpiLabel}>Conf</span>
-                      <span className={s.qKpiVal} style={{ color: 'var(--blue)' }}>{i.confidence}</span>
-                    </div>
-                  </div>
-
-                  <div className={s.queueCardFoot}>
-                    <span className={`${s.tag} ${i.status === 'Resolved' ? s.tagGreen : s.tagAmber}`}>{i.status}</span>
-                    {i._fromForecast && (
-                      <span style={{ fontSize: '8px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: 8, fontWeight: 800, border: '1px solid #93c5fd' }}>
-                        📈 Forecast Deviation
-                      </span>
-                    )}
-                    {i.periodLabel && (
-                      <span className={s.tag} style={{ background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe', marginLeft: 'auto', fontWeight: 800 }}>
-                        📅 {i.periodLabel}
-                      </span>
-                    )}
                   </div>
                 </div>
               )

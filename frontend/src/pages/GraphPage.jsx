@@ -87,7 +87,7 @@ export default function GraphPage() {
 
   // Nodes for explorer — use graph/nodes endpoint directly
   const nodesQuery = useQuery({
-    queryKey: ['graphNodes', 'all'],
+    queryKey: ['supplyChain', 'graphNodes', 'all'],
     queryFn: () => api.getGraphNodes({ label: 'Supplier' }).then(r => r.data?.nodes || r.data || []),
     staleTime: 60_000,
   })
@@ -220,7 +220,7 @@ export default function GraphPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => qc.invalidateQueries()}
+              onClick={() => qc.invalidateQueries({ queryKey: ['supplyChain'] })}
             >
               <RefreshCw size={13} /> Sync Graph Engine
             </button>

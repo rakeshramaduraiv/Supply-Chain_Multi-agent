@@ -74,6 +74,15 @@ def _load_parquet() -> pd.DataFrame | None:
     return df
 
 
+def _safe_date(date_str: str):
+    """Parse date string, returning None if out of pandas nanosecond range (year < 1678)."""
+    try:
+        ts = pd.to_datetime(date_str)
+        return ts if ts.year >= 1678 else None
+    except Exception:
+        return None
+
+
 def _clean_node_id(node_id: str) -> str:
     if not node_id:
         return "Unknown Entity"
@@ -141,12 +150,14 @@ async def get_live_ops_entities(
     if product and "Product Name" in filtered_df.columns:
         filtered_df = filtered_df[filtered_df["Product Name"] == product]
 
-    if date_start or date_end:
+    ts_start = _safe_date(date_start) if date_start else None
+    ts_end   = _safe_date(date_end)   if date_end   else None
+    if ts_start or ts_end:
         filtered_df["_date"] = pd.to_datetime(filtered_df["order date (DateOrders)"], errors="coerce")
-        if date_start:
-            filtered_df = filtered_df[filtered_df["_date"] >= pd.to_datetime(date_start)]
-        if date_end:
-            filtered_df = filtered_df[filtered_df["_date"] <= pd.to_datetime(date_end)]
+        if ts_start:
+            filtered_df = filtered_df[filtered_df["_date"] >= ts_start]
+        if ts_end:
+            filtered_df = filtered_df[filtered_df["_date"] <= ts_end]
 
     col = _get_entity_column_map(entity_type)
     if col not in filtered_df.columns:

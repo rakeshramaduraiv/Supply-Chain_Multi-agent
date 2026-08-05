@@ -22,7 +22,7 @@ export function useRealtimeSync() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data)
-          if (payload.event) queryClient.invalidateQueries()
+          if (payload.event) queryClient.invalidateQueries({ queryKey: ['supplyChain'] })
         } catch (_) {}
       }
       ws.onerror = () => {}

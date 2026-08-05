@@ -227,6 +227,31 @@ export default function RiskPage() {
   const [selectedIssueId, setSelectedIssueId] = useState(issueId || 'supplier_delay_main')
   const [selectedType, setSelectedType] = useState('Supplier')
 
+  // Forecast-derived incidents injected from ForecastPage after actuals upload
+  // Deduplicate by id at read time to prevent React key collisions from multiple event fires
+  const readForecastIncidents = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('amasci_forecast_incidents') || '[]')
+      const seen = new Set()
+      return raw.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true })
+    } catch { return [] }
+  }
+
+  const [forecastIncidents, setForecastIncidents] = useState(readForecastIncidents)
+
+  useEffect(() => {
+    const handler = () => setForecastIncidents(readForecastIncidents())
+    window.addEventListener('amasci:forecast_incidents_updated', handler)
+    return () => window.removeEventListener('amasci:forecast_incidents_updated', handler)
+  }, [])
+
+  // Merge static incidents with forecast-derived ones (forecast ones appear at top)
+  const ALL_INCIDENTS_LIVE = useMemo(() => {
+    const staticIds = new Set(ALL_INCIDENTS.map(i => i.id))
+    const fresh = forecastIncidents.filter(i => !staticIds.has(i.id))
+    return [...fresh, ...ALL_INCIDENTS]
+  }, [forecastIncidents])
+
   // Search & filters in queue
   const [searchQ, setSearchQ] = useState('')
   const [filterSeverity, setFilterSeverity] = useState('All')
@@ -265,7 +290,7 @@ export default function RiskPage() {
   const { riskDash, rcaStats, rcaDash, rcaHistory, kpis } = useRiskPageData()
   useRcaInvestigationHistory()
 
-  const inc = useMemo(() => ALL_INCIDENTS.find(i => i.id === selectedIssueId) || ALL_INCIDENTS[0], [selectedIssueId])
+  const inc = useMemo(() => ALL_INCIDENTS_LIVE.find(i => i.id === selectedIssueId) || ALL_INCIDENTS_LIVE[0], [selectedIssueId, ALL_INCIDENTS_LIVE])
 
   // Backend sync mutations
   const investigationMut = useMutation({
@@ -377,11 +402,10 @@ export default function RiskPage() {
 
   // Filtered Queue with real-time Year dataset filtering support
   const filteredIncidents = useMemo(() => {
-    let list = ALL_INCIDENTS
+    let list = ALL_INCIDENTS_LIVE
 
     if (filterYear !== 'All') {
-      // Find matching incidents for the selected YYYY
-      const yearMatched = ALL_INCIDENTS.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
+      const yearMatched = ALL_INCIDENTS_LIVE.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       if (yearMatched.length > 0) {
         list = yearMatched
       } else {
@@ -460,7 +484,7 @@ export default function RiskPage() {
       }
       return true
     })
-  }, [searchQ, filterSeverity, filterStatus, filterYear])
+  }, [searchQ, filterSeverity, filterStatus, filterYear, ALL_INCIDENTS_LIVE])
 
   // Live Counterfactual simulator recalculation
   const simResult = useMemo(() => {
@@ -590,7 +614,7 @@ export default function RiskPage() {
         <aside className={s.leftSidebar}>
           <div className={s.sidebarHeader}>
             <span className={s.sidebarTitle}>Investigation Queue</span>
-            <span className={s.badgeCounter}>{filteredIncidents.length} active</span>
+            <span className={s.badgeCounter}>{filteredIncidents.length} active {forecastIncidents.length > 0 && <span style={{color:'#f59e0b',fontWeight:800}}>+{forecastIncidents.length} from forecast</span>}</span>
           </div>
 
           <div className={s.sidebarFilters}>
@@ -669,6 +693,11 @@ export default function RiskPage() {
 
                   <div className={s.queueCardFoot}>
                     <span className={`${s.tag} ${i.status === 'Resolved' ? s.tagGreen : s.tagAmber}`}>{i.status}</span>
+                    {i._fromForecast && (
+                      <span style={{ fontSize: '8px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 6px', borderRadius: 8, fontWeight: 800, border: '1px solid #93c5fd' }}>
+                        📈 Forecast Deviation
+                      </span>
+                    )}
                     {i.periodLabel && (
                       <span className={s.tag} style={{ background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe', marginLeft: 'auto', fontWeight: 800 }}>
                         📅 {i.periodLabel}
@@ -727,9 +756,9 @@ export default function RiskPage() {
               const done = st.stepNum < activeStep
               const active = st.stepNum === activeStep
               return (
-                <button key={st.stepNum} className={`${s.wizardStepBtn} ${active ? s.wizardActive : ''} ${done ? s.wizardDone : ''}`} onClick={() => setActiveStep(st.stepNum)}>
+                <button key={st.stepNum} className={`${s.wizardStepBtn} ${active ? s.wizardActive : ''} ${done ? s.wizardDone : ''}`} onClick={() => setActiveStep(st.stepNum)} title={st.label}>
                   <div className={s.wizardStepIcon}>
-                    {done ? <CheckCircle2 size={13} color="var(--emerald)" /> : <Icon size={12} />}
+                    {done ? <CheckCircle2 size={12} color="var(--emerald)" /> : <Icon size={12} />}
                   </div>
                   <span className={s.wizardStepLabel}>{st.label}</span>
                 </button>
@@ -744,6 +773,63 @@ export default function RiskPage() {
             {activeStep === 1 && (
               <div className={s.stepPane}>
                 <div className={s.stepHeaderTitle}><Shield size={14} color="var(--blue)" /> Step 1: Incident Triage & Specification Checklist</div>
+
+                {/* Forecast-derived incident: show prediction context banner */}
+                {inc._fromForecast && (
+                  <div style={{
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
+                    border: '1.5px solid #3b82f6', borderRadius: 8,
+                    padding: '12px 14px', marginBottom: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <TrendingUp size={13} color="#3b82f6" />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e40af' }}>
+                        Forecast Prediction Context — {inc.period}
+                      </span>
+                      <span style={{ marginLeft: 'auto', fontSize: '9px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 7px', borderRadius: 10, fontWeight: 700 }}>
+                        LightGBM · {inc.predictionSource}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                      <div style={{ background: '#fff', borderRadius: 6, padding: '8px 10px', border: '1px solid #bfdbfe' }}>
+                        <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Predicted Demand</div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#1e40af' }}>
+                          {(inc.affectedOrders + Math.round(inc.financialLoss / 45)).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#64748b' }}>units forecast</div>
+                      </div>
+                      <div style={{ background: '#fff', borderRadius: 6, padding: '8px 10px', border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Actual Demand</div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: '#15803d' }}>
+                          {inc.affectedOrders.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#64748b' }}>units ingested</div>
+                      </div>
+                      <div style={{ background: '#fff', borderRadius: 6, padding: '8px 10px', border: `1px solid ${inc.severity === 'High' ? '#fecaca' : '#fde68a'}` }}>
+                        <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', fontWeight: 700 }}>Deviation</div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: inc.severity === 'High' ? '#dc2626' : '#d97706' }}>
+                          {inc.forecastDrop.toFixed(1)}%
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#64748b' }}>vs model prediction</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '9.5px', color: '#334155' }}>
+                        Model confidence: <strong style={{ color: '#3b82f6' }}>{inc.confidence}</strong>
+                      </span>
+                      <span style={{ fontSize: '9.5px', color: '#334155' }}>
+                        · Financial exposure: <strong style={{ color: '#dc2626' }}>${inc.financialLoss.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ fontSize: '9.5px', color: '#334155' }}>
+                        · Region: <strong>{inc.region}</strong>
+                      </span>
+                      <span style={{ fontSize: '9.5px', color: '#334155' }}>
+                        · Responsible agent: <strong>{inc.affectedSupplier}</strong>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className={s.stepBriefContainer}>
                   <div className={s.executiveBriefingTitle}>{inc.name} Specification</div>
                   <div className={s.executiveBriefingDetails}>

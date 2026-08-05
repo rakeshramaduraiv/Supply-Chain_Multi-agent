@@ -141,6 +141,9 @@ class Neo4jConnectionManager:
             except AuthError as e:
                 logger.error(f"Neo4j authentication failed: {e}")
                 raise
+            except ConnectionError as e:
+                logger.debug(f"Neo4j query skipped (offline): {e}")
+                raise
             except Exception as e:
                 logger.error(f"Neo4j query failed: {e}")
                 raise

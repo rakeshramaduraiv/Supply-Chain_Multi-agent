@@ -452,10 +452,10 @@ def _compute_auto_forecast() -> dict:
 
         return {
             "ready": True,
-            "forecast_period": "2019-02",
-            "forecast_period_start": "2019-02-01",
-            "forecast_period_end": "2019-02-28",
-            "training_data_end": "2019-01-31",
+            "forecast_period": "2018-02",
+            "forecast_period_start": "2018-02-01",
+            "forecast_period_end": "2018-02-28",
+            "training_data_end": "2018-01-31",
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": "completed",
             "overall_confidence": overall_confidence,
@@ -472,8 +472,13 @@ def _compute_auto_forecast() -> dict:
         return {"ready": False, "message": f"Forecast generation failed: {str(e)}"}
 
 
-# Cache for auto-forecast (expensive computation)
+# Cache for auto-forecast (expensive computation) — cleared on backend restart
 _forecast_cache: dict | None = None
+
+
+def clear_forecast_cache():
+    global _forecast_cache
+    _forecast_cache = None
 
 
 @router.get("/summary")
@@ -497,10 +502,10 @@ def get_next_forecast_period():
     """Auto-detect the next forecast period based on training data end date."""
     summary = _compute_summary()
     return {
-        "period_start": "2019-02-01",
-        "period_end": "2019-02-28",
-        "training_data_end": "2019-01-31",
-        "recommendation": "Forecasting February 2019 (next period after training data ends 2019-01-31)",
+        "period_start": "2018-02-01",
+        "period_end": "2018-02-28",
+        "training_data_end": "2018-01-31",
+        "recommendation": "Forecasting February 2018 (next period after DataCo training data ends 2018-01-31)",
     }
 
 
@@ -551,7 +556,7 @@ def get_error_diagnostics(period_start: str = None):
         diagnostics.append({
             "category": cat,
             "region": region,
-            "period": period_start or "2019-01",
+            "period": period_start or "2018-02",
             "predicted_demand": pred_demand,
             "actual_demand": actual_demand,
             "variance": f"{variance:+} ({pct_var}%)",

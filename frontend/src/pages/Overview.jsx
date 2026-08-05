@@ -92,18 +92,21 @@ export default function Overview() {
 
   // Fetch dataset metadata for available regions
   const summaryQuery = useQuery({
-    queryKey: ['datasetSummary'],
+    queryKey: ['supplyChain', 'datasetSummary'],
     queryFn: () => api.getDatasetSummary().then(r => r.data),
   })
   const regionOptions = summaryQuery.data?.regions || []
 
   // ── 1. Fetch Entity List from Backend (Entity Explorer) ─────────────────
+  const validStart = dateRange.start?.length === 10 && parseInt(dateRange.start) >= 1900 ? dateRange.start : undefined
+  const validEnd   = dateRange.end?.length   === 10 && parseInt(dateRange.end)   >= 1900 ? dateRange.end   : undefined
+
   const entityListQuery = useLiveOpsEntities({
     entity_type: selectedType,
     search: searchQuery,
     region: selectedRegion,
-    date_start: dateRange.start,
-    date_end: dateRange.end,
+    ...(validStart && { date_start: validStart }),
+    ...(validEnd   && { date_end:   validEnd }),
   })
 
   const entities = entityListQuery.data?.entities || []
@@ -138,8 +141,8 @@ export default function Overview() {
     entity_id: selectedEntityId,
     entity_type: selectedType,
     region: selectedRegion,
-    date_start: dateRange.start,
-    date_end: dateRange.end,
+    ...(validStart && { date_start: validStart }),
+    ...(validEnd   && { date_end:   validEnd }),
   })
 
   const analytics = analyticsQuery.data || {}

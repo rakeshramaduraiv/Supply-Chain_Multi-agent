@@ -188,6 +188,53 @@
   transition: width 0.3s ease;
 }
 
+.stepSummary {
+  font-size: 9px;
+  color: var(--tm);
+  line-height: 1.35;
+  border-top: 1px solid var(--b);
+  padding-top: 4px;
+}
+
+.stepAction {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.stepSelect {
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--b);
+  background: var(--s1);
+  color: var(--tp);
+  font-size: 9.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.stepLog {
+  font-size: 9px;
+  color: var(--ts);
+  font-family: var(--mono);
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
 /* ── MULTI-AGENT INTELLIGENCE CARDS ── */
 .agentGrid {
   display: grid;

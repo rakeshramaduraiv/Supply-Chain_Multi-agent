@@ -53,25 +53,46 @@ class EntityExtractor:
         for name, group in grouped:
             supplier_id = generate_node_id("Supplier", name)
             total_orders = len(group)
-            late_count = group["Late_delivery_risk"].sum() if "Late_delivery_risk" in group.columns else 0
-            delay_rate = float(late_count / total_orders) if total_orders > 0 else 0.0
 
-            avg_real = group["Days for shipping (real)"].mean() if "Days for shipping (real)" in group.columns else 0
-            avg_sched = group["Days for shipment (scheduled)"].mean() if "Days for shipment (scheduled)" in group.columns else 0
-            avg_delay = float(avg_real - avg_sched) if avg_real and avg_sched else 0.0
+            # Prefer engineered features (Fix 1) over raw CSV derivation
+            if "supplier_reliability_score" in group.columns:
+                reliability = safe_float(group["supplier_reliability_score"].mean(), 0.5)
+            elif "Late_delivery_risk" in group.columns:
+                late_count = group["Late_delivery_risk"].sum()
+                delay_rate_raw = float(late_count / total_orders) if total_orders > 0 else 0.0
+                reliability = max(0.0, 1.0 - delay_rate_raw)
+            else:
+                reliability = 0.5
 
-            efficiency = max(0.0, 1.0 - delay_rate)
-            reliability = max(0.0, 1.0 - (delay_rate * 0.6 + min(avg_delay / 10.0, 1.0) * 0.4))
-            risk_score = min(1.0, delay_rate * 0.5 + min(max(avg_delay, 0) / 7.0, 1.0) * 0.5)
+            if "supplier_delay_rate" in group.columns:
+                delay_rate = safe_float(group["supplier_delay_rate"].mean(), 0.3)
+            elif "Late_delivery_risk" in group.columns:
+                delay_rate = float(group["Late_delivery_risk"].sum() / total_orders) if total_orders > 0 else 0.3
+            else:
+                delay_rate = 0.3
+
+            avg_real  = group["Days for shipping (real)"].mean()       if "Days for shipping (real)"       in group.columns else 0
+            avg_sched = group["Days for shipment (scheduled)"].mean()  if "Days for shipment (scheduled)"  in group.columns else 0
+            avg_delay_days = safe_float(avg_real - avg_sched, 0.0) if avg_real and avg_sched else 0.0
+
+            if "shipping_delay_ratio" in group.columns:
+                shipping_efficiency = safe_float(1.0 - group["shipping_delay_ratio"].mean(), 1.0)
+            else:
+                shipping_efficiency = max(0.0, 1.0 - delay_rate)
+
+            risk_score = min(1.0, delay_rate * 0.5 + min(max(avg_delay_days, 0) / 7.0, 1.0) * 0.5)
 
             suppliers.append(SupplierNode(
                 node_id=supplier_id,
                 supplier_id=supplier_id,
                 supplier_name=safe_str(name),
+                # Property names match get_agent_context() Cypher RETURN aliases
                 supplier_reliability_score=round(reliability, 4),
+                reliability_score=round(reliability, 4),
                 supplier_delay_rate=round(delay_rate, 4),
-                shipping_efficiency_score=round(efficiency, 4),
-                avg_delay=round(avg_delay, 2),
+                shipping_efficiency_score=round(shipping_efficiency, 4),
+                avg_delay=round(avg_delay_days, 2),
+                avg_delay_days=round(avg_delay_days, 2),
                 total_orders=total_orders,
                 risk_score=round(risk_score, 4),
             ))
@@ -93,14 +114,35 @@ class EntityExtractor:
             qty_col = "Order Item Quantity"
 
             quantities = group[qty_col] if qty_col in group.columns else pd.Series([0])
-            rolling_7d = float(quantities.tail(7).mean()) if len(quantities) >= 7 else float(quantities.mean())
+            rolling_7d  = float(quantities.tail(7).mean())  if len(quantities) >= 7  else float(quantities.mean())
             rolling_30d = float(quantities.tail(30).mean()) if len(quantities) >= 30 else float(quantities.mean())
-            volatility = float(quantities.std() / quantities.mean()) if quantities.mean() > 0 else 0.0
-            demand_trend = float(quantities.tail(7).mean() - quantities.head(7).mean()) if len(quantities) >= 14 else 0.0
+
+            # Prefer engineered features (Fix 1) over raw derivation
+            volatility = (
+                safe_float(group["demand_volatility"].mean())
+                if "demand_volatility" in group.columns
+                else safe_float(quantities.std() / quantities.mean() if quantities.mean() > 0 else 0.0)
+            )
+            # demand_trend_slope is the exact property name read by get_agent_context()
+            demand_trend_slope = (
+                safe_float(group["demand_trend_slope"].mean())
+                if "demand_trend_slope" in group.columns
+                else safe_float(quantities.tail(7).mean() - quantities.head(7).mean() if len(quantities) >= 14 else 0.0)
+            )
+            demand_momentum = (
+                safe_float(group["demand_momentum"].mean())
+                if "demand_momentum" in group.columns
+                else 0.0
+            )
+            avg_spike_rate = (
+                safe_float(group["demand_spike_flag"].mean())
+                if "demand_spike_flag" in group.columns
+                else 0.0
+            )
 
             late_rate = group["Late_delivery_risk"].mean() if "Late_delivery_risk" in group.columns else 0.0
-            inventory_stress = min(1.0, volatility * 0.5 + late_rate * 0.5)
-            forecast_risk = min(1.0, volatility * 0.4 + late_rate * 0.3 + abs(demand_trend) / (rolling_30d + 1) * 0.3)
+            inventory_stress = min(1.0, volatility * 0.5 + safe_float(late_rate) * 0.5)
+            forecast_risk    = min(1.0, volatility * 0.4 + safe_float(late_rate) * 0.3 + abs(demand_trend_slope) / (rolling_30d + 1) * 0.3)
 
             products.append(ProductNode(
                 node_id=product_id,
@@ -108,10 +150,14 @@ class EntityExtractor:
                 category=safe_str(category),
                 rolling_7d_demand=round(safe_float(rolling_7d), 2),
                 rolling_30d_demand=round(safe_float(rolling_30d), 2),
-                demand_volatility=round(safe_float(volatility), 4),
-                demand_trend=round(safe_float(demand_trend), 2),
-                inventory_stress=round(safe_float(inventory_stress), 4),
-                forecast_risk=round(safe_float(forecast_risk), 4),
+                # Property names match get_agent_context() Cypher RETURN aliases
+                demand_volatility=round(volatility, 4),
+                demand_trend=round(demand_trend_slope, 4),
+                demand_trend_slope=round(demand_trend_slope, 4),
+                demand_momentum=round(demand_momentum, 4),
+                avg_spike_rate=round(avg_spike_rate, 4),
+                inventory_stress=round(inventory_stress, 4),
+                forecast_risk=round(forecast_risk, 4),
             ))
 
         logger.info(f"Extracted {len(products)} product nodes")
@@ -119,7 +165,7 @@ class EntityExtractor:
 
     def extract_warehouses(self, df: pd.DataFrame) -> list[WarehouseNode]:
         """Extract warehouse nodes from city/region data."""
-        city_col = "Order City"
+        city_col   = "Order City"
         region_col = "Order Region"
         if city_col not in df.columns:
             return []
@@ -132,22 +178,39 @@ class EntityExtractor:
             region = safe_str(group[region_col].iloc[0]) if region_col in group.columns else ""
             total = len(group)
             late_count = group["Late_delivery_risk"].sum() if "Late_delivery_risk" in group.columns else 0
-            late_rate = float(late_count / total) if total > 0 else 0.0
+            late_rate  = float(late_count / total) if total > 0 else 0.0
 
-            avg_qty = group["Order Item Quantity"].mean() if "Order Item Quantity" in group.columns else 0
-            stock_coverage = max(0.0, 1.0 - late_rate)
-            stress_index = min(1.0, late_rate * 0.6 + min(safe_float(avg_qty) / 20.0, 1.0) * 0.4)
-            days_reorder = max(0.0, (1.0 - stress_index) * 30.0)
-            warehouse_risk = min(1.0, stress_index * 0.7 + late_rate * 0.3)
+            # Prefer engineered features (Fix 1) — property names match get_agent_context() aliases
+            avg_inventory_stress = (
+                safe_float(group["inventory_stress_index"].mean())
+                if "inventory_stress_index" in group.columns
+                else min(1.0, late_rate * 0.6 + min(safe_float(group["Order Item Quantity"].mean() if "Order Item Quantity" in group.columns else 0) / 20.0, 1.0) * 0.4)
+            )
+            avg_days_to_reorder = (
+                safe_float(group["days_until_reorder"].mean())
+                if "days_until_reorder" in group.columns
+                else max(0.0, (1.0 - avg_inventory_stress) * 30.0)
+            )
+            avg_coverage_ratio = (
+                safe_float(group["stock_coverage_ratio"].mean())
+                if "stock_coverage_ratio" in group.columns
+                else max(0.0, 1.0 - late_rate)
+            )
+            warehouse_risk = min(1.0, avg_inventory_stress * 0.7 + late_rate * 0.3)
 
             warehouses.append(WarehouseNode(
                 node_id=warehouse_id,
                 warehouse_id=warehouse_id,
                 city=safe_str(city),
                 region=region,
-                stock_coverage_ratio=round(stock_coverage, 4),
-                inventory_stress_index=round(stress_index, 4),
-                days_until_reorder=round(days_reorder, 1),
+                location_region=region,
+                # Property names match get_agent_context() Cypher RETURN aliases
+                stock_coverage_ratio=round(avg_coverage_ratio, 4),
+                inventory_stress_index=round(avg_inventory_stress, 4),
+                avg_inventory_stress=round(avg_inventory_stress, 4),
+                days_until_reorder=round(avg_days_to_reorder, 1),
+                avg_days_to_reorder=round(avg_days_to_reorder, 1),
+                avg_coverage_ratio=round(avg_coverage_ratio, 4),
                 warehouse_risk=round(warehouse_risk, 4),
             ))
 

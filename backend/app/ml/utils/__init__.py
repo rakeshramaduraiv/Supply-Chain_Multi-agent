@@ -39,42 +39,74 @@ class FeatureConfig:
 
 
 # --- Feature Definitions per Intelligence Service ---
+# Each agent uses DOMAIN-SPECIFIC engineered features + graph context.
+# The 4 graph_* features are defaulted at training and injected live
+# from Neo4j via GraphRAG at prediction time.
 
-DEMAND_FEATURES = [
-    "order_month", "order_day_of_week", "order_week_of_year", "order_quarter",
-    "order_is_weekend", "Sales", "Order Profit Per Order",
-    "Product Price", "Order Item Discount", "Days for shipping (real)",
-    "Days for shipment (scheduled)", "delivery_duration_days",
+GRAPH_CONTEXT_FEATURES = [
+    "graph_supplier_reliability",
+    "graph_inventory_stress",
+    "graph_has_upcoming_event",
+    "graph_avg_shipping_delay",
 ]
+
+# ── DEMAND AGENT ──────────────────────────────────────────────
+# Predicts: next-period demand quantity (REGRESSION)
+DEMAND_FEATURES = [
+    "rolling_7d_demand", "rolling_14d_demand", "rolling_30d_demand",
+    "demand_volatility", "demand_spike_flag", "demand_trend_slope",
+    "demand_momentum", "demand_intensity", "quantity_zscore",
+    "seasonality_index", "category_demand_rank",
+    "demand_lag_1m", "demand_lag_3m",
+    "Product Price", "Order Item Discount", "discount_impact",
+    "price_quantity_interaction",
+    "order_month", "order_quarter", "order_week_of_year", "order_is_weekend",
+] + GRAPH_CONTEXT_FEATURES
 
 DEMAND_TARGET = "Order Item Quantity"
 
+
+# ── INVENTORY AGENT ───────────────────────────────────────────
+# Predicts: stockout risk (CLASSIFICATION)
 INVENTORY_FEATURES = [
-    "order_month", "order_day_of_week", "order_quarter", "order_is_weekend",
-    "Order Item Quantity", "Sales", "Product Price", "Order Item Discount",
-    "Days for shipping (real)", "Days for shipment (scheduled)",
-    "delivery_duration_days", "Order Profit Per Order",
-]
+    "inventory_stress_index", "days_until_reorder", "stock_coverage_ratio",
+    "rolling_7d_demand", "rolling_14d_demand", "rolling_30d_demand",
+    "demand_volatility", "demand_spike_flag", "demand_momentum",
+    "supplier_reliability_score", "supplier_delay_rate",
+    "delivery_duration_days", "delivery_gap",
+    "order_month", "order_quarter",
+] + GRAPH_CONTEXT_FEATURES
 
-INVENTORY_TARGET = "Late_delivery_risk"
+INVENTORY_TARGET = "stockout_risk_flag"
 
+
+# ── SUPPLIER AGENT ────────────────────────────────────────────
+# Predicts: late delivery risk (CLASSIFICATION) — PRIMARY ML OBJECTIVE
 SUPPLIER_FEATURES = [
+    "supplier_reliability_score", "supplier_delay_rate",
+    "supplier_risk_index", "supplier_volume",
+    "delivery_duration_days", "shipping_delay_ratio",
+    "is_delayed", "delivery_gap",
     "Days for shipping (real)", "Days for shipment (scheduled)",
-    "order_month", "order_quarter", "order_day_of_week",
-    "Order Item Quantity", "Sales", "Product Price",
-    "Order Item Discount", "Order Profit Per Order",
-    "delivery_duration_days", "order_is_weekend",
-]
+    "supplier_delay_lag_1m", "delay_rolling_mean_3m",
+    "demand_spike_flag", "demand_volatility",
+    "order_month", "order_quarter",
+] + GRAPH_CONTEXT_FEATURES
 
 SUPPLIER_TARGET = "Late_delivery_risk"
 
+
+# ── LOGISTICS AGENT ───────────────────────────────────────────
+# Predicts: route-level delivery delay risk (CLASSIFICATION)
 LOGISTICS_FEATURES = [
+    "delivery_duration_days", "shipping_delay_ratio", "is_delayed",
+    "delivery_gap", "delay_rolling_mean_3m",
     "Days for shipping (real)", "Days for shipment (scheduled)",
-    "delivery_duration_days", "order_month", "order_day_of_week",
-    "order_quarter", "order_is_weekend", "Order Item Quantity",
-    "Sales", "Product Price", "Order Item Discount",
-    "Order Profit Per Order",
-]
+    "order_value_log", "revenue_per_unit", "Order Item Quantity",
+    "supplier_reliability_score", "supplier_delay_rate",
+    "composite_risk_score",
+    "order_month", "order_day_of_week", "order_is_weekend",
+] + GRAPH_CONTEXT_FEATURES
 
 LOGISTICS_TARGET = "Late_delivery_risk"
 
@@ -152,6 +184,29 @@ RANDOM_FOREST_PARAMS = {
 }
 
 
+def build_stockout_target(df: pd.DataFrame) -> pd.Series:
+    """
+    Constructs binary stockout risk target for the Inventory Agent.
+
+    stockout_risk_flag = 1 when either:
+      (a) inventory stress is critical AND demand spiked, or
+      (b) reorder point is imminent (< 3 days)
+    """
+    stress_cond = (
+        df["inventory_stress_index"] < 0.3 if "inventory_stress_index" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    spike_cond = (
+        df["demand_spike_flag"] == 1 if "demand_spike_flag" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    reorder_cond = (
+        df["days_until_reorder"] < 3 if "days_until_reorder" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    return ((stress_cond & spike_cond) | reorder_cond).astype(int)
+
+
 def prepare_features(
     df: pd.DataFrame,
     feature_config: FeatureConfig,
@@ -161,6 +216,11 @@ def prepare_features(
 
     Returns only rows where all features and target are non-null.
     """
+    # Build synthetic target for Inventory Agent if missing
+    if feature_config.target == "stockout_risk_flag" and feature_config.target not in df.columns:
+        df = df.copy()
+        df["stockout_risk_flag"] = build_stockout_target(df)
+
     available_features = [f for f in feature_config.features if f in df.columns and f != feature_config.target]
     if not available_features:
         raise ValueError(f"No configured features found in dataframe. Expected: {feature_config.features}")

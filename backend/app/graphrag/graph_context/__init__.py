@@ -95,6 +95,113 @@ class GraphContextService:
         ctx = await self._context_builder.build_forecast_context(entity_id, entity_label)
         return ctx.to_dict()
 
+    async def get_agent_context(
+        self, category: str, region: str
+    ) -> dict[str, Any]:
+        """
+        Returns a FLAT numeric context dict for direct ML feature injection.
+
+        Unlike get_forecast_context() which returns a rich nested payload
+        for LLM reasoning, this returns only scalar values that agents
+        inject as model features.
+
+        Every value is null-safe. Never returns None.
+        Reads live Neo4j node properties AND TPKE inferred edges.
+        """
+        cypher = """
+        MATCH (p:Product {category: $category})
+        OPTIONAL MATCH (s:Supplier)-[rs:SUPPLIES]->(p)
+        OPTIONAL MATCH (p)-[:STORED_IN]->(w:Warehouse {location_region: $region})
+        OPTIONAL MATCH (w)-[:SHIPS_VIA]->(sh:Shipment)
+        OPTIONAL MATCH (ce:CalendarEvent)-[:INFLUENCES]->(p)
+        OPTIONAL MATCH (ce2:CalendarEvent)-[r2:SEASONAL_STOCKOUT_RISK]->(p)
+        OPTIONAL MATCH (p)-[r3:DEMAND_SPIKE_AMPLIFIES_SUPPLIER_RISK]->(sup2:Supplier)
+        RETURN
+            p.demand_volatility            AS demand_volatility,
+            p.demand_trend_slope           AS demand_trend_slope,
+            avg(s.reliability_score)       AS avg_supplier_reliability,
+            avg(s.avg_delay_days)          AS avg_supplier_delay,
+            w.avg_inventory_stress         AS inventory_stress,
+            w.avg_days_to_reorder          AS days_to_reorder,
+            avg(sh.shipping_delay)         AS avg_shipping_delay,
+            collect(DISTINCT ce.event_name)[..3]  AS upcoming_events,
+            collect(DISTINCT ce2.event_name)[..2] AS holiday_risk_events,
+            count(DISTINCT sup2)           AS amplified_supplier_count
+        LIMIT 1
+        """
+
+        try:
+            records = await self._retrieval._conn.execute_query(
+                cypher, {"category": category, "region": region}
+            )
+        except Exception as e:
+            logger.warning(f"Agent context query failed for {category}/{region}: {e}")
+            return self._default_agent_context(category, region)
+
+        if not records:
+            return self._default_agent_context(category, region)
+
+        r = records[0]
+
+        def _f(key: str, default: float) -> float:
+            val = r.get(key)
+            if val is None:
+                return default
+            try:
+                f = float(val)
+                if f != f or f in (float("inf"), float("-inf")):
+                    return default
+                return f
+            except (TypeError, ValueError):
+                return default
+
+        def _list(key: str) -> list:
+            val = r.get(key) or []
+            return [v for v in val if v]
+
+        upcoming     = _list("upcoming_events")
+        holiday_risk = _list("holiday_risk_events")
+        amplified    = int(r.get("amplified_supplier_count") or 0)
+
+        return {
+            "summary": (
+                f"'{category}' / '{region}': "
+                f"supplier_reliability={_f('avg_supplier_reliability', 0.5):.3f}, "
+                f"inventory_stress={_f('inventory_stress', 0.5):.3f}, "
+                f"shipping_delay={_f('avg_shipping_delay', 0.0):.1f}d, "
+                f"events={len(upcoming)}, tpke_edges={len(holiday_risk) + amplified}"
+            ),
+            "avg_supplier_reliability": _f("avg_supplier_reliability", 0.5),
+            "avg_supplier_delay":       _f("avg_supplier_delay", 0.0),
+            "inventory_stress":         _f("inventory_stress", 0.5),
+            "days_to_reorder":          _f("days_to_reorder", 7.0),
+            "avg_shipping_delay":       _f("avg_shipping_delay", 0.0),
+            "demand_volatility":        _f("demand_volatility", 0.3),
+            "demand_trend_slope":       _f("demand_trend_slope", 0.0),
+            "upcoming_events":          upcoming,
+            "holiday_risk_events":      holiday_risk,
+            "amplified_supplier_count": amplified,
+            "entities":                 [dict(r)],
+        }
+
+    @staticmethod
+    def _default_agent_context(category: str, region: str) -> dict[str, Any]:
+        """Neutral defaults. Never returns None — agents must not crash."""
+        return {
+            "summary": f"No graph context for '{category}' / '{region}'",
+            "avg_supplier_reliability": 0.5,
+            "avg_supplier_delay":       0.0,
+            "inventory_stress":         0.5,
+            "days_to_reorder":          7.0,
+            "avg_shipping_delay":       0.0,
+            "demand_volatility":        0.3,
+            "demand_trend_slope":       0.0,
+            "upcoming_events":          [],
+            "holiday_risk_events":      [],
+            "amplified_supplier_count": 0,
+            "entities":                 [],
+        }
+
     async def get_risk_context(
         self, entity_id: str, entity_label: str
     ) -> dict[str, Any]:

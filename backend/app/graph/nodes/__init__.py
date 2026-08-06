@@ -29,9 +29,11 @@ class SupplierNode(BaseNode):
     supplier_id: str = ""
     supplier_name: str = ""
     supplier_reliability_score: float = 0.0
+    reliability_score: float = 0.0     # alias read by get_agent_context() Cypher
     supplier_delay_rate: float = 0.0
     shipping_efficiency_score: float = 0.0
     avg_delay: float = 0.0
+    avg_delay_days: float = 0.0        # alias read by get_agent_context() Cypher
     total_orders: int = 0
     risk_score: float = 0.0
 
@@ -46,6 +48,9 @@ class ProductNode(BaseNode):
     rolling_30d_demand: float = 0.0
     demand_volatility: float = 0.0
     demand_trend: float = 0.0
+    demand_trend_slope: float = 0.0
+    demand_momentum: float = 0.0
+    avg_spike_rate: float = 0.0
     inventory_stress: float = 0.0
     forecast_risk: float = 0.0
 
@@ -57,9 +62,13 @@ class WarehouseNode(BaseNode):
     warehouse_id: str = ""
     city: str = ""
     region: str = ""
+    location_region: str = ""          # alias read by get_agent_context() Cypher
     stock_coverage_ratio: float = 0.0
     inventory_stress_index: float = 0.0
+    avg_inventory_stress: float = 0.0  # alias read by get_agent_context() Cypher
     days_until_reorder: float = 0.0
+    avg_days_to_reorder: float = 0.0   # alias read by get_agent_context() Cypher
+    avg_coverage_ratio: float = 0.0
     warehouse_risk: float = 0.0
 
 

@@ -120,12 +120,15 @@ class ForecastService(BaseService):
             DemandAgent, InventoryAgent,
             SupplierAgent, LogisticsAgent,
         )
+        from datetime import datetime, timezone
 
         graph_svc = GraphContextService()
         demand    = DemandAgent()
         inventory = InventoryAgent()
         supplier  = SupplierAgent()
         logistics = LogisticsAgent()
+
+        forecast_generated_at = datetime.now(timezone.utc).isoformat()
 
         group_cols = [c for c in ["Category Name", "Order Region"] if c in df.columns]
         if not group_cols:
@@ -195,6 +198,9 @@ class ForecastService(BaseService):
                     "inventory": i_out.graph_amplification,
                     "supplier":  s_out.graph_amplification,
                 },
+                # Issue #9: Staleness tracking
+                "forecast_generated_at": forecast_generated_at,
+                "cold_start": graph_context.get("_cold_start", False),
             })
 
         logger.info(

@@ -89,6 +89,36 @@ class CollaborativeAgentPipeline:
         self.supplier_agent = SupplierAgent(self.registry)
         self.inventory_agent = InventoryAgent(self.registry)
         self.logistics_agent = LogisticsAgent(self.registry)
+        # Issue #11: Adaptive consensus weights
+        self._performance: dict[str, list[float]] = {
+            "demand": [], "inventory": [], "supplier": [], "logistics": []
+        }
+        self._fixed_weights = {
+            "demand": 0.25, "inventory": 0.25, "supplier": 0.30, "logistics": 0.20
+        }
+
+    def record_agent_performance(self, agent_name: str, score: float) -> None:
+        """Record F1/accuracy score for adaptive weighting (Issue #11)."""
+        if agent_name in self._performance:
+            self._performance[agent_name].append(score)
+            # Keep rolling window of last 100 scores
+            if len(self._performance[agent_name]) > 100:
+                self._performance[agent_name] = self._performance[agent_name][-100:]
+
+    def get_consensus_weights(self) -> dict[str, float]:
+        """
+        Return adaptive weights proportional to recent agent performance.
+        Falls back to fixed weights when no performance data exists (Issue #11).
+        """
+        import numpy as np
+        scores = {
+            k: float(np.mean(v)) if v else self._fixed_weights[k]
+            for k, v in self._performance.items()
+        }
+        total = sum(scores.values())
+        if total <= 0:
+            return dict(self._fixed_weights)
+        return {k: round(v / total, 4) for k, v in scores.items()}
 
 
 class EventBus:

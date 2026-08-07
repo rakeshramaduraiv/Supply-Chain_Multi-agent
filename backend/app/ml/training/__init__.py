@@ -41,6 +41,7 @@ from app.ml.utils import (
     prepare_features,
 )
 from app.ml.validation import WalkForwardValidator
+from app.feature_engineering import engineer_features, engineer_features_on_test
 
 logger = logging.getLogger(__name__)
 
@@ -114,33 +115,35 @@ class BaseTrainer:
         Execute full training pipeline.
 
         Steps:
-        1. Feature preparation
-        2. Chronological split
-        3. Walk-forward validation (optional)
-        4. Final model training
-        5. Evaluation on holdout
-        6. Feature importance computation
-        7. Confidence estimation
-        8. Model persistence via registry
+        1. Chronological split on RAW data (before feature engineering)
+        2. Engineer train set independently
+        3. Engineer test set anchored on train statistics (no leakage)
+        4. Walk-forward validation on train set only
+        5. Final model training on engineered train set
+        6. Evaluation on leakage-free test set
+        7. Feature importance, confidence, registry persistence
         """
         start_time = time.perf_counter()
         feature_config = FEATURE_CONFIGS[intelligence_type]
 
         self.logger.info(f"Training {intelligence_type.value} model...")
 
-        # Prepare features
-        X, y = prepare_features(df, feature_config)
-        train_df, test_df = chronological_split(df, train_ratio=0.8)
+        # Step 1: Split BEFORE engineering to prevent rolling-feature leakage
+        train_raw, test_raw = chronological_split(df, train_ratio=0.8)
+
+        # Step 2 & 3: Engineer each split independently
+        train_df = engineer_features(train_raw)
+        test_df  = engineer_features_on_test(test_raw, train_raw)
 
         X_train, y_train = prepare_features(train_df, feature_config)
-        X_test, y_test = prepare_features(test_df, feature_config)
+        X_test,  y_test  = prepare_features(test_df,  feature_config)
 
         features_used = X_train.columns.tolist()
-        hyperparams = self._get_hyperparameters(intelligence_type)
+        hyperparams   = self._get_hyperparameters(intelligence_type)
 
-        # Walk-forward validation
+        # Step 4: Walk-forward validation on train set only
         wf_result = None
-        if run_walk_forward and len(X) > 500:
+        if run_walk_forward and len(X_train) > 500:
             validator = WalkForwardValidator(n_splits=5)
             wf_result_obj = validator.validate(
                 df=train_df,
@@ -149,11 +152,11 @@ class BaseTrainer:
             )
             wf_result = wf_result_obj.to_dict()
 
-        # Train final model on full training set
+        # Step 5: Train final model on full training set
         model = self._create_model(intelligence_type)
         model.fit(X_train, y_train)
 
-        # Evaluate on holdout
+        # Step 6: Evaluate on leakage-free holdout
         y_pred = model.predict(X_test)
 
         if feature_config.task == ModelTask.CLASSIFICATION:

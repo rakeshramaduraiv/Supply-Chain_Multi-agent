@@ -141,6 +141,24 @@ class FeatureEngineeringPipeline:
         if "graph_avg_shipping_delay" not in df.columns:
             df["graph_avg_shipping_delay"] = 0.0
 
+        # ── SPEC ALIASES (CLAUDE.md 26-feature compliance) ────────────────────
+        # Internal names differ from spec names; both must exist so models
+        # trained on spec names and inference code using internal names both work.
+        df["shipping_delay"]             = df["delivery_gap"]
+        df["shipping_efficiency_score"]  = df["shipping_delay_ratio"]
+        df["profit_margin_ratio"]        = df["profit_margin_pct"]
+        df["is_weekend_order"]           = df["order_is_weekend"]
+        df["order_value_tier"]           = pd.cut(
+            df["order_value_log"], bins=4, labels=[0, 1, 2, 3], right=False
+        ).astype(int)
+        df["delay_category"] = pd.cut(
+            df["shipping_delay"],
+            bins=[-999, -1, 0, 3, 7, 999],
+            labels=[0, 1, 2, 3, 4],
+            right=False,
+        ).astype(int)
+        df["is_holiday_week"] = df["order_month"].isin([11, 12]).astype(int)
+
         engineered_count = sum(1 for f in ENGINEERED_FEATURES if f in df.columns)
         logger.info(f"Feature engineering complete: {engineered_count}/{len(ENGINEERED_FEATURES)} features created")
         return df
@@ -509,3 +527,33 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Convenience function to run the full feature engineering pipeline."""
     pipeline = FeatureEngineeringPipeline()
     return pipeline.transform(df)
+
+
+def engineer_features_on_test(
+    test_df: pd.DataFrame,
+    train_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Engineer test-set features using ONLY train-set statistics.
+
+    Rolling means, supplier rates, and inventory stats are anchored
+    on train_df rows so the test set never sees future data.
+    Prevents walk-forward leakage (Issue #3).
+
+    Strategy: tag each row with a _is_test marker, concatenate
+    [train | test] in chronological order, engineer the combined
+    frame (train rows anchor all rolling windows), then return only
+    the rows tagged as test.  The marker survives the internal
+    sort_values() call so the slice is always correct regardless of
+    how many rows share the same timestamp.
+    """
+    train_tagged = train_df.copy()
+    test_tagged  = test_df.copy()
+    train_tagged["_is_test"] = 0
+    test_tagged["_is_test"]  = 1
+
+    combined     = pd.concat([train_tagged, test_tagged], ignore_index=True)
+    combined_eng = engineer_features(combined)
+
+    result = combined_eng[combined_eng["_is_test"] == 1].drop(columns=["_is_test"]).reset_index(drop=True)
+    return result

@@ -10,6 +10,8 @@ import math
 from datetime import datetime, timezone
 from typing import Any
 
+import pandas as pd
+
 logger = logging.getLogger(__name__)
 
 # --- Batch Processing Constants ---
@@ -100,3 +102,40 @@ def build_set_clause(properties: dict[str, Any], alias: str = "n") -> str:
 def chunk_list(items: list, chunk_size: int = DEFAULT_BATCH_SIZE) -> list[list]:
     """Split a list into chunks for batch processing."""
     return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+
+# ── Issue #4: Entity Normalization ────────────────────────────────────────────
+
+def normalize_entity_name(name: Any) -> str | None:
+    """
+    Normalize entity names to prevent duplicate KG nodes.
+    'ELECTRONICS' / 'electronics' / 'Electronic_Parts' all map to canonical form.
+    Returns None for null/empty values so callers can skip them.
+    """
+    if name is None:
+        return None
+    try:
+        if pd.isna(name):
+            return None
+    except (TypeError, ValueError):
+        pass
+    normalized = (
+        str(name)
+        .strip()
+        .lower()
+        .replace("_", " ")
+        .replace("  ", " ")
+        .title()
+    )
+    return normalized if normalized else None
+
+
+def slugify_entity_name(name: Any) -> str | None:
+    """
+    Convert entity name to a slug suitable for node IDs.
+    'Electronic Parts' -> 'electronic_parts'
+    """
+    normalized = normalize_entity_name(name)
+    if normalized is None:
+        return None
+    return normalized.lower().replace(" ", "_").replace("-", "_")

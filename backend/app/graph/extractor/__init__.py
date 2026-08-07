@@ -30,7 +30,7 @@ from app.graph.relationships import (
     create_stored_in,
     create_supplies,
 )
-from app.graph.utils import generate_node_id, safe_float, safe_int, safe_str, utc_now_iso
+from app.graph.utils import generate_node_id, safe_float, safe_int, safe_str, utc_now_iso, normalize_entity_name, slugify_entity_name
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +48,14 @@ class EntityExtractor:
             return []
 
         suppliers = []
-        grouped = df.groupby("Department Name")
+        # Normalize department names before grouping (#4)
+        df = df.copy()
+        df["_dept_norm"] = df["Department Name"].apply(normalize_entity_name)
+        grouped = df.groupby("_dept_norm")
 
         for name, group in grouped:
+            if not name:
+                continue
             supplier_id = generate_node_id("Supplier", name)
             total_orders = len(group)
 
@@ -107,9 +112,14 @@ class EntityExtractor:
             return []
 
         products = []
-        grouped = df.groupby(cat_col)
+        # Normalize category names before grouping (#4)
+        df = df.copy()
+        df["_cat_norm"] = df[cat_col].apply(normalize_entity_name)
+        grouped = df.groupby("_cat_norm")
 
         for category, group in grouped:
+            if not category:
+                continue
             product_id = generate_node_id("Product", category)
             qty_col = "Order Item Quantity"
 
@@ -171,9 +181,14 @@ class EntityExtractor:
             return []
 
         warehouses = []
-        grouped = df.groupby(city_col)
+        # Normalize city names before grouping (#4)
+        df = df.copy()
+        df["_city_norm"] = df[city_col].apply(normalize_entity_name)
+        grouped = df.groupby("_city_norm")
 
         for city, group in grouped:
+            if not city:
+                continue
             warehouse_id = generate_node_id("Warehouse", city)
             region = safe_str(group[region_col].iloc[0]) if region_col in group.columns else ""
             total = len(group)
@@ -282,27 +297,57 @@ class EntityExtractor:
         logger.info(f"Extracted {len(customers)} customer nodes")
         return customers
 
-    def extract_orders(self, df: pd.DataFrame, sample_size: int = 5000) -> list[OrderNode]:
-        """Extract order nodes (sampled for large datasets)."""
+    def extract_orders(
+        self,
+        df: pd.DataFrame,
+        sample_size: int = 5000,
+        strategy: str = "stratified",
+    ) -> list[OrderNode]:
+        """
+        Extract order nodes using a sampling strategy (#10).
+
+        strategy:
+          'stratified' — sample equally from each calendar month (default)
+          'all'        — load all orders (may be slow on 180k rows)
+          'recent'     — load orders from the most recent 6 months
+        """
         order_col = "Order Id"
         if order_col not in df.columns:
             return []
 
-        sampled = df.drop_duplicates(subset=[order_col])
-        if len(sampled) > sample_size:
-            sampled = sampled.sample(n=sample_size, random_state=42)
+        date_col = "order date (DateOrders)"
+        df = df.copy()
+        if date_col in df.columns:
+            df["_order_date"] = pd.to_datetime(df[date_col], errors="coerce")
+        else:
+            df["_order_date"] = pd.NaT
+
+        if strategy == "all":
+            sampled = df.drop_duplicates(subset=[order_col])
+        elif strategy == "recent":
+            max_date = df["_order_date"].max()
+            cutoff   = max_date - pd.Timedelta(days=180)
+            sampled  = df[df["_order_date"] >= cutoff].drop_duplicates(subset=[order_col])
+        else:  # stratified (default)
+            df["_month"] = df["_order_date"].dt.to_period("M").astype(str)
+            per_month = max(1, sample_size // max(df["_month"].nunique(), 1))
+            sampled = (
+                df.groupby("_month", group_keys=False)
+                .apply(lambda g: g.sample(n=min(per_month, len(g)), random_state=42))
+                .drop_duplicates(subset=[order_col])
+            )
 
         orders = []
         for _, row in sampled.iterrows():
             oid = safe_str(row.get(order_col))
             if not oid:
                 continue
-            node_id = generate_node_id("Order", oid)
-            order_date = safe_str(row.get("order date (DateOrders)", ""))
-            value = safe_float(row.get("Sales", 0))
-            qty = safe_int(row.get("Order Item Quantity", 0))
-            profit = safe_float(row.get("Order Profit Per Order", 0))
-            risk = safe_float(row.get("Late_delivery_risk", 0))
+            node_id    = generate_node_id("Order", oid)
+            order_date = safe_str(row.get(date_col, ""))
+            value      = safe_float(row.get("Sales", 0))
+            qty        = safe_int(row.get("Order Item Quantity", 0))
+            profit     = safe_float(row.get("Order Profit Per Order", 0))
+            risk       = safe_float(row.get("Late_delivery_risk", 0))
 
             orders.append(OrderNode(
                 node_id=node_id,
@@ -314,7 +359,7 @@ class EntityExtractor:
                 risk_score=round(risk, 4),
             ))
 
-        logger.info(f"Extracted {len(orders)} order nodes")
+        logger.info(f"Extracted {len(orders)} order nodes (strategy={strategy})")
         return orders
 
     def extract_calendar_events(self, df: pd.DataFrame) -> list[CalendarEventNode]:

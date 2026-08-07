@@ -77,6 +77,24 @@ class GraphTraversalEngine:
     - Multi-Hop Traversal (directed)
     """
 
+    # Issue #15: Trust weights by relationship type.
+    # Static edges (from data) = 1.0; TPKE inferred = 0.6 (probabilistic).
+    EDGE_TRUST_WEIGHTS: dict[str, float] = {
+        "SUPPLIES":      1.0,
+        "STORED_IN":     1.0,
+        "SHIPS_VIA":     1.0,
+        "DELIVERED_TO":  1.0,
+        "PLACED":        1.0,
+        "CONTAINS":      1.0,
+        "INFLUENCES":    0.9,
+        "TPKE_INFERRED": 0.6,
+    }
+
+    @classmethod
+    def edge_trust(cls, edge_type: str) -> float:
+        """Return trust weight for a relationship type (Issue #15)."""
+        return cls.EDGE_TRUST_WEIGHTS.get(edge_type, 0.5)
+
     def __init__(self, connection: Neo4jConnectionManager | None = None):
         self._conn = connection or get_connection_manager()
 
@@ -116,7 +134,8 @@ class GraphTraversalEngine:
                 properties=r["properties"],
                 depth=r["depth"],
                 edge_type=r["edge_type"],
-                edge_weight=r["edge_weight"],
+                # Issue #15: multiply relationship_strength by edge trust weight
+                edge_weight=r["edge_weight"] * GraphTraversalEngine.edge_trust(r["edge_type"]),
             )
             for r in records
         ]

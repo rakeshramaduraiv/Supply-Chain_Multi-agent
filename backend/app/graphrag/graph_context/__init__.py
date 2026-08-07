@@ -6,6 +6,7 @@ The rest of the project MUST interact with GraphRAG ONLY through this service.
 """
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from app.graph.connection import Neo4jConnectionManager, get_connection_manager
@@ -44,6 +45,11 @@ class GraphContextService:
         self._chain = GraphRAGChain()
         self._cache = get_context_cache()
         self._history: list[dict[str, Any]] = []
+        # Issue #5: TTL cache for get_agent_context (1-hour TTL)
+        self._agent_ctx_cache: dict[tuple[str, str], tuple[dict, datetime]] = {}
+        self._agent_ctx_ttl = timedelta(hours=1)
+        # Issue #13: cold-start flag (set True once ACTIVE TPKE edges exist)
+        self._warm_started: bool | None = None  # None = not yet checked
 
     # --- Context Retrieval (Primary Interface) ---
 
@@ -101,21 +107,42 @@ class GraphContextService:
         """
         Returns a FLAT numeric context dict for direct ML feature injection.
 
-        Unlike get_forecast_context() which returns a rich nested payload
-        for LLM reasoning, this returns only scalar values that agents
-        inject as model features.
+        Issue #5: Results are cached per (category, region) for 1 hour.
+        Issue #13: On cold start (no ACTIVE TPKE edges), TPKE-inferred edge
+                   queries are skipped and a _cold_start flag is set.
 
         Every value is null-safe. Never returns None.
-        Reads live Neo4j node properties AND TPKE inferred edges.
         """
+        # ── Issue #5: TTL cache check ────────────────────────────────────────────
+        cache_key = (category, region)
+        if cache_key in self._agent_ctx_cache:
+            cached_ctx, cached_at = self._agent_ctx_cache[cache_key]
+            if datetime.now() - cached_at < self._agent_ctx_ttl:
+                return cached_ctx
+
+        # ── Issue #13: Cold-start check (lazy, cached after first query) ───────────
+        if self._warm_started is None:
+            try:
+                warm_check = await self._retrieval._conn.execute_query(
+                    "MATCH ()-[r:TPKE_INFERRED {status: 'ACTIVE'}]->() "
+                    "RETURN count(r) AS cnt LIMIT 1"
+                )
+                self._warm_started = bool(warm_check and warm_check[0].get("cnt", 0) > 0)
+            except Exception:
+                self._warm_started = False
+            if not self._warm_started:
+                logger.info("GraphRAG cold start: no ACTIVE TPKE edges yet")
+
         cypher = """
         MATCH (p:Product {category: $category})
         OPTIONAL MATCH (s:Supplier)-[rs:SUPPLIES]->(p)
         OPTIONAL MATCH (p)-[:STORED_IN]->(w:Warehouse {location_region: $region})
         OPTIONAL MATCH (w)-[:SHIPS_VIA]->(sh:Shipment)
         OPTIONAL MATCH (ce:CalendarEvent)-[:INFLUENCES]->(p)
-        OPTIONAL MATCH (ce2:CalendarEvent)-[r2:SEASONAL_STOCKOUT_RISK]->(p)
-        OPTIONAL MATCH (p)-[r3:DEMAND_SPIKE_AMPLIFIES_SUPPLIER_RISK]->(sup2:Supplier)
+        OPTIONAL MATCH (ce2:CalendarEvent)-[r2:TPKE_INFERRED {status: 'ACTIVE'}]->(p)
+            WHERE r2.relationship_type = 'SEASONAL_STOCKOUT_RISK'
+        OPTIONAL MATCH (p)-[r3:TPKE_INFERRED {status: 'ACTIVE'}]->(sup2:Supplier)
+            WHERE r3.relationship_type = 'DEMAND_SPIKE_AMPLIFIES_SUPPLIER_RISK'
         RETURN
             p.demand_volatility            AS demand_volatility,
             p.demand_trend_slope           AS demand_trend_slope,
@@ -163,7 +190,7 @@ class GraphContextService:
         holiday_risk = _list("holiday_risk_events")
         amplified    = int(r.get("amplified_supplier_count") or 0)
 
-        return {
+        result = {
             "summary": (
                 f"'{category}' / '{region}': "
                 f"supplier_reliability={_f('avg_supplier_reliability', 0.5):.3f}, "
@@ -182,7 +209,22 @@ class GraphContextService:
             "holiday_risk_events":      holiday_risk,
             "amplified_supplier_count": amplified,
             "entities":                 [dict(r)],
+            "_cold_start":              not self._warm_started,
         }
+
+        # ── Issue #5: Store in TTL cache ────────────────────────────────────────────
+        self._agent_ctx_cache[cache_key] = (result, datetime.now())
+        return result
+
+    def mark_warm_start(self) -> None:
+        """Call after first ACTIVE TPKE edges are created (Issue #13)."""
+        self._warm_started = True
+        self._agent_ctx_cache.clear()  # Invalidate cache so next call reads TPKE edges
+        logger.info("GraphRAG transitioned to warm start: TPKE edges now active")
+
+    def clear_agent_context_cache(self) -> None:
+        """Manually invalidate the agent context TTL cache (Issue #5)."""
+        self._agent_ctx_cache.clear()
 
     @staticmethod
     def _default_agent_context(category: str, region: str) -> dict[str, Any]:

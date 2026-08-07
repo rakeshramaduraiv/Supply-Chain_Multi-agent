@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from app.ml.training import TrainingOrchestrator; from app.feature_engineering import engineer_features; import pandas as pd; df=engineer_features(pd.read_csv('data/raw/DataCoSupplyChainDataset.csv',encoding='latin-1')); orch=TrainingOrchestrator(); results=orch.train_all(df); [print(r.intelligence_type, r.version_id) for r in results]
+                                                                                                                                                                                                                                                                                                 ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'intelligence_type'

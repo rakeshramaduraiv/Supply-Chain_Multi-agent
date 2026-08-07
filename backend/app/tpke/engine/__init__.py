@@ -51,6 +51,7 @@ class EvolutionReport:
     edges_decayed: int
     edges_removed: int
     total_tpke_edges: int
+    edges_promoted_to_active: int = 0
     top_patterns: list[dict[str, Any]] = field(default_factory=list)
     parameters: dict[str, Any] = field(default_factory=dict)
 
@@ -66,6 +67,7 @@ class EvolutionReport:
             "edges_decayed": self.edges_decayed,
             "edges_removed": self.edges_removed,
             "total_tpke_edges": self.total_tpke_edges,
+            "edges_promoted_to_active": self.edges_promoted_to_active,
             "top_patterns": self.top_patterns,
             "parameters": self.parameters,
         }
@@ -164,6 +166,11 @@ class TPKEEngine:
 
         created = sum(1 for m in mutations if m.action == "edge_created")
         strengthened = sum(1 for m in mutations if m.action == "edge_strengthened")
+        # Count edges that were strengthened AND crossed the ACTIVE threshold this cycle
+        promoted = sum(
+            1 for m in mutations
+            if m.action == "edge_strengthened" and m.weight_after is not None
+        )
 
         report = EvolutionReport(
             run_id=run_id,
@@ -176,6 +183,7 @@ class TPKEEngine:
             edges_decayed=decay_result.edges_decayed,
             edges_removed=decay_result.edges_removed,
             total_tpke_edges=total_edges,
+            edges_promoted_to_active=promoted,
             top_patterns=[
                 {
                     "source": f"{p.source_type}:{p.source_id}",

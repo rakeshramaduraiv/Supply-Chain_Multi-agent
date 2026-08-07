@@ -212,10 +212,12 @@ class PredictionEngine:
         X: pd.DataFrame, graph_context: dict[str, Any] | None
     ) -> pd.DataFrame:
         """
-        Injects live Knowledge Graph context as model features.
+        Maps GraphRAG internal names -> model feature names (graph_ prefix).
+        See CLAUDE.md section 5 "GraphRAG Context Naming Convention" for the
+        full two-stage transformation: avg_* (Neo4j) -> graph_* (ML model).
 
-        The 4 graph_* features exist at training time with neutral defaults.
-        At prediction time they are replaced with real values from Neo4j via GraphRAG.
+        The 4 graph_* columns exist at training time with neutral defaults.
+        At prediction time they are overwritten with live Neo4j values.
         """
         X = X.copy()
         if graph_context:

@@ -46,6 +46,7 @@ from app.core.constants import TPKE_MIN_EDGE_WEIGHT, TPKE_MAX_EDGE_WEIGHT
 from app.graph.connection import Neo4jConnectionManager
 from app.services.domain.tpke_service import TPKELogService
 from app.tpke.pattern import TemporalPattern
+from app.tpke.validators import validate_edge_logic
 
 logger = logging.getLogger(__name__)
 
@@ -79,10 +80,12 @@ _FIND_TPKE_EDGE = """
     MATCH (s {entity_id: $source_id})-[r:TPKE_INFERRED]->(t {entity_id: $target_id})
     WHERE r.relationship_type = $rel_type
     RETURN r.weight AS weight, r.frequency AS frequency,
-           r.last_updated AS last_updated, r.created_at AS created_at
+           r.last_updated AS last_updated, r.created_at AS created_at,
+           coalesce(r.repetitions, 1) AS repetitions,
+           coalesce(r.status, 'CANDIDATE') AS status
 """
 
-# Create a new TPKE-inferred edge
+# Create a new TPKE-inferred edge (starts as CANDIDATE — not yet used by GraphRAG)
 _CREATE_TPKE_EDGE = """
     MATCH (s {entity_id: $source_id}), (t {entity_id: $target_id})
     CREATE (s)-[r:TPKE_INFERRED {
@@ -106,6 +109,8 @@ _CREATE_TPKE_EDGE = """
         evidence_count:           $evidence_count,
         support_ratio:            $support_ratio,
         triggering_actual_upload: $triggering_upload,
+        status:                   'CANDIDATE',
+        repetitions:              1,
         created_at:               $now,
         last_updated:             $now,
         updated_at:               $now
@@ -134,6 +139,8 @@ _UPDATE_TPKE_EDGE = """
         r.evidence_count           = $evidence_count,
         r.support_ratio            = $support_ratio,
         r.triggering_actual_upload = $triggering_upload,
+        r.repetitions              = $repetitions,
+        r.status                   = $status,
         r.last_updated             = $now,
         r.updated_at               = $now
     RETURN r.weight AS weight
@@ -157,7 +164,9 @@ _GET_ALL_TPKE_EDGES = """
            r.relationship_type AS rel_type,
            r.weight         AS weight,
            r.frequency      AS frequency,
-           r.last_updated   AS last_updated
+           r.last_updated   AS last_updated,
+           coalesce(r.repetitions, 1) AS repetitions,
+           coalesce(r.status, 'CANDIDATE') AS status
 """
 
 # Promote a temporary TPKE edge to stable/permanent
@@ -173,6 +182,23 @@ _COUNT_TPKE_EDGES = """
     MATCH ()-[r:TPKE_INFERRED]->()
     RETURN count(r) AS count
 """
+
+# Minimal update used only during decay — only touches weight/confidence/status fields
+_DECAY_TPKE_EDGE = """
+    MATCH (s {entity_id: $source_id})-[r:TPKE_INFERRED]->(t {entity_id: $target_id})
+    WHERE r.relationship_type = $rel_type
+    SET r.weight        = $weight,
+        r.confidence    = $confidence,
+        r.temporal_score = $temporal_score,
+        r.last_updated  = $now,
+        r.updated_at    = $now
+    RETURN r.weight AS weight
+"""
+
+# Seasonal pattern constants (Issue #8)
+_SEASONAL_MONTHS = {11, 12}          # Nov/Dec are structural high-demand months
+_SEASONAL_MIN_CONFIDENCE = 0.40      # Seasonal edges never decay below this floor
+_SEASONAL_DECAY_RATE_MULTIPLIER = 0.5  # Seasonal edges decay at half the normal rate
 
 
 class EdgeManager:
@@ -291,8 +317,18 @@ class EdgeManager:
 
             old_weight = float(edge.get("weight", 0.5))
 
-            # w_new = w_old × (1 - decay_rate) ^ days_elapsed
-            new_weight = old_weight * ((1.0 - self._decay_rate) ** days_elapsed)
+            # Issue #8: Seasonal edges decay at half rate and never below floor
+            current_month = ref.month
+            is_seasonal = current_month in _SEASONAL_MONTHS
+            effective_decay = (
+                self._decay_rate * _SEASONAL_DECAY_RATE_MULTIPLIER
+                if is_seasonal else self._decay_rate
+            )
+
+            # w_new = w_old × (1 - effective_decay) ^ days_elapsed
+            new_weight = old_weight * ((1.0 - effective_decay) ** days_elapsed)
+            if is_seasonal:
+                new_weight = max(new_weight, _SEASONAL_MIN_CONFIDENCE)
             new_weight = round(new_weight, 4)
 
             source_id = edge["source_id"]
@@ -325,16 +361,15 @@ class EdgeManager:
                     f"(w={old_weight} → {new_weight} < {TPKE_MIN_EDGE_WEIGHT})"
                 )
             else:
-                # Decay the edge weight
-                await self._conn.execute_write(_UPDATE_TPKE_EDGE, {
-                    "source_id": source_id,
-                    "target_id": target_id,
-                    "rel_type": rel_type,
-                    "weight": new_weight,
-                    "confidence": new_weight,
-                    "frequency": edge.get("frequency", 1),
+                # Decay the edge weight — preserve status and repetitions
+                await self._conn.execute_write(_DECAY_TPKE_EDGE, {
+                    "source_id":      source_id,
+                    "target_id":      target_id,
+                    "rel_type":       rel_type,
+                    "weight":         new_weight,
+                    "confidence":     new_weight,
                     "temporal_score": new_weight,
-                    "now": ref.isoformat(),
+                    "now":            ref.isoformat(),
                 })
                 mutation = EdgeMutation(
                     action="edge_decayed",
@@ -400,7 +435,18 @@ class EdgeManager:
         return records[0] if records else None
 
     async def _create_edge(self, pattern: TemporalPattern, now: str) -> None:
-        """Create a new TPKE-inferred edge with complete metrics and edge_history."""
+        """Create a new TPKE-inferred edge after pre-validating causal logic (Issue #14)."""
+        # Issue #14: Pre-validate edge logic before writing to Neo4j
+        is_valid, reason = validate_edge_logic(
+            source_event=getattr(pattern, "source_event_type", pattern.source_type),
+            target_event=getattr(pattern, "target_event_type", pattern.target_type),
+            source_entity_type=pattern.source_type,
+            target_entity_type=pattern.target_type,
+        )
+        if not is_valid:
+            logger.info(f"TPKE edge rejected (pre-validation): {reason}")
+            return
+
         weight = min(pattern.weight, TPKE_MAX_EDGE_WEIGHT)
         history_entry = {
             "timestamp": now,
@@ -457,13 +503,25 @@ class EdgeManager:
         existing: dict[str, Any],
         now: str,
     ) -> None:
-        """Strengthen an existing TPKE edge and append to edge_history."""
-        old_weight = float(existing.get("weight", 0.5))
-        old_freq = int(existing.get("frequency", 1))
+        """Strengthen an existing TPKE edge, increment repetitions, promote to ACTIVE
+        once repetitions >= 3 AND confidence >= 0.70."""
+        old_weight   = float(existing.get("weight", 0.5))
+        old_freq     = int(existing.get("frequency", 1))
+        old_reps     = int(existing.get("repetitions", 1))
+        old_status   = str(existing.get("status", "CANDIDATE"))
 
         new_weight = min(old_weight * 0.6 + pattern.weight * 0.4, TPKE_MAX_EDGE_WEIGHT)
         new_weight = round(new_weight, 4)
-        new_freq = old_freq + pattern.frequency
+        new_freq   = old_freq + pattern.frequency
+        new_reps   = old_reps + 1
+
+        # Promote to ACTIVE when pattern has been observed >= 3 times
+        # AND confidence crosses the theta threshold (0.70)
+        new_status = (
+            "ACTIVE"
+            if new_reps >= 3 and pattern.confidence >= 0.70
+            else old_status
+        )
 
         # Parse existing history or start new list
         raw_hist = existing.get("edge_history") or "[]"
@@ -479,6 +537,8 @@ class EdgeManager:
             "support": getattr(pattern, "support", new_freq),
             "probability": getattr(pattern, "probability", 0.85),
             "action": "strengthened",
+            "repetitions": new_reps,
+            "status": new_status,
         })
         history_json = json.dumps(hist_list[-10:])
 
@@ -497,6 +557,8 @@ class EdgeManager:
             "window":          getattr(pattern, "window", 30),
             "temporal_score":  pattern.temporal_score,
             "history_json":    history_json,
+            "repetitions":     new_reps,
+            "status":          new_status,
             "now":             now,
         })
 
@@ -512,9 +574,17 @@ class EdgeManager:
             frequency=new_freq,
         ))
 
-        logger.info(
-            f"TPKE strengthened: {pattern.source_type}:{pattern.source_id} "
-            f"→[{pattern.relationship_type}]→ "
-            f"{pattern.target_type}:{pattern.target_id} "
-            f"w={old_weight} → {new_weight}, K={new_freq}"
-        )
+        if new_status == "ACTIVE" and old_status != "ACTIVE":
+            logger.info(
+                f"TPKE promoted to ACTIVE: {pattern.source_type}:{pattern.source_id} "
+                f"->[{pattern.relationship_type}]-> "
+                f"{pattern.target_type}:{pattern.target_id} "
+                f"reps={new_reps}, confidence={pattern.confidence}"
+            )
+        else:
+            logger.info(
+                f"TPKE strengthened: {pattern.source_type}:{pattern.source_id} "
+                f"->[{pattern.relationship_type}]-> "
+                f"{pattern.target_type}:{pattern.target_id} "
+                f"w={old_weight} -> {new_weight}, reps={new_reps}, status={new_status}"
+            )

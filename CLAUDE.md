@@ -192,6 +192,50 @@ graph_supplier_reliability (0.5) / graph_inventory_stress (0.5) / graph_has_upco
 
 Cypher rules: always MERGE never CREATE / always parameterised / always safe_params() (NaN kills the driver).
 
+### GraphRAG Context Naming Convention
+
+Two-stage naming transformation:
+
+**STAGE 1 — GraphRAG Internal Context**
+What Neo4j queries return (internal representation):
+
+```python
+context_internal = {
+    "avg_supplier_reliability": 0.87,   # Aggregated from Supplier nodes
+    "inventory_stress": 0.42,           # Aggregated from Warehouse nodes
+    "avg_shipping_delay": 2.3,          # Aggregated from Shipment nodes
+    "upcoming_events": 2,               # Count from CalendarEvent nodes
+}
+```
+
+**STAGE 2 — Model Feature Names**
+What ML models actually see after _inject_graph_context():
+
+```python
+context_model = {
+    "graph_supplier_reliability": 0.87, # Renamed from "avg_supplier_reliability"
+    "graph_inventory_stress": 0.42,     # Renamed from "inventory_stress"
+    "graph_avg_shipping_delay": 2.3,    # Renamed from "avg_shipping_delay"
+    "graph_has_upcoming_event": 1,      # Converted from upcoming_events > 0
+}
+```
+
+**Mapping (in _inject_graph_context)**
+```python
+def _inject_graph_context(df, context):
+    """Map GraphRAG internal names -> model feature names (graph_ prefix)."""
+    df['graph_supplier_reliability'] = context['avg_supplier_reliability']
+    df['graph_inventory_stress']     = context['inventory_stress']
+    df['graph_avg_shipping_delay']   = context['avg_shipping_delay']
+    df['graph_has_upcoming_event']   = int(context['upcoming_events'] > 0)
+    return df
+```
+
+**Why two names?**
+- Internal (`avg_*`): describes what Neo4j aggregation computed
+- Model (`graph_*`): signals to the ML pipeline that values come from GraphRAG
+- The `graph_` prefix is the contract between GraphRAG and the prediction engine
+
 ---
 
 ## 6. TPKE — THE NOVELTY

@@ -1,0 +1,33 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/integration/test_graph_influence.py::test_graph_influence_on_predictions PASSED [ 25%]
+tests/integration/test_graph_influence.py::test_stressed_risk_higher_than_healthy PASSED [ 50%]
+tests/integration/test_graph_influence.py::test_all_spec_features_present PASSED [ 75%]
+tests/integration/test_graph_influence.py::test_graph_features_have_variance PASSED [100%]
+
+============================== warnings summary ===============================
+tests\integration\test_graph_influence.py:58
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:58: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:113
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:113: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:138
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:138: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:168
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:168: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 4 passed, 4 warnings in 39.99s ========================

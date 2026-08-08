@@ -1,0 +1,30 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 12 items
+
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_confidence_threshold PASSED [  8%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_top_k PASSED [ 16%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_decay_rate PASSED [ 25%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_removal_threshold PASSED [ 33%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_window_size_days PASSED [ 41%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_all_frozen_values_at_once PASSED [ 50%]
+tests/unit/test_tpke_parameters.py::TestConstantsAlignment::test_min_edge_weight_equals_removal_threshold PASSED [ 58%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_k PASSED [ 66%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_theta PASSED [ 75%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_window PASSED [ 83%]
+tests/unit/test_tpke_parameters.py::TestEdgeManagerDecayRate::test_edge_manager_decay_rate PASSED [ 91%]
+tests/unit/test_tpke_parameters.py::TestTPKEEngineReportParameters::test_engine_status_reports_frozen_params PASSED [100%]
+
+============================== warnings summary ===============================
+tests/unit/test_tpke_parameters.py::TestTPKEEngineReportParameters::test_engine_status_reports_frozen_params
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\tpke\engine\__init__.py:230: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    active_version = None
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 12 passed, 1 warning in 0.06s ========================

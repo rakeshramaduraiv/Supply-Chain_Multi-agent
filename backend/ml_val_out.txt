@@ -1,0 +1,13 @@
+  PASS  import: leakage guard passed at module load
+  PASS  Inventory scale_pos_weight=3.0
+  PASS  all 4 agents have all 4 graph_* features
+  PASS  leakage guard raises on banned feature: Target leakage in demand: ['delivery_gap']
+  PASS  build_stockout_target raises on single-class: build_stockout_target produced a single-class target (pos=0,
+  PASS  build_stockout_target: pos=10 neg=10
+  PASS  Inventory model: LGBMClassifier scale_pos_weight=3.0
+  PASS  Demand model: LGBMRegressor
+  PASS  Supplier model: RandomForestClassifier
+  PASS  Logistics model: LGBMClassifier (no scale_pos_weight override)
+  PASS  Training records tpke_params_at_training in registry entry
+
+=== ALL ML VALIDATION PASS ===

@@ -96,7 +96,7 @@ async def analyze_incident(req: IncidentAnalysisRequest):
     # 2. Compute exact business impact from dataset
     total_orders = len(df) if df is not None else 180519
     late_rate = float(df["Late_delivery_risk"].mean()) if df is not None and "Late_delivery_risk" in df.columns else 0.548
-    avg_delay = float(df["shipping_delay_days"].mean()) if df is not None and "shipping_delay_days" in df.columns else 1.25
+    avg_delay = float(df["shipping_delay"].mean()) if df is not None and "shipping_delay" in df.columns else 1.25
     total_sales = float(df["Sales"].sum()) if df is not None and "Sales" in df.columns else 31785000.0
 
     financial_loss = round(total_sales * (late_rate * 0.12), 2)

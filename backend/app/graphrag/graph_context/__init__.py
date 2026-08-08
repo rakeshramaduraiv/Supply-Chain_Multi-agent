@@ -242,6 +242,7 @@ class GraphContextService:
             "holiday_risk_events":      [],
             "amplified_supplier_count": 0,
             "entities":                 [],
+            "_cold_start":              True,
         }
 
     async def get_risk_context(

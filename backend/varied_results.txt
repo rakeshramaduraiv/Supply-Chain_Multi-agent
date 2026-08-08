@@ -1,0 +1,5 @@
+graph_supplier_reliability: nunique=2 std=0.0336 [OK]
+graph_inventory_stress: nunique=2 std=0.0854 [OK]
+graph_avg_shipping_delay: nunique=2 std=0.0504 [OK]
+days_until_reorder: min=5.30 max=8.40
+varied data check DONE

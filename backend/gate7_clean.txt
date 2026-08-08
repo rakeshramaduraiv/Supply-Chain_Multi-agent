@@ -1,0 +1,84 @@
+
+======================================================================
+GATE 7 — Feature Importance Sanity Check
+======================================================================
+
+  [DEMAND]  version=demand_v_20260807_152655_751aa2  graph_importance_total=0.0961
+    graph_supplier_reliability           0.024196  ############
+    graph_inventory_stress               0.067835  #################################
+    graph_has_upcoming_event             0.000218  
+    graph_avg_shipping_delay             0.003836  #
+  Top-10 features:
+    discount_rate                        0.241041
+    price_ratio                          0.121719
+    qty_roll_7                           0.111649
+    demand_volatility                    0.077165
+    demand_trend_slope                   0.076511
+    graph_inventory_stress               0.067835 <- GRAPH
+    qty_roll_30                          0.058811
+    qty_lag_1                            0.051181
+    category_demand_rank                 0.041765
+    demand_momentum                      0.030953
+
+  [INVENTORY]  version=inventory_v_20260807_152741_1d87c7  graph_importance_total=0.0504
+    graph_supplier_reliability           0.005379  ##
+    graph_inventory_stress               0.044988  ######################
+    graph_has_upcoming_event             0.000000  
+    graph_avg_shipping_delay             0.000000  
+  Top-10 features:
+    demand_momentum                      0.246455
+    demand_variability                   0.169682
+    inventory_stress_index               0.145721
+    demand_spike_flag                    0.096822
+    days_until_reorder                   0.091932
+    reorder_point                        0.083130
+    qty_roll_30                          0.054279
+    graph_inventory_stress               0.044988 <- GRAPH
+    demand_volatility                    0.031785
+    qty_roll_7                           0.011736
+
+  [SUPPLIER]  version=supplier_v_20260807_153307_d338f4  graph_importance_total=0.2966
+    graph_supplier_reliability           0.204462  ######################################################################################################
+    graph_inventory_stress               0.013018  ######
+    graph_has_upcoming_event             0.000856  
+    graph_avg_shipping_delay             0.078277  #######################################
+  Top-10 features:
+    supplier_hist_late_rate              0.235875
+    supplier_reliability_score           0.221659
+    graph_supplier_reliability           0.204462 <- GRAPH
+    supplier_risk_index                  0.134463
+    graph_avg_shipping_delay             0.078277 <- GRAPH
+    days_scheduled                       0.076835
+    graph_inventory_stress               0.013018 <- GRAPH
+    qty_roll_7                           0.009874
+    order_dayofweek                      0.009413
+    order_month                          0.007698
+
+  [LOGISTICS]  version=logistics_v_20260807_153421_7099ee  graph_importance_total=0.1019
+    graph_supplier_reliability           0.028357  ##############
+    graph_inventory_stress               0.072471  ####################################
+    graph_has_upcoming_event             0.000865  
+    graph_avg_shipping_delay             0.000188  
+  Top-10 features:
+    region_congestion_index              0.163708
+    shipping_mode_encoded                0.139677
+    route_hist_late_rate                 0.116886
+    order_dayofweek                      0.090560
+    graph_inventory_stress               0.072471 <- GRAPH
+    route_frequency                      0.071531
+    qty_roll_7                           0.059985
+    order_value_log                      0.058105
+    order_month                          0.055848
+    discount_rate                        0.055246
+
+----------------------------------------------------------------------
+GATE 7 ASSERTIONS
+----------------------------------------------------------------------
+  [PASS] Supplier  graph_importance=0.2966 >= 0.005
+  [PASS] Logistics graph_importance=0.1019 >= 0.005
+
+  Report written to: data\logs\feature_importance_report.json
+
+  [PASS] Gate 7 — graph_* features carry non-trivial importance
+======================================================================
+

@@ -112,7 +112,7 @@ def _compute_summary() -> dict:
     late_pct = round(late_count / total_orders * 100, 2)
 
     # Shipping delay
-    avg_delay = round(df["shipping_delay_days"].mean(), 2)
+    avg_delay = round(df["shipping_delay"].mean(), 2)
 
     # Date range
     dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
@@ -130,14 +130,14 @@ def _compute_summary() -> dict:
             "count": len(grp),
             "pct": round(len(grp) / total_orders * 100, 1),
             "late_rate": round(grp["Late_delivery_risk"].mean() * 100, 2),
-            "avg_delay": round(grp["shipping_delay_days"].mean(), 2),
+            "avg_delay": round(grp["shipping_delay"].mean(), 2),
         }
 
     # Supplier reliability (1 - late_rate per department)
     dept_stats = df.groupby("Department Name").agg(
         total=("Late_delivery_risk", "count"),
         late=("Late_delivery_risk", "sum"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
     ).reset_index()
     dept_stats["reliability"] = 1 - (dept_stats["late"] / dept_stats["total"])
     avg_reliability = round(dept_stats["reliability"].mean(), 4)
@@ -147,7 +147,7 @@ def _compute_summary() -> dict:
         total_qty=("Order Item Quantity", "sum"),
         order_count=("Order Item Quantity", "count"),
         late_rate=("Late_delivery_risk", "mean"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
     ).sort_values("total_qty", ascending=False).head(15).reset_index()
     top_categories = top_cats.to_dict("records")
     for cat in top_categories:
@@ -162,7 +162,7 @@ def _compute_summary() -> dict:
     region_stats = df.groupby("Order Region").agg(
         order_count=("Late_delivery_risk", "count"),
         late_rate=("Late_delivery_risk", "mean"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
     ).sort_values("order_count", ascending=False).reset_index()
     region_breakdown = region_stats.to_dict("records")
     for r in region_breakdown:
@@ -228,7 +228,7 @@ def _compute_analytics() -> dict:
             "name": mode,
             "value": round(grp["Late_delivery_risk"].mean() * 100, 1),
             "count": len(grp),
-            "avg_delay": round(grp["shipping_delay_days"].mean(), 2),
+            "avg_delay": round(grp["shipping_delay"].mean(), 2),
         })
     shipping_risk.sort(key=lambda x: x["value"], reverse=True)
 
@@ -281,7 +281,7 @@ def _compute_analytics() -> dict:
     # === Risk heatmap (category × region) ===
     risk_heatmap = df.groupby(["Category Name", "Order Region"]).agg(
         late_rate=("Late_delivery_risk", "mean"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
         order_count=("Late_delivery_risk", "count"),
     ).reset_index()
     # Only keep combinations with enough data
@@ -309,7 +309,7 @@ def _compute_analytics() -> dict:
     monthly = df_dated.groupby("_period").agg(
         orders=("Late_delivery_risk", "count"),
         late_rate=("Late_delivery_risk", "mean"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
         total_sales=("Sales", "sum"),
     ).reset_index()
     monthly_trend = [

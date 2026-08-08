@@ -1,0 +1,32 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_no_blacklisted_feature[SUPPLIER-features0] PASSED [  4%]
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_no_blacklisted_feature[LOGISTICS-features1] PASSED [  9%]
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_no_blacklisted_feature[INVENTORY-features2] PASSED [ 14%]
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_demand_no_algebraic_leakage PASSED [ 19%]
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_no_full_df_encoding_in_supplier PASSED [ 23%]
+tests/critical/test_no_target_leakage.py::TestBlacklist::test_expanding_rate_features_present PASSED [ 28%]
+tests/critical/test_no_target_leakage.py::TestStatisticalAudit::test_max_correlation_below_threshold[supplier] PASSED [ 33%]
+tests/critical/test_no_target_leakage.py::TestStatisticalAudit::test_max_correlation_below_threshold[logistics] PASSED [ 38%]
+tests/critical/test_no_target_leakage.py::TestStatisticalAudit::test_is_delayed_not_in_engineered_supplier_features PASSED [ 42%]
+tests/critical/test_no_target_leakage.py::TestStatisticalAudit::test_shipping_delay_ratio_not_in_logistics_features PASSED [ 47%]
+tests/critical/test_targets_are_valid.py::TestTargetValidity::test_late_delivery_risk_two_classes PASSED [ 52%]
+tests/critical/test_targets_are_valid.py::TestTargetValidity::test_stockout_flag_two_classes PASSED [ 57%]
+tests/critical/test_targets_are_valid.py::TestTargetValidity::test_classification_target_not_single_class[supplier] PASSED [ 61%]
+tests/critical/test_targets_are_valid.py::TestTargetValidity::test_classification_target_not_single_class[logistics] PASSED [ 66%]
+tests/critical/test_targets_are_valid.py::TestTargetValidity::test_classification_target_not_single_class[inventory] PASSED [ 71%]
+tests/critical/test_temporal_integrity.py::TestTemporalIntegrity::test_chronological_split_no_overlap PASSED [ 76%]
+tests/critical/test_temporal_integrity.py::TestTemporalIntegrity::test_no_shuffling_in_split PASSED [ 80%]
+tests/critical/test_temporal_integrity.py::TestTemporalIntegrity::test_engineer_features_on_test_no_future_leakage PASSED [ 85%]
+tests/critical/test_decision_engine_no_literals.py::TestDecisionEngineNoLiterals::test_no_large_literals_in_decision_engine PASSED [ 90%]
+tests/critical/test_decision_engine_no_literals.py::TestDecisionEngineNoLiterals::test_decision_engine_loads_from_db PASSED [ 95%]
+tests/critical/test_decision_engine_no_literals.py::TestDecisionEngineNoLiterals::test_decision_output_has_parameter_source PASSED [100%]
+
+======================== 21 passed in 64.24s (0:01:04) ========================

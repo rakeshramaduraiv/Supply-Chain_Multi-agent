@@ -1,0 +1,32 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_supplier_reliability] PASSED [  4%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_inventory_stress] PASSED [  9%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_avg_shipping_delay] PASSED [ 14%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_has_upcoming_event] PASSED [ 19%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_supplier_reliability] PASSED [ 23%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_inventory_stress] PASSED [ 28%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_avg_shipping_delay] PASSED [ 33%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_has_upcoming_event] PASSED [ 38%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_supplier_reliability] PASSED [ 42%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_inventory_stress] PASSED [ 47%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_avg_shipping_delay] PASSED [ 52%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_has_upcoming_event] PASSED [ 57%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_all_graph_features_vary PASSED [ 61%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_nunique PASSED [ 66%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_range PASSED [ 71%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_stockout_target_both_classes PASSED [ 76%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_stockout_target_minority_class_ratio PASSED [ 80%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_formula_not_constant PASSED [ 85%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_engineer_features_runs PASSED [ 90%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_engineer_features_no_all_nan_columns PASSED [ 95%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_graph_context_assertion_fires_on_constant PASSED [100%]
+
+============================= 21 passed in 18.41s =============================

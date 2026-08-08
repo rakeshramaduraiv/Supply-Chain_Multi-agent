@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 26 items
+
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[supplier] PASSED [  3%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[logistics] PASSED [  7%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[inventory] PASSED [ 11%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[supplier] PASSED [ 15%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[logistics] PASSED [ 19%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[inventory] PASSED [ 23%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[supplier] PASSED [ 26%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[logistics] PASSED [ 30%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[inventory] PASSED [ 34%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[supplier] PASSED [ 38%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[logistics] PASSED [ 42%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[inventory] PASSED [ 46%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[supplier] PASSED [ 50%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[logistics] PASSED [ 53%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[inventory] PASSED [ 57%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[supplier] PASSED [ 61%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[logistics] PASSED [ 65%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[inventory] PASSED [ 69%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[supplier] PASSED [ 73%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[logistics] PASSED [ 76%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[inventory] PASSED [ 80%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_not_binary PASSED [ 84%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_finite PASSED [ 88%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_has_no_probabilities PASSED [ 92%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_flag_set_for_stressed PASSED [ 96%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_factor_positive PASSED [100%]
+
+======================== 26 passed in 78.53s (0:01:18) ========================

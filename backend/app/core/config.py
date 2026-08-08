@@ -1,8 +1,8 @@
 """
 AMASCI Configuration Module
 ============================
-Centralized configuration using Pydantic BaseSettings.
-Supports Development, Testing, and Production environments.
+Centralised Pydantic settings. Single source of truth for every parameter.
+All five TPKE values are frozen here and propagated to every .env.* file.
 """
 
 from functools import lru_cache
@@ -35,7 +35,11 @@ class Settings(BaseSettings):
     secret_key: str = "change-this-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 1440
-    cors_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:3001"
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
+        "http://localhost:5173,http://localhost:5174,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001"
+    )
 
     # --- PostgreSQL ---
     postgres_host: str = "localhost"
@@ -43,7 +47,9 @@ class Settings(BaseSettings):
     postgres_user: str = "amasci_user"
     postgres_password: str = "amasci_password"
     postgres_db: str = "amasci_db"
-    database_url: str = "postgresql+asyncpg://amasci_user:amasci_password@localhost:5432/amasci_db"
+    database_url: str = (
+        "postgresql+asyncpg://amasci_user:amasci_password@localhost:5432/amasci_db"
+    )
 
     # --- Neo4j ---
     neo4j_uri: str = "bolt://localhost:7687"
@@ -56,6 +62,7 @@ class Settings(BaseSettings):
     model_dir: str = "./data/models"
     log_dir: str = "./data/logs"
     raw_data_dir: str = "./data/raw"
+    processed_dir: str = "./data/uploads"   # processed_master.parquet lives here
     max_upload_size_mb: int = 500
     auto_initialize: bool = True
 
@@ -65,21 +72,21 @@ class Settings(BaseSettings):
     lightgbm_learning_rate: float = 0.05
     lightgbm_max_depth: int = 7
 
-    # --- LLM/OpenAI Configuration ---
+    # --- LLM/OpenAI ---
     openai_api_key: str = ""
     openai_api_base: str = "https://api.openai.com/v1"
     openai_model_name: str = "gpt-4o"
 
-    # --- TPKE Configuration ---
-    # θ: minimum P(B|A) for an edge to be created
-    tpke_confidence_threshold: float = 0.6
-    # K: minimum number of times a sequence must occur
+    # --- TPKE — FROZEN (spec §1.3, CLAUDE.md §6) ---
+    # These five values must be identical in config.py, all .env.* files, and CLAUDE.md.
+    # A mismatch is a build failure.
+    tpke_confidence_threshold: float = 0.70   # θ_add: min P(B|A) to create edge
+    tpke_top_k: int = 3                        # K:     top-K patterns per source node
+    tpke_decay_rate: float = 0.05              # δ:     edge weight decay per cycle
+    tpke_removal_threshold: float = 0.10       # θ_rem: delete edge below this weight
+    tpke_window_size_days: int = 30            # W:     sliding detection window (days)
+    # Internal use only — not part of the frozen spec surface
     tpke_frequency_threshold: int = 3
-    # decay_rate per day: w_new = w_old × (1 - rate)^days
-    tpke_decay_rate: float = 0.05
-    # W: sliding window — only events within this many days are considered
-    tpke_window_size_days: int = 90
-    # lag_days: max days between event A and event B to count as a sequence
     tpke_lag_days: int = 7
 
     # --- Logging ---
@@ -89,43 +96,42 @@ class Settings(BaseSettings):
     log_rotation: str = "daily"
     log_retention_days: int = 30
 
+    # ------------------------------------------------------------------ #
+    # Derived paths                                                        #
+    # ------------------------------------------------------------------ #
+
     @property
     def cors_origin_list(self) -> list[str]:
-        """Parse CORS origins from comma-separated string."""
-        return [origin.strip() for origin in self.cors_origins.split(",")]
+        return [o.strip() for o in self.cors_origins.split(",")]
 
     @property
     def sync_database_url(self) -> str:
-        """Synchronous database URL for Alembic migrations."""
         return self.database_url.replace("+asyncpg", "+psycopg2")
 
     @property
     def upload_path(self) -> Path:
-        """Resolved upload directory path."""
-        path = Path(self.upload_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return Path(self.upload_dir)
 
     @property
     def model_path(self) -> Path:
-        """Resolved model directory path."""
-        path = Path(self.model_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return Path(self.model_dir)
+
+    @property
+    def model_registry_path(self) -> Path:
+        """Path to registry.json inside the model directory."""
+        return Path(self.model_dir) / "registry.json"
 
     @property
     def raw_data_path(self) -> Path:
-        """Resolved raw data directory path."""
-        path = Path(self.raw_data_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return Path(self.raw_data_dir)
+
+    @property
+    def processed_master_path(self) -> Path:
+        return Path(self.processed_dir) / "processed_master.parquet"
 
     @property
     def log_path(self) -> Path:
-        """Resolved log directory path."""
-        path = Path(self.log_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        return Path(self.log_dir)
 
     @property
     def is_production(self) -> bool:
@@ -135,22 +141,36 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         return self.app_env == "development"
 
+    # ------------------------------------------------------------------ #
+    # Directory bootstrap                                                  #
+    # ------------------------------------------------------------------ #
+
+    def ensure_dirs(self) -> None:
+        """Create all configured directories idempotently. Safe to call many times."""
+        for d in (
+            self.upload_path,
+            self.model_path,
+            self.raw_data_path,
+            self.log_path,
+            Path(self.processed_dir),
+        ):
+            d.mkdir(parents=True, exist_ok=True)
+
 
 class DevelopmentSettings(Settings):
-    """Development-specific overrides."""
     debug: bool = True
     log_level: str = "DEBUG"
 
 
 class TestingSettings(Settings):
-    """Testing-specific overrides."""
     app_env: Literal["development", "testing", "production"] = "testing"
     debug: bool = True
-    database_url: str = "postgresql+asyncpg://amasci_user:amasci_password@localhost:5432/amasci_test_db"
+    database_url: str = (
+        "postgresql+asyncpg://amasci_user:amasci_password@localhost:5432/amasci_test_db"
+    )
 
 
 class ProductionSettings(Settings):
-    """Production-specific overrides."""
     app_env: Literal["development", "testing", "production"] = "production"
     debug: bool = False
     log_level: str = "WARNING"
@@ -159,13 +179,9 @@ class ProductionSettings(Settings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Factory function to get environment-appropriate settings."""
     import os
     env = os.getenv("APP_ENV", "development")
-    settings_map = {
-        "development": DevelopmentSettings,
-        "testing": TestingSettings,
-        "production": ProductionSettings,
-    }
-    settings_class = settings_map.get(env, DevelopmentSettings)
-    return settings_class()
+    cls = {"development": DevelopmentSettings,
+           "testing": TestingSettings,
+           "production": ProductionSettings}.get(env, DevelopmentSettings)
+    return cls()

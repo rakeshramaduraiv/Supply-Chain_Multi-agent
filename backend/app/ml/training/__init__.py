@@ -33,6 +33,7 @@ from app.ml.registry import ModelRegistry
 from app.ml.utils import (
     FEATURE_CONFIGS,
     LIGHTGBM_CLASSIFIER_PARAMS,
+    LIGHTGBM_INVENTORY_PARAMS,
     LIGHTGBM_REGRESSOR_PARAMS,
     RANDOM_FOREST_PARAMS,
     IntelligenceType,
@@ -92,6 +93,9 @@ class BaseTrainer:
             return LGBMRegressor(**LIGHTGBM_REGRESSOR_PARAMS)
         elif intelligence_type == IntelligenceType.SUPPLIER:
             return RandomForestClassifier(**RANDOM_FOREST_PARAMS)
+        elif intelligence_type == IntelligenceType.INVENTORY:
+            # stockout_risk_flag is rare — explicit scale_pos_weight makes it learnable
+            return LGBMClassifier(**LIGHTGBM_INVENTORY_PARAMS)
         else:
             return LGBMClassifier(**LIGHTGBM_CLASSIFIER_PARAMS)
 
@@ -101,6 +105,8 @@ class BaseTrainer:
             return LIGHTGBM_REGRESSOR_PARAMS.copy()
         elif intelligence_type == IntelligenceType.SUPPLIER:
             return RANDOM_FOREST_PARAMS.copy()
+        elif intelligence_type == IntelligenceType.INVENTORY:
+            return LIGHTGBM_INVENTORY_PARAMS.copy()
         else:
             return LIGHTGBM_CLASSIFIER_PARAMS.copy()
 
@@ -183,6 +189,19 @@ class BaseTrainer:
         feature_importance = fi_result.to_dict()
 
         training_duration_ms = (time.perf_counter() - start_time) * 1000
+
+        # Include active TPKE parameters in registry entry so the evolution
+        # timeline is reconstructable: we know which graph state each model saw.
+        from app.core.config import get_settings
+        _s = get_settings()
+        tpke_params_at_training = {
+            "tpke_confidence_threshold": _s.tpke_confidence_threshold,
+            "tpke_top_k":                _s.tpke_top_k,
+            "tpke_decay_rate":           _s.tpke_decay_rate,
+            "tpke_removal_threshold":    _s.tpke_removal_threshold,
+            "tpke_window_size_days":     _s.tpke_window_size_days,
+        }
+        hyperparams["tpke_params_at_training"] = tpke_params_at_training
 
         # Save to registry
         version = self.registry.save_model(

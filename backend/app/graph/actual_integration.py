@@ -81,7 +81,7 @@ class ActualIntegrationLayer:
                 "node_id": str(r.get("node_id", r.get("Category Name", "DEFAULT"))),
                 "timestamp": ts,
                 "actual_demand": float(r.get("actual_demand_7d", r.get("Sales", 0.0))),
-                "actual_delay_days": float(r.get("actual_delay_days", r.get("shipping_delay_days", 0.0))),
+                "actual_delay_days": float(r.get("actual_delay_days", r.get("shipping_delay", 0.0))),
                 "actual_late_delivery": int(r.get("actual_late_delivery", r.get("Late_delivery_risk", 0))),
             })
 
@@ -132,7 +132,7 @@ async def auto_sync_actuals(df: pd.DataFrame | None = None) -> dict[str, Any]:
             records.append({
                 "node_id": str(r.get("Category Name", r.get("Department Name", "DEFAULT"))),
                 "actual_demand_7d": float(r.get("Sales", 150.0)),
-                "actual_delay_days": float(r.get("shipping_delay_days", 1.0)),
+                "actual_delay_days": float(r.get("shipping_delay", 1.0)),
                 "actual_late_delivery": int(r.get("Late_delivery_risk", 0)),
             })
     else:

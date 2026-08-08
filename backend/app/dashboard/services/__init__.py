@@ -211,7 +211,7 @@ class DashboardService:
             if parquet_path.exists():
                 df = pd.read_parquet(parquet_path)
                 late_rate = float(df["Late_delivery_risk"].mean()) if "Late_delivery_risk" in df.columns else 0.3
-                avg_delay = float(df["shipping_delay_days"].mean()) if "shipping_delay_days" in df.columns else 2.5
+                avg_delay = float(df["shipping_delay"].mean()) if "shipping_delay" in df.columns else 2.5
                 self._analytics.update_ml_metrics({
                     "avg_supplier_delay_rate": late_rate,
                     "avg_late_delivery_rate": late_rate,

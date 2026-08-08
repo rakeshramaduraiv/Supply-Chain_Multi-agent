@@ -1,0 +1,10 @@
+=== AMASCI Phase 1 Invariant Check ===
+  PASS  TPKE params: theta=0.70 K=3 top_k=3 delta=0.05 theta_rem=0.10 W=30
+  PASS  Feature engineering: spec features present, exactly 4 graph_ context features
+  PASS  ML utils: all 4 agents have 4 graph features, correct targets
+  PASS  Training: Supplier=RF, Demand=LGBMRegressor, Inventory/Logistics=LGBMClassifier
+  PASS  Prediction: DemandPredictor alias, predict() has graph_context param
+  PASS  GraphRAG: _default_agent_context has _cold_start=True and all required keys
+  PASS  ForecastService: run_graph_aware_forecast wired to GraphRAG
+
+=== ALL INVARIANTS PASS ===

@@ -1,0 +1,148 @@
+2026-08-07 20:54:48,232 INFO retrain: Loading data\raw\DataCoSupplyChainDataset.csv ...
+2026-08-07 20:54:52,547 INFO retrain: Loaded 180,519 rows x 53 cols
+2026-08-07 20:54:52,547 INFO retrain: Running data engineering pipeline ...
+2026-08-07 20:54:52,548 INFO app.data_engineering.pipeline: [retrain] Step 1/4: Validation
+2026-08-07 20:55:01,791 INFO app.data_engineering.validation: Validation complete: valid=True, score=0.99
+2026-08-07 20:55:01,791 INFO app.data_engineering.pipeline: [retrain] Validation passed (score=0.99)
+2026-08-07 20:55:01,791 INFO app.data_engineering.pipeline: [retrain] Step 2/4: Cleaning
+C:\Users\balan\AppData\Local\Programs\Python\Python313\Lib\site-packages\numpy\lib\_nanfunctions_impl.py:1215: RuntimeWarning: Mean of empty slice
+  return np.nanmean(a, axis, out=out, keepdims=keepdims)
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\balan\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\balan\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 86: character maps to <undefined>
+Call stack:
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\retrain.py", line 71, in <module>
+    main()
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\retrain.py", line 41, in main
+    df_clean, result = pipeline.execute(df_raw, dataset_id="retrain")
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\data_engineering\pipeline.py", line 114, in execute
+    df_clean, cleaning_report = self.cleaner.clean(df)
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\data_engineering\cleaning\__init__.py", line 86, in clean
+    logger.info(
+Message: 'Cleaning complete: 180519 \u2192 180519 rows'
+Arguments: ()
+--- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\balan\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1153, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\balan\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 95: character maps to <undefined>
+Call stack:
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\retrain.py", line 71, in <module>
+    main()
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\retrain.py", line 41, in main
+    df_clean, result = pipeline.execute(df_raw, dataset_id="retrain")
+  File "c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\data_engineering\pipeline.py", line 118, in execute
+    logger.info(
+Message: '[retrain] Cleaning complete (180519\u2192180519)'
+Arguments: ()
+2026-08-07 20:55:09,766 INFO app.data_engineering.pipeline: [retrain] Step 3/4: Transformation
+2026-08-07 20:55:13,273 INFO app.data_engineering.transformation: Transformation complete: 13 columns added
+2026-08-07 20:55:13,274 INFO app.data_engineering.pipeline: [retrain] Transformation complete (13 cols added)
+2026-08-07 20:55:13,274 INFO app.data_engineering.pipeline: [retrain] Step 4/4: Profiling
+2026-08-07 20:55:24,015 INFO app.data_engineering.profiling: Profile generated: 180519 rows, 57 columns
+2026-08-07 20:55:24,015 INFO app.data_engineering.pipeline: [retrain] Profiling complete
+2026-08-07 20:55:24,016 INFO app.data_engineering.pipeline: [retrain] Pipeline completed in 31468ms
+2026-08-07 20:55:24,066 INFO retrain: Pipeline: 180519 -> 180519 rows
+2026-08-07 20:55:24,067 INFO retrain: Feature engineering ...
+2026-08-07 20:55:32,416 INFO retrain: Features: 113 columns
+2026-08-07 20:55:36,783 INFO retrain: Saved processed parquet: data\uploads\processed_master.parquet
+2026-08-07 20:55:36,783 INFO retrain: Training all models ...
+2026-08-07 20:55:36,831 INFO DemandTrainer: Training demand model...
+2026-08-07 20:55:37,392 INFO app.ml.utils: Chronological split: train=144415, test=36104
+2026-08-07 20:55:54,155 INFO app.ml.utils: prepare_features: 21 features, 144415 samples
+2026-08-07 20:55:54,194 INFO app.ml.utils: prepare_features: 21 features, 36104 samples
+2026-08-07 20:55:54,350 INFO app.ml.utils: prepare_features: 21 features, 144415 samples
+2026-08-07 20:56:01,799 INFO app.ml.metrics: Regression metrics: MAE=0.0528, RMSE=0.2399, R²=0.9731
+2026-08-07 20:56:01,799 INFO app.ml.validation: Fold 0: train=72207, test=14441, duration=7423.3ms
+2026-08-07 20:56:10,581 INFO app.ml.metrics: Regression metrics: MAE=0.0539, RMSE=0.2540, R²=0.9699
+2026-08-07 20:56:10,582 INFO app.ml.validation: Fold 1: train=86648, test=14441, duration=8781.8ms
+2026-08-07 20:56:20,213 INFO app.ml.metrics: Regression metrics: MAE=0.0526, RMSE=0.2352, R²=0.9746
+2026-08-07 20:56:20,213 INFO app.ml.validation: Fold 2: train=101089, test=14441, duration=9631.4ms
+2026-08-07 20:56:30,378 INFO app.ml.metrics: Regression metrics: MAE=0.0490, RMSE=0.2339, R²=0.9750
+2026-08-07 20:56:30,379 INFO app.ml.validation: Fold 3: train=115530, test=14441, duration=10165.7ms
+2026-08-07 20:56:42,471 INFO app.ml.metrics: Regression metrics: MAE=0.0495, RMSE=0.2442, R²=0.9725
+2026-08-07 20:56:42,471 INFO app.ml.validation: Fold 4: train=129971, test=14441, duration=12092.2ms
+2026-08-07 20:56:42,473 INFO app.ml.validation: Walk-forward validation complete: 5 folds, 48269.5ms total
+2026-08-07 20:56:55,037 INFO app.ml.metrics: Regression metrics: MAE=0.1200, RMSE=0.3475, R²=0.9325
+2026-08-07 20:56:55,053 INFO app.ml.feature_importance: Feature importance computed: top feature = discount_rate
+2026-08-07 20:56:55,430 INFO app.ml.registry: Model saved: demand_v_20260807_152655_751aa2 (demand)
+2026-08-07 20:56:55,430 INFO DemandTrainer: Training complete: demand v=demand_v_20260807_152655_751aa2 duration=78222.5ms
+2026-08-07 20:56:55,614 INFO InventoryTrainer: Training inventory model...
+2026-08-07 20:56:56,307 INFO app.ml.utils: Chronological split: train=144415, test=36104
+2026-08-07 20:57:13,085 INFO app.ml.utils: stockout_risk_flag: pos=2948 (2.0%), neg=141467
+2026-08-07 20:57:13,134 INFO app.ml.utils: prepare_features: 18 features, 144415 samples
+2026-08-07 20:57:13,206 INFO app.ml.utils: stockout_risk_flag: pos=623 (1.7%), neg=35481
+2026-08-07 20:57:13,221 INFO app.ml.utils: prepare_features: 18 features, 36104 samples
+2026-08-07 20:57:13,642 INFO app.ml.utils: stockout_risk_flag: pos=2948 (2.0%), neg=141467
+2026-08-07 20:57:13,751 INFO app.ml.utils: prepare_features: 18 features, 144415 samples
+2026-08-07 20:57:17,401 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:17,403 INFO app.ml.validation: Fold 0: train=72207, test=14441, duration=3516.5ms
+2026-08-07 20:57:21,642 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:21,643 INFO app.ml.validation: Fold 1: train=86648, test=14441, duration=4239.0ms
+2026-08-07 20:57:26,618 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:26,618 INFO app.ml.validation: Fold 2: train=101089, test=14441, duration=4975.1ms
+2026-08-07 20:57:30,536 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:30,537 INFO app.ml.validation: Fold 3: train=115530, test=14441, duration=3918.4ms
+2026-08-07 20:57:35,586 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:35,587 INFO app.ml.validation: Fold 4: train=129971, test=14441, duration=5049.6ms
+2026-08-07 20:57:35,588 INFO app.ml.validation: Walk-forward validation complete: 5 folds, 22356.2ms total
+2026-08-07 20:57:41,347 INFO app.ml.metrics: Classification metrics: Acc=1.0000, F1=1.0000, AUC=1.0000
+2026-08-07 20:57:41,363 INFO app.ml.feature_importance: Feature importance computed: top feature = demand_momentum
+2026-08-07 20:57:41,409 INFO app.ml.registry: Model saved: inventory_v_20260807_152741_1d87c7 (inventory)
+2026-08-07 20:57:41,410 INFO InventoryTrainer: Training complete: inventory v=inventory_v_20260807_152741_1d87c7 duration=45750.3ms
+2026-08-07 20:57:41,534 INFO SupplierTrainer: Training supplier model...
+2026-08-07 20:57:42,438 INFO app.ml.utils: Chronological split: train=144415, test=36104
+2026-08-07 20:58:01,906 INFO app.ml.utils: prepare_features: 16 features, 144415 samples
+2026-08-07 20:58:01,936 INFO app.ml.utils: prepare_features: 16 features, 36104 samples
+2026-08-07 20:58:02,025 INFO app.ml.utils: prepare_features: 16 features, 144415 samples
+2026-08-07 20:58:32,605 INFO app.ml.metrics: Classification metrics: Acc=0.7009, F1=0.6695, AUC=0.7313
+2026-08-07 20:58:32,605 INFO app.ml.validation: Fold 0: train=72207, test=14441, duration=30563.3ms
+2026-08-07 20:59:12,040 INFO app.ml.metrics: Classification metrics: Acc=0.6930, F1=0.6632, AUC=0.7163
+2026-08-07 20:59:12,040 INFO app.ml.validation: Fold 1: train=86648, test=14441, duration=39435.2ms
+2026-08-07 20:59:59,265 INFO app.ml.metrics: Classification metrics: Acc=0.6927, F1=0.6596, AUC=0.7232
+2026-08-07 20:59:59,265 INFO app.ml.validation: Fold 2: train=101089, test=14441, duration=47225.0ms
+2026-08-07 21:00:54,717 INFO app.ml.metrics: Classification metrics: Acc=0.6999, F1=0.6634, AUC=0.7301
+2026-08-07 21:00:54,718 INFO app.ml.validation: Fold 3: train=115530, test=14441, duration=55452.3ms
+2026-08-07 21:01:51,663 INFO app.ml.metrics: Classification metrics: Acc=0.6864, F1=0.6501, AUC=0.7210
+2026-08-07 21:01:51,664 INFO app.ml.validation: Fold 4: train=129971, test=14441, duration=56945.8ms
+2026-08-07 21:01:51,665 INFO app.ml.validation: Walk-forward validation complete: 5 folds, 229724.4ms total
+2026-08-07 21:03:07,016 INFO app.ml.metrics: Classification metrics: Acc=0.6924, F1=0.6597, AUC=0.7178
+2026-08-07 21:03:07,384 INFO app.ml.feature_importance: Feature importance computed: top feature = supplier_hist_late_rate
+2026-08-07 21:03:07,740 INFO app.ml.registry: Model saved: supplier_v_20260807_153307_d338f4 (supplier)
+2026-08-07 21:03:07,740 INFO SupplierTrainer: Training complete: supplier v=supplier_v_20260807_153307_d338f4 duration=325851.9ms
+2026-08-07 21:03:07,902 INFO LogisticsTrainer: Training logistics model...
+2026-08-07 21:03:08,533 INFO app.ml.utils: Chronological split: train=144415, test=36104
+2026-08-07 21:03:24,266 INFO app.ml.utils: prepare_features: 19 features, 144415 samples
+2026-08-07 21:03:24,300 INFO app.ml.utils: prepare_features: 19 features, 36104 samples
+2026-08-07 21:03:24,415 INFO app.ml.utils: prepare_features: 19 features, 144415 samples
+2026-08-07 21:03:31,502 INFO app.ml.metrics: Classification metrics: Acc=0.6914, F1=0.6753, AUC=0.7312
+2026-08-07 21:03:31,503 INFO app.ml.validation: Fold 0: train=72207, test=14441, duration=7068.0ms
+2026-08-07 21:03:39,655 INFO app.ml.metrics: Classification metrics: Acc=0.6883, F1=0.6670, AUC=0.7145
+2026-08-07 21:03:39,655 INFO app.ml.validation: Fold 1: train=86648, test=14441, duration=8152.8ms
+2026-08-07 21:03:49,571 INFO app.ml.metrics: Classification metrics: Acc=0.6884, F1=0.6680, AUC=0.7374
+2026-08-07 21:03:49,571 INFO app.ml.validation: Fold 2: train=101089, test=14441, duration=9916.0ms
+2026-08-07 21:03:59,641 INFO app.ml.metrics: Classification metrics: Acc=0.6891, F1=0.6701, AUC=0.7308
+2026-08-07 21:03:59,641 INFO app.ml.validation: Fold 3: train=115530, test=14441, duration=10069.4ms
+2026-08-07 21:04:09,870 INFO app.ml.metrics: Classification metrics: Acc=0.6886, F1=0.6624, AUC=0.7223
+2026-08-07 21:04:09,870 INFO app.ml.validation: Fold 4: train=129971, test=14441, duration=10229.1ms
+2026-08-07 21:04:09,871 INFO app.ml.validation: Walk-forward validation complete: 5 folds, 45563.8ms total
+2026-08-07 21:04:21,045 INFO app.ml.metrics: Classification metrics: Acc=0.6908, F1=0.6596, AUC=0.7279
+2026-08-07 21:04:21,068 INFO app.ml.feature_importance: Feature importance computed: top feature = route_hist_late_rate
+2026-08-07 21:04:21,306 INFO app.ml.registry: Model saved: logistics_v_20260807_153421_7099ee (logistics)
+2026-08-07 21:04:21,306 INFO LogisticsTrainer: Training complete: logistics v=logistics_v_20260807_153421_7099ee duration=73166.0ms
+2026-08-07 21:04:21,674 INFO app.ml.training: All models trained: ['demand', 'inventory', 'supplier', 'logistics']
+2026-08-07 21:04:21,674 INFO retrain:   demand      version=demand_v_20260807_152655_751aa2  mape=7.8594
+2026-08-07 21:04:21,674 INFO retrain:   inventory   version=inventory_v_20260807_152741_1d87c7  accuracy=1.0000
+2026-08-07 21:04:21,674 INFO retrain:   supplier    version=supplier_v_20260807_153307_d338f4  accuracy=0.6924
+2026-08-07 21:04:21,674 INFO retrain:   logistics   version=logistics_v_20260807_153421_7099ee  accuracy=0.6908
+2026-08-07 21:04:21,674 INFO retrain: Retrain complete in 573.4s

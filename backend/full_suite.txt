@@ -1,0 +1,26 @@
+...............................................................          [100%]
+============================== warnings summary ===============================
+tests\integration\test_graph_influence.py:58
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:58: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:113
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:113: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:138
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:138: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:168
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:168: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/unit/test_tpke_parameters.py::TestTPKEEngineReportParameters::test_engine_status_reports_frozen_params
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\tpke\engine\__init__.py:230: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    active_version = None
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+63 passed, 5 warnings in 152.35s (0:02:32)

@@ -142,30 +142,41 @@ class PredictionEngine:
         X = X[feature_config.features]
         X = X.fillna(0)
 
-        # Generate predictions
+        # Generate raw model outputs
         predictions = model.predict(X).tolist()
-
-        # ── GRAPH-DERIVED RISK AMPLIFICATION ───────────────────────
-        predictions, amplification_applied = self._apply_graph_amplification(
-            predictions, intelligence_type, graph_context
-        )
 
         # Probabilities and confidence
         probabilities = None
         confidence_scores = []
         risk_levels = []
+        amplification_applied: dict[str, Any] = {"amplified": False, "factor": 1.0, "reason": None}
 
         if feature_config.task == ModelTask.CLASSIFICATION:
             if hasattr(model, "predict_proba"):
                 prob_array = model.predict_proba(X)[:, 1]
-                probabilities = prob_array.tolist()
-                conf_result = compute_classification_confidence(prob_array)
+
+                # ── GRAPH AMPLIFICATION on probabilities (classifiers) ──
+                # Amplification is applied to P(risk=1) before thresholding,
+                # not to the binary label — multiplying 0/1 by a factor is
+                # meaningless and produces out-of-range values.
+                prob_list, amplification_applied = self._apply_graph_amplification(
+                    prob_array.tolist(), intelligence_type, graph_context
+                )
+                prob_array_amp = np.clip(np.array(prob_list), 0.0, 1.0)
+
+                probabilities = prob_array_amp.tolist()
+                predictions = (prob_array_amp >= 0.5).astype(int).tolist()
+                conf_result = compute_classification_confidence(prob_array_amp)
                 confidence_scores = conf_result.confidence_scores
-                risk_levels = [_classify_risk(p) for p in prob_array]
+                risk_levels = [_classify_risk(p) for p in prob_array_amp]
             else:
                 confidence_scores = [0.5] * len(predictions)
                 risk_levels = [_classify_risk(float(p)) for p in predictions]
         else:
+            # ── GRAPH AMPLIFICATION on demand forecast (regressor) ──
+            predictions, amplification_applied = self._apply_graph_amplification(
+                predictions, intelligence_type, graph_context
+            )
             conf_result = compute_regression_confidence(np.array(predictions))
             confidence_scores = conf_result.confidence_scores
 
@@ -352,4 +363,11 @@ class LogisticsAgent:
 def get_collaborative_pipeline(registry: ModelRegistry | None = None):
     from app.ml.prediction.collaborative_pipeline import CollaborativeAgentPipeline
     return CollaborativeAgentPipeline(registry)
+
+
+# Aliases for test compatibility (CLAUDE.md section 11)
+DemandPredictor    = DemandAgent
+InventoryPredictor = InventoryAgent
+SupplierPredictor  = SupplierAgent
+LogisticsPredictor = LogisticsAgent
 

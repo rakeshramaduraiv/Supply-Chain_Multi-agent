@@ -1,0 +1,832 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 26 items
+
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[supplier] FAILED [  3%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[logistics] FAILED [  7%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[inventory] FAILED [ 11%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[supplier] FAILED [ 15%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[logistics] FAILED [ 19%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[inventory] FAILED [ 23%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[supplier] FAILED [ 26%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[logistics] FAILED [ 30%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[inventory] FAILED [ 34%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[supplier] FAILED [ 38%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[logistics] FAILED [ 42%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[inventory] FAILED [ 46%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[supplier] FAILED [ 50%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[logistics] FAILED [ 53%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[inventory] FAILED [ 57%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[supplier] FAILED [ 61%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[logistics] FAILED [ 65%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[inventory] FAILED [ 69%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[supplier] FAILED [ 73%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[logistics] FAILED [ 76%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[inventory] FAILED [ 80%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_not_binary FAILED [ 84%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_finite FAILED [ 88%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_has_no_probabilities FAILED [ 92%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_flag_set_for_stressed FAILED [ 96%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_factor_positive FAILED [100%]
+
+================================== FAILURES ===================================
+_____ TestClassifierLabels.test_predictions_are_binary_healthy[supplier] ______
+tests\unit\test_amplification.py:70: in test_predictions_are_binary_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+_____ TestClassifierLabels.test_predictions_are_binary_healthy[logistics] _____
+tests\unit\test_amplification.py:70: in test_predictions_are_binary_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestClassifierLabels.test_predictions_are_binary_healthy[inventory] _____
+tests\unit\test_amplification.py:70: in test_predictions_are_binary_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestClassifierLabels.test_predictions_are_binary_stressed[supplier] _____
+tests\unit\test_amplification.py:80: in test_predictions_are_binary_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+____ TestClassifierLabels.test_predictions_are_binary_stressed[logistics] _____
+tests\unit\test_amplification.py:80: in test_predictions_are_binary_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+____ TestClassifierLabels.test_predictions_are_binary_stressed[inventory] _____
+tests\unit\test_amplification.py:80: in test_predictions_are_binary_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestProbabilityRange.test_probabilities_in_range_healthy[supplier] ______
+tests\unit\test_amplification.py:94: in test_probabilities_in_range_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+_____ TestProbabilityRange.test_probabilities_in_range_healthy[logistics] _____
+tests\unit\test_amplification.py:94: in test_probabilities_in_range_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestProbabilityRange.test_probabilities_in_range_healthy[inventory] _____
+tests\unit\test_amplification.py:94: in test_probabilities_in_range_healthy
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestProbabilityRange.test_probabilities_in_range_stressed[supplier] _____
+tests\unit\test_amplification.py:106: in test_probabilities_in_range_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+____ TestProbabilityRange.test_probabilities_in_range_stressed[logistics] _____
+tests\unit\test_amplification.py:106: in test_probabilities_in_range_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+____ TestProbabilityRange.test_probabilities_in_range_stressed[inventory] _____
+tests\unit\test_amplification.py:106: in test_probabilities_in_range_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+__________ TestRiskLevelConsistency.test_risk_levels_valid[supplier] __________
+tests\unit\test_amplification.py:121: in test_risk_levels_valid
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+_________ TestRiskLevelConsistency.test_risk_levels_valid[logistics] __________
+tests\unit\test_amplification.py:121: in test_risk_levels_valid
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_________ TestRiskLevelConsistency.test_risk_levels_valid[inventory] __________
+tests\unit\test_amplification.py:121: in test_risk_levels_valid
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+___ TestRiskLevelConsistency.test_risk_levels_match_probabilities[supplier] ___
+tests\unit\test_amplification.py:130: in test_risk_levels_match_probabilities
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+__ TestRiskLevelConsistency.test_risk_levels_match_probabilities[logistics] ___
+tests\unit\test_amplification.py:130: in test_risk_levels_match_probabilities
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+__ TestRiskLevelConsistency.test_risk_levels_match_probabilities[inventory] ___
+tests\unit\test_amplification.py:130: in test_risk_levels_match_probabilities
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestAmplificationEffect.test_stressed_probability_higher[supplier] ______
+tests\unit\test_amplification.py:152: in test_stressed_probability_higher
+    res_h = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+_____ TestAmplificationEffect.test_stressed_probability_higher[logistics] _____
+tests\unit\test_amplification.py:152: in test_stressed_probability_higher
+    res_h = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (20).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (20).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestAmplificationEffect.test_stressed_probability_higher[inventory] _____
+tests\unit\test_amplification.py:152: in test_stressed_probability_higher
+    res_h = engine.predict(engineered_df, agent_type, graph_context=CTX_HEALTHY)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1597: in predict
+    result = self.predict_proba(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1627: in predict_proba
+    result = super().predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (18) is not the same as it was in training data (19).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (18) is not the same as it was in training data (19).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_________ TestRegressorNotClipped.test_demand_predictions_not_binary __________
+tests\unit\test_amplification.py:169: in test_demand_predictions_not_binary
+    result = engine.predict(
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (22) is not the same as it was in training data (25).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (22) is not the same as it was in training data (25).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+___________ TestRegressorNotClipped.test_demand_predictions_finite ____________
+tests\unit\test_amplification.py:180: in test_demand_predictions_finite
+    result = engine.predict(
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (22) is not the same as it was in training data (25).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (22) is not the same as it was in training data (25).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+__________ TestRegressorNotClipped.test_demand_has_no_probabilities ___________
+tests\unit\test_amplification.py:190: in test_demand_has_no_probabilities
+    result = engine.predict(
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\sklearn.py:1144: in predict
+    return self._Booster.predict(  # type: ignore[union-attr]
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:4767: in predict
+    return predictor.predict(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1204: in predict
+    preds, nrow = self.__pred_for_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1361: in __pred_for_np2d
+    return self.__inner_predict_np2d(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:1307: in __inner_predict_np2d
+    _safe_call(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\lightgbm\basic.py:313: in _safe_call
+    raise LightGBMError(_LIB.LGBM_GetLastError().decode("utf-8"))
+E   lightgbm.basic.LightGBMError: The number of features in data (22) is not the same as it was in training data (25).
+E   You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+---------------------------- Captured stderr call -----------------------------
+[LightGBM] [Fatal] The number of features in data (22) is not the same as it was in training data (25).
+You can set ``predict_disable_shape_check=true`` to discard this error, but please be aware what you are doing.
+_____ TestAmplificationMetadata.test_amplification_flag_set_for_stressed ______
+tests\unit\test_amplification.py:206: in test_amplification_flag_set_for_stressed
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+________ TestAmplificationMetadata.test_amplification_factor_positive _________
+tests\unit\test_amplification.py:217: in test_amplification_factor_positive
+    result = engine.predict(engineered_df, agent_type, graph_context=CTX_STRESSED)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app\ml\prediction\__init__.py:146: in predict
+    predictions = model.predict(X).tolist()
+                  ^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:904: in predict
+    proba = self.predict_proba(X)
+            ^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:946: in predict_proba
+    X = self._validate_X_predict(X)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\ensemble\_forest.py:638: in _validate_X_predict
+    X = validate_data(
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2919: in validate_data
+    _check_feature_names(_estimator, X, reset=reset)
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\site-packages\sklearn\utils\validation.py:2777: in _check_feature_names
+    raise ValueError(message)
+E   ValueError: The feature names should match those that were passed during fit.
+E   Feature names unseen at fit time:
+E   - is_holiday_period
+E   - order_dayofweek
+E   - qty_roll_7
+E   - region_congestion_index
+E   - route_frequency
+E   - ...
+E   Feature names seen at fit time, yet now missing:
+E   - Days for shipment (scheduled)
+E   - Days for shipping (real)
+E   - delay_rolling_mean_3m
+E   - delivery_duration_days
+E   - delivery_gap
+E   - ...
+=========================== short test summary info ===========================
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[supplier]
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[logistics]
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[inventory]
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[supplier]
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[logistics]
+FAILED tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[inventory]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[supplier]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[logistics]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[inventory]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[supplier]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[logistics]
+FAILED tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[inventory]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[supplier]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[logistics]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[inventory]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[supplier]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[logistics]
+FAILED tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[inventory]
+FAILED tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[supplier]
+FAILED tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[logistics]
+FAILED tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[inventory]
+FAILED tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_not_binary
+FAILED tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_finite
+FAILED tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_has_no_probabilities
+FAILED tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_flag_set_for_stressed
+FAILED tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_factor_positive
+============================= 26 failed in 12.91s =============================

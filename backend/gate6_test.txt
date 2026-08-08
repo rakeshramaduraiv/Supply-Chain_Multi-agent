@@ -1,0 +1,50 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/integration/test_graph_influence.py::test_graph_influence_on_predictions FAILED [ 25%]
+tests/integration/test_graph_influence.py::test_stressed_risk_higher_than_healthy PASSED [ 50%]
+tests/integration/test_graph_influence.py::test_all_spec_features_present PASSED [ 75%]
+tests/integration/test_graph_influence.py::test_graph_features_have_variance PASSED [100%]
+
+================================== FAILURES ===================================
+_____________________ test_graph_influence_on_predictions _____________________
+tests\integration\test_graph_influence.py:103: in test_graph_influence_on_predictions
+    assert r["healthy"] != r["stressed"], (
+E   AssertionError: inventory: identical predictions — graph context has NO influence (0.0198 == 0.0198)
+E   assert 0.019759692885513436 != 0.019759692885513436
+---------------------------- Captured stdout setup ----------------------------
+
+  [OK] Loaded 180,519 rows
+  [OK] Engineered 123 features
+---------------------------- Captured stdout call -----------------------------
+  supplier    healthy=0.3492  stressed=1.0000  diff=+186.3%
+  logistics   healthy=0.4714  stressed=0.8711  diff=+84.8%
+  inventory   healthy=0.0198  stressed=0.0198  diff=+0.0%
+  demand      healthy=0.9884  stressed=1.4186  diff=+43.5%
+============================== warnings summary ===============================
+tests\integration\test_graph_influence.py:58
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:58: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:111
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:111: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:136
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:136: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:166
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:166: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/integration/test_graph_influence.py::test_graph_influence_on_predictions
+================== 1 failed, 3 passed, 4 warnings in 38.55s ===================

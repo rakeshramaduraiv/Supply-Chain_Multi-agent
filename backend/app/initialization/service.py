@@ -259,11 +259,11 @@ class InitializationService:
 
         # Shipping Intelligence
         if "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
-            df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+            df["shipping_delay"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
             df["shipping_delay_ratio"] = (
-                df["shipping_delay_days"] / df["Days for shipment (scheduled)"].replace(0, 1)
+                df["shipping_delay"] / df["Days for shipment (scheduled)"].replace(0, 1)
             )
-            df["is_delayed"] = (df["shipping_delay_days"] > 0).astype(int)
+            df["is_delayed"] = (df["shipping_delay"] > 0).astype(int)
 
         # Financial Intelligence
         if "Sales" in df.columns and "Order Item Quantity" in df.columns:

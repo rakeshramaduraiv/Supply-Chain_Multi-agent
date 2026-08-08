@@ -1,0 +1,7 @@
+Missing spec features: NONE
+graph_supplier_reliability: nunique=2 std=0.5042 [OK]
+graph_inventory_stress: nunique=2 std=0.0280 [OK]
+graph_avg_shipping_delay: nunique=2 std=0.5042 [OK]
+days_until_reorder: min=1.63 max=7.00 [OK]
+graph_has_upcoming_event values: [0, 1]
+feature_engineering DONE

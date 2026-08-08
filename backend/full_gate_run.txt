@@ -1,0 +1,98 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\balan\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: c:\Users\balan\OneDrive\Desktop\supply-chain\backend
+configfile: pyproject.toml
+plugins: anyio-4.13.0, langsmith-0.9.3, asyncio-1.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 63 items
+
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_confidence_threshold PASSED [  1%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_top_k PASSED [  3%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_decay_rate PASSED [  4%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_removal_threshold PASSED [  6%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_window_size_days PASSED [  7%]
+tests/unit/test_tpke_parameters.py::TestConfigDefaults::test_all_frozen_values_at_once PASSED [  9%]
+tests/unit/test_tpke_parameters.py::TestConstantsAlignment::test_min_edge_weight_equals_removal_threshold PASSED [ 11%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_k PASSED [ 12%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_theta PASSED [ 14%]
+tests/unit/test_tpke_parameters.py::TestPatternDetectorParameters::test_pattern_detector_uses_frozen_window PASSED [ 15%]
+tests/unit/test_tpke_parameters.py::TestEdgeManagerDecayRate::test_edge_manager_decay_rate PASSED [ 17%]
+tests/unit/test_tpke_parameters.py::TestTPKEEngineReportParameters::test_engine_status_reports_frozen_params PASSED [ 19%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_supplier_reliability] PASSED [ 20%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_inventory_stress] PASSED [ 22%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_avg_shipping_delay] PASSED [ 23%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_exists[graph_has_upcoming_event] PASSED [ 25%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_supplier_reliability] PASSED [ 26%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_inventory_stress] PASSED [ 28%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_avg_shipping_delay] PASSED [ 30%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_nunique[graph_has_upcoming_event] PASSED [ 31%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_supplier_reliability] PASSED [ 33%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_inventory_stress] PASSED [ 34%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_avg_shipping_delay] PASSED [ 36%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_graph_feature_std[graph_has_upcoming_event] PASSED [ 38%]
+tests/unit/test_feature_invariants.py::TestGraphFeatureVariance::test_all_graph_features_vary PASSED [ 39%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_nunique PASSED [ 41%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_range PASSED [ 42%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_stockout_target_both_classes PASSED [ 44%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_stockout_target_minority_class_ratio PASSED [ 46%]
+tests/unit/test_feature_invariants.py::TestInventoryTargetValidity::test_days_until_reorder_formula_not_constant PASSED [ 47%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_engineer_features_runs PASSED [ 49%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_engineer_features_no_all_nan_columns PASSED [ 50%]
+tests/unit/test_feature_invariants.py::TestEngineerFeaturesSmoke::test_graph_context_assertion_fires_on_constant PASSED [ 52%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[supplier] PASSED [ 53%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[logistics] PASSED [ 55%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_healthy[inventory] PASSED [ 57%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[supplier] PASSED [ 58%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[logistics] PASSED [ 60%]
+tests/unit/test_amplification.py::TestClassifierLabels::test_predictions_are_binary_stressed[inventory] PASSED [ 61%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[supplier] PASSED [ 63%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[logistics] PASSED [ 65%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_healthy[inventory] PASSED [ 66%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[supplier] PASSED [ 68%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[logistics] PASSED [ 69%]
+tests/unit/test_amplification.py::TestProbabilityRange::test_probabilities_in_range_stressed[inventory] PASSED [ 71%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[supplier] PASSED [ 73%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[logistics] PASSED [ 74%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_valid[inventory] PASSED [ 76%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[supplier] PASSED [ 77%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[logistics] PASSED [ 79%]
+tests/unit/test_amplification.py::TestRiskLevelConsistency::test_risk_levels_match_probabilities[inventory] PASSED [ 80%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[supplier] PASSED [ 82%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[logistics] PASSED [ 84%]
+tests/unit/test_amplification.py::TestAmplificationEffect::test_stressed_probability_higher[inventory] PASSED [ 85%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_not_binary PASSED [ 87%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_predictions_finite PASSED [ 88%]
+tests/unit/test_amplification.py::TestRegressorNotClipped::test_demand_has_no_probabilities PASSED [ 90%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_flag_set_for_stressed PASSED [ 92%]
+tests/unit/test_amplification.py::TestAmplificationMetadata::test_amplification_factor_positive PASSED [ 93%]
+tests/integration/test_graph_influence.py::test_graph_influence_on_predictions PASSED [ 95%]
+tests/integration/test_graph_influence.py::test_stressed_risk_higher_than_healthy PASSED [ 96%]
+tests/integration/test_graph_influence.py::test_all_spec_features_present PASSED [ 98%]
+tests/integration/test_graph_influence.py::test_graph_features_have_variance PASSED [100%]
+
+============================== warnings summary ===============================
+tests\integration\test_graph_influence.py:58
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:58: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:113
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:113: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:138
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:138: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests\integration\test_graph_influence.py:168
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\integration\test_graph_influence.py:168: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/unit/test_tpke_parameters.py::TestTPKEEngineReportParameters::test_engine_status_reports_frozen_params
+  c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\tpke\engine\__init__.py:230: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    active_version = None
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 63 passed, 5 warnings in 127.91s (0:02:07) ==================

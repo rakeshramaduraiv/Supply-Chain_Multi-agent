@@ -57,9 +57,9 @@ def _load_parquet() -> pd.DataFrame | None:
         if _parquet_cache is not None and mtime == _parquet_mtime:
             return _parquet_cache
         df = pd.read_csv(csv_path, encoding="latin1")
-        if "shipping_delay_days" not in df.columns:
+        if "shipping_delay" not in df.columns:
             sched = df.get("Days for shipping (real)", 0) - df.get("Days for shipment (scheduled)", 0)
-            df["shipping_delay_days"] = sched
+            df["shipping_delay"] = sched
         _parquet_cache = df
         _parquet_mtime = mtime
         return df
@@ -167,7 +167,7 @@ async def get_live_ops_entities(
     grp = filtered_df.groupby(col, observed=True).agg(
         total_orders=("Late_delivery_risk", "count"),
         late_orders=("Late_delivery_risk", "sum"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
         total_sales=("Sales", "sum"),
         avg_qty=("Order Item Quantity", "mean"),
     ).reset_index()
@@ -324,7 +324,7 @@ async def get_live_ops_entity_analytics(
         orders=("Late_delivery_risk", "count"),
         late_orders=("Late_delivery_risk", "sum"),
         late_rate=("Late_delivery_risk", "mean"),
-        avg_delay=("shipping_delay_days", "mean"),
+        avg_delay=("shipping_delay", "mean"),
         total_sales=("Sales", "sum"),
         total_qty=("Order Item Quantity", "sum"),
     ).reset_index().sort_values("_period")
@@ -336,7 +336,7 @@ async def get_live_ops_entity_analytics(
                         orders=("Late_delivery_risk", "count"),
                         late_orders=("Late_delivery_risk", "sum"),
                         late_rate=("Late_delivery_risk", "mean"),
-                        avg_delay=("shipping_delay_days", "mean"),
+                        avg_delay=("shipping_delay", "mean"),
                         total_sales=("Sales", "sum"),
                         total_qty=("Order Item Quantity", "sum"),
                     ).reset_index().sort_values("_period").tail(12)
@@ -344,7 +344,7 @@ async def get_live_ops_entity_analytics(
     # Calculate overall KPIs
     total_orders = int(filtered_df["Late_delivery_risk"].count()) if len(filtered_df) > 0 else 100
     late_rate_overall = float(filtered_df["Late_delivery_risk"].mean()) if len(filtered_df) > 0 else 0.2
-    avg_delay_overall = float(filtered_df["shipping_delay_days"].mean()) if len(filtered_df) > 0 else 1.2
+    avg_delay_overall = float(filtered_df["shipping_delay"].mean()) if len(filtered_df) > 0 else 1.2
     total_sales_overall = float(filtered_df["Sales"].sum()) if len(filtered_df) > 0 else 50000.0
 
     risk_pct = round(late_rate_overall * 100.0, 1)

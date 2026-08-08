@@ -156,9 +156,9 @@ class InitializationService:
                 f"{pipeline_result.row_count_raw} → {pipeline_result.row_count_final} rows"
             )
 
-            # Step 3: Feature Engineering
+            # Step 3: Feature Engineering (Tier-1, no graph)
             step_start = time.perf_counter()
-            logger.info("[3/7] Feature engineering...")
+            logger.info("[3/7] Feature engineering (Tier-1)...")
             df_features = self._engineer_features(df_processed)
             result["steps"]["feature_engineering"] = {
                 "status": "completed",
@@ -168,9 +168,25 @@ class InitializationService:
             }
             logger.info(f"[3/7] Feature engineering complete: {len(df_features.columns)} total columns")
 
-            # Step 4: Train ML Models
+            # Step 4: Build Knowledge Graph (A4: BEFORE training so models see real graph variance)
             step_start = time.perf_counter()
-            logger.info("[4/7] Training ML models...")
+            logger.info("[4/7] Building Knowledge Graph...")
+            graph_result = self._build_knowledge_graph(df_features)
+            result["steps"]["knowledge_graph"] = {
+                "status": "completed",
+                "nodes_created": graph_result.get("nodes_created", 0),
+                "relationships_created": graph_result.get("relationships_created", 0),
+                "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+            }
+            logger.info(
+                f"[4/7] Knowledge Graph built: "
+                f"{graph_result.get('nodes_created', 0)} nodes, "
+                f"{graph_result.get('relationships_created', 0)} relationships"
+            )
+
+            # Step 5: Train ML Models (now sees real graph features from Step 4)
+            step_start = time.perf_counter()
+            logger.info("[5/7] Training ML models...")
             training_results = self._training_orchestrator.train_all(
                 df_features, dataset_version="master_v1"
             )
@@ -187,23 +203,7 @@ class InitializationService:
                 },
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
-            logger.info(f"[4/7] Training complete: {len(training_results)} models")
-
-            # Step 5: Build Knowledge Graph
-            step_start = time.perf_counter()
-            logger.info("[5/7] Building Knowledge Graph...")
-            graph_result = self._build_knowledge_graph(df_features)
-            result["steps"]["knowledge_graph"] = {
-                "status": "completed",
-                "nodes_created": graph_result.get("nodes_created", 0),
-                "relationships_created": graph_result.get("relationships_created", 0),
-                "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
-            }
-            logger.info(
-                f"[5/7] Knowledge Graph built: "
-                f"{graph_result.get('nodes_created', 0)} nodes, "
-                f"{graph_result.get('relationships_created', 0)} relationships"
-            )
+            logger.info(f"[5/7] Training complete: {len(training_results)} models")
 
             # Step 6: Register models (already done in training step via registry)
             step_start = time.perf_counter()

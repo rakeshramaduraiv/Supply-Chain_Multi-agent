@@ -39,6 +39,9 @@ class PredictionResult:
     model_version: str
     predictions: list[float]
     probabilities: list[float] | None = None
+    # Raw model output — use for all evaluation, ablation, walk-forward metrics.
+    # Never contains amplification overlay.
+    probabilities_raw: list[float] | None = None
     confidence_scores: list[float] = field(default_factory=list)
     risk_levels: list[str] = field(default_factory=list)
     mean_confidence: float = 0.0
@@ -102,6 +105,7 @@ class PredictionEngine:
         intelligence_type: IntelligenceType,
         version_id: str | None = None,
         graph_context: dict[str, Any] | None = None,
+        apply_amplification: bool = True,
     ) -> PredictionResult:
         """
         Generate predictions for a dataframe.
@@ -134,10 +138,13 @@ class PredictionEngine:
         # ── GRAPH CONTEXT INJECTION ────────────────────────────────
         X = self._inject_graph_context(X, graph_context)
 
-        # Handle missing features by filling with 0
-        for feat in feature_config.features:
-            if feat not in X.columns:
-                X[feat] = 0
+        # ── MISSING FEATURE GUARD ─────────────────────────────────
+        missing = [f for f in feature_config.features if f not in X.columns]
+        if missing:
+            raise ValueError(
+                f"{intelligence_type.value} missing required features: {missing} "
+                f"— refusing to predict. Ensure feature engineering ran on this data."
+            )
 
         X = X[feature_config.features]
         X = X.fillna(0)
@@ -145,38 +152,46 @@ class PredictionEngine:
         # Generate raw model outputs
         predictions = model.predict(X).tolist()
 
-        # Probabilities and confidence
+        # Probabilities, confidence, amplification
         probabilities = None
-        confidence_scores = []
-        risk_levels = []
         amplification_applied: dict[str, Any] = {"amplified": False, "factor": 1.0, "reason": None}
+
+        confidence_scores: list[float] = []
+        risk_levels: list[str] = []
+        probabilities_raw: list[float] | None = None
 
         if feature_config.task == ModelTask.CLASSIFICATION:
             if hasattr(model, "predict_proba"):
-                prob_array = model.predict_proba(X)[:, 1]
+                prob_array_raw = model.predict_proba(X)[:, 1]
+                probabilities_raw = prob_array_raw.tolist()
 
-                # ── GRAPH AMPLIFICATION on probabilities (classifiers) ──
-                # Amplification is applied to P(risk=1) before thresholding,
-                # not to the binary label — multiplying 0/1 by a factor is
-                # meaningless and produces out-of-range values.
-                prob_list, amplification_applied = self._apply_graph_amplification(
-                    prob_array.tolist(), intelligence_type, graph_context
-                )
-                prob_array_amp = np.clip(np.array(prob_list), 0.0, 1.0)
+                if apply_amplification:
+                    prob_list, amplification_applied = self._apply_graph_amplification(
+                        prob_array_raw.tolist(), intelligence_type, graph_context
+                    )
+                    prob_array_final = np.clip(np.array(prob_list), 0.0, 1.0)
+                else:
+                    prob_array_final = prob_array_raw
+                    amplification_applied = {"amplified": False, "factor": 1.0, "reason": None}
 
-                probabilities = prob_array_amp.tolist()
-                predictions = (prob_array_amp >= 0.5).astype(int).tolist()
-                conf_result = compute_classification_confidence(prob_array_amp)
+                # UI/decisions use final; metrics always use raw
+                probabilities = prob_array_final.tolist()
+                predictions = (prob_array_final >= 0.5).astype(int).tolist()
+                conf_result = compute_classification_confidence(prob_array_final)
                 confidence_scores = conf_result.confidence_scores
-                risk_levels = [_classify_risk(p) for p in prob_array_amp]
+                risk_levels = [_classify_risk(p) for p in prob_array_final]
             else:
                 confidence_scores = [0.5] * len(predictions)
                 risk_levels = [_classify_risk(float(p)) for p in predictions]
         else:
-            # ── GRAPH AMPLIFICATION on demand forecast (regressor) ──
-            predictions, amplification_applied = self._apply_graph_amplification(
-                predictions, intelligence_type, graph_context
-            )
+            raw_preds = predictions[:]
+            if apply_amplification:
+                predictions, amplification_applied = self._apply_graph_amplification(
+                    predictions, intelligence_type, graph_context
+                )
+            else:
+                amplification_applied = {"amplified": False, "factor": 1.0, "reason": None}
+            probabilities_raw = raw_preds
             conf_result = compute_regression_confidence(np.array(predictions))
             confidence_scores = conf_result.confidence_scores
 
@@ -197,6 +212,7 @@ class PredictionEngine:
             model_version=model_version,
             predictions=predictions,
             probabilities=probabilities,
+            probabilities_raw=probabilities_raw,
             confidence_scores=confidence_scores,
             risk_levels=risk_levels,
             mean_confidence=float(np.mean(confidence_scores)) if confidence_scores else 0.0,
@@ -208,6 +224,7 @@ class PredictionEngine:
             graph_amplification=amplification_applied,
             metadata={
                 "features_used": available_features,
+                "amplification_applied": apply_amplification,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )

@@ -38,6 +38,8 @@ from app.ml.utils import (
     RANDOM_FOREST_PARAMS,
     IntelligenceType,
     ModelTask,
+    TautologicalTargetError,
+    assert_target_not_reconstructible,
     chronological_split,
     prepare_features,
 )
@@ -143,6 +145,12 @@ class BaseTrainer:
 
         X_train, y_train = prepare_features(train_df, feature_config)
         X_test,  y_test  = prepare_features(test_df,  feature_config)
+
+        # A1: tautology guard — classification agents only
+        if feature_config.task == ModelTask.CLASSIFICATION:
+            assert_target_not_reconstructible(
+                X_train, y_train, label=intelligence_type.value
+            )
 
         features_used = X_train.columns.tolist()
         hyperparams   = self._get_hyperparameters(intelligence_type)
@@ -279,14 +287,18 @@ class TrainingOrchestrator:
     def train_all(
         self, df: pd.DataFrame, dataset_version: str = ""
     ) -> dict[str, TrainingResult]:
-        """Train all intelligence models on the same dataset."""
+        """
+        Train all viable intelligence models on the same dataset.
+
+        NOTE: Inventory agent is excluded — its synthetic stockout_risk_flag
+        target is algebraically derived from rolling demand features (qty_roll_7,
+        qty_roll_30, demand_momentum). No independent inventory signal exists in
+        DataCo. CV AUC = 0.479 with non-tautological features.
+        """
         results = {}
-
-        results["demand"] = self.demand_trainer.train_demand(df, dataset_version)
-        results["inventory"] = self.inventory_trainer.train_inventory(df, dataset_version)
-        results["supplier"] = self.supplier_trainer.train_supplier(df, dataset_version)
+        results["demand"]    = self.demand_trainer.train_demand(df, dataset_version)
+        results["supplier"]  = self.supplier_trainer.train_supplier(df, dataset_version)
         results["logistics"] = self.logistics_trainer.train_logistics(df, dataset_version)
-
         logger.info(f"All models trained: {list(results.keys())}")
         return results
 

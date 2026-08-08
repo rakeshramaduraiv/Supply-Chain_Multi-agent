@@ -143,6 +143,40 @@ def expanding_target_rate(
     return result.fillna(global_prior)
 
 
+def _expanding_group_mean(
+    df: pd.DataFrame,
+    group_cols: list[str],
+    value_col: str,
+    min_periods: int = 10,
+) -> pd.Series:
+    """
+    Expanding shifted mean of a non-target column per group.
+    Row i sees only rows strictly before it — same discipline as
+    expanding_target_rate but for continuous features.
+    """
+    if value_col not in df.columns:
+        return pd.Series(df[value_col].mean() if value_col in df.columns else 0.5, index=df.index)
+
+    available = [c for c in group_cols if c in df.columns]
+    global_prior = float(df[value_col].mean())
+    result = pd.Series(np.nan, index=df.index)
+
+    if not available:
+        s = df[value_col].astype(float)
+        shifted = s.expanding(min_periods=1).mean().shift(1)
+        return shifted.fillna(global_prior)
+
+    for _, grp_idx in df.groupby(available).groups.items():
+        s = df.loc[grp_idx, value_col].astype(float)
+        rate  = s.expanding(min_periods=1).mean().shift(1)
+        count = s.expanding().count().shift(1)
+        prior = s.expanding(min_periods=1).mean()
+        filled = rate.where(count >= min_periods, prior).fillna(global_prior)
+        result.loc[grp_idx] = filled.values
+
+    return result.fillna(global_prior)
+
+
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
 def _sort_chronologically(df: pd.DataFrame) -> pd.DataFrame:
@@ -415,49 +449,41 @@ def _post_shipment(df: pd.DataFrame) -> pd.DataFrame:
 
 def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Tier-1 graph context columns — per-group aggregates, never constants.
+    Tier-1 graph context columns — expanding-shifted aggregates, never full-df.
+
+    A3 fix: replaced full-df groupby().transform("mean") with expanding-shifted
+    equivalents so test rows cannot see test-set target-derived values.
 
     graph_avg_shipping_delay uses Days for shipment (scheduled) — the
     pre-shipment plan known at order time — NOT delivery_gap (post-hoc).
-    This satisfies §4.1: graph features must not be a fourth leak.
-
-    At prediction time (Tier 2), PredictionEngine._inject_graph_context
-    overwrites these with live KG neighbourhood values.
     """
     dept_col   = "Department Name"
     mode_col   = "Shipping Mode"
     cat_col    = "Category Name"
     region_col = "Order Region"
     sched_col  = "Days for shipment (scheduled)"
+    target_col = "Late_delivery_risk"
 
-    # graph_supplier_reliability: per (Department, Shipping Mode) on-time rate
-    if dept_col in df.columns and mode_col in df.columns:
-        df["graph_supplier_reliability"] = df.groupby(
-            [dept_col, mode_col]
-        )["supplier_reliability_score"].transform("mean").fillna(0.5)
-    else:
-        df["graph_supplier_reliability"] = df["supplier_reliability_score"].fillna(0.5)
+    # graph_supplier_reliability: expanding shifted on-time rate per (Dept, Mode)
+    # = 1 - expanding late rate (same source as supplier_reliability_score but
+    # computed at graph-group level, not supplier level)
+    grp = [c for c in (dept_col, mode_col) if c in df.columns]
+    df["graph_supplier_reliability"] = (
+        1.0 - expanding_target_rate(df, grp, target_col)
+    ).clip(0, 1)
 
-    # graph_inventory_stress: per (Category, Region) mean stress index
-    if cat_col in df.columns and region_col in df.columns:
-        df["graph_inventory_stress"] = df.groupby(
-            [cat_col, region_col]
-        )["inventory_stress_index"].transform("mean").fillna(0.5)
-    else:
-        df["graph_inventory_stress"] = df["inventory_stress_index"].fillna(0.5)
+    # graph_inventory_stress: expanding shifted mean per (Category, Region)
+    df["graph_inventory_stress"] = _expanding_group_mean(
+        df, [cat_col, region_col], "inventory_stress_index"
+    )
 
-    # graph_avg_shipping_delay: per (Shipping Mode, Region) mean SCHEDULED days
-    # Uses scheduled days (order-time observable), NOT delivery_gap (post-hoc).
-    if mode_col in df.columns and region_col in df.columns and sched_col in df.columns:
-        df["graph_avg_shipping_delay"] = df.groupby(
-            [mode_col, region_col]
-        )[sched_col].transform("mean").fillna(df[sched_col].mean())
-    elif sched_col in df.columns:
-        df["graph_avg_shipping_delay"] = df[sched_col].fillna(3.0)
-    else:
-        df["graph_avg_shipping_delay"] = 3.0
+    # graph_avg_shipping_delay: expanding shifted mean of SCHEDULED days per
+    # (Shipping Mode, Region) — order-time observable, not post-hoc.
+    df["graph_avg_shipping_delay"] = _expanding_group_mean(
+        df, [mode_col, region_col], sched_col
+    )
 
-    # graph_has_upcoming_event: 1 for peak months (Oct–Jan)
+    # graph_has_upcoming_event: 1 for peak months (Oct–Jan) — no leakage
     df["graph_has_upcoming_event"] = df["order_month"].isin([10, 11, 12, 1]).astype(int)
 
     return df

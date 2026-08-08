@@ -25,6 +25,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import roc_auc_score
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +80,11 @@ DEMAND_TARGET = "Order Item Quantity"
 # Target: stockout_risk_flag (synthetic)
 # Banned: delivery_duration_days, delivery_gap, is_delayed, shipping_delay_ratio
 #         (post-shipment observables)
+# Banned: days_until_reorder, inventory_stress_index, demand_spike_flag
+#         (A1 fix: these are the exact inputs to build_stockout_target — tautology)
 INVENTORY_FEATURES: list[str] = [
-    "inventory_stress_index", "days_until_reorder", "reorder_point",
-    "demand_variability", "qty_roll_7", "qty_roll_30",
-    "demand_volatility", "demand_spike_flag", "demand_momentum",
+    "reorder_point", "demand_variability",
+    "qty_roll_7", "qty_roll_30", "demand_volatility", "demand_momentum",
     "supplier_reliability_score", "supplier_hist_late_rate",
     "order_month", "order_quarter", "is_holiday_period",
 ] + GRAPH_CONTEXT_FEATURES
@@ -140,6 +143,8 @@ _LEAKY: dict[str, set[str]] = {
         "is_delayed", "shipping_delay_ratio",
         # Full-df target encoding
         "supplier_delay_rate",
+        # Tautological inputs to build_stockout_target (A1)
+        "days_until_reorder", "inventory_stress_index", "demand_spike_flag",
     },
     "supplier": {
         # Post-shipment observables
@@ -339,6 +344,38 @@ def audit_feature_leakage(
         )
 
     return rows
+
+
+class TautologicalTargetError(ValueError):
+    pass
+
+
+def assert_target_not_reconstructible(
+    X: pd.DataFrame,
+    y: pd.Series,
+    max_auc: float = 0.98,
+    label: str = "",
+) -> None:
+    """
+    Fit a depth-3 DecisionTree on X -> y.
+    If train AUC > max_auc, the target is a deterministic function of the
+    features — raise TautologicalTargetError naming the top-3 features.
+    """
+    X_num = X.select_dtypes(include=[np.number]).fillna(0)
+    if X_num.empty or len(y.unique()) < 2:
+        return
+    tree = DecisionTreeClassifier(max_depth=3, random_state=42)
+    tree.fit(X_num, y)
+    auc = roc_auc_score(y, tree.predict_proba(X_num)[:, 1])
+    if auc > max_auc:
+        importances = dict(zip(X_num.columns, tree.feature_importances_))
+        top3 = sorted(importances, key=importances.get, reverse=True)[:3]
+        raise TautologicalTargetError(
+            f"{label}: depth-3 tree achieves AUC={auc:.4f} > {max_auc}. "
+            f"Target is reconstructible from features. Top-3: {top3}. "
+            f"Remove tautological features before training."
+        )
+    logger.info(f"Tautology guard {label}: depth-3 AUC={auc:.4f} ✓")
 
 
 def assert_agents_distinct(preds: dict[str, np.ndarray], threshold: float = 0.95) -> None:

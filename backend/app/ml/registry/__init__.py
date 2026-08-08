@@ -37,7 +37,7 @@ class ModelVersion:
     n_training_samples: int = 0
     is_active: bool = True
     description: str = ""
-    graph_enriched: bool = True   # False when Tier-1 pandas aggregates were used
+    graph_enriched: bool = False  # True only when Neo4j enrichment actually ran
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -103,7 +103,7 @@ class ModelRegistry:
         dataset_version: str = "",
         n_training_samples: int = 0,
         description: str = "",
-        graph_enriched: bool = True,
+        graph_enriched: bool = False,
     ) -> ModelVersion:
         """
         Save a trained model to the registry.
@@ -142,6 +142,21 @@ class ModelRegistry:
             v.is_active = False
 
         self._versions[key].append(version)
+
+        # Prune to latest 3 versions — delete excess .joblib files from disk
+        _KEEP = 3
+        all_versions = self._versions[key]
+        if len(all_versions) > _KEEP:
+            to_prune = all_versions[:-_KEEP]
+            for old in to_prune:
+                old_path = Path(old.model_path)
+                if old_path.exists():
+                    try:
+                        old_path.unlink()
+                    except OSError as prune_err:
+                        logger.warning(f"Could not delete old model file {old_path}: {prune_err}")
+            self._versions[key] = all_versions[-_KEEP:]
+
         self._save_registry()
 
         logger.info(f"Model saved: {version_id} ({intelligence_type.value})")

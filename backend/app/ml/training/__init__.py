@@ -115,7 +115,7 @@ class BaseTrainer:
         intelligence_type: IntelligenceType,
         run_walk_forward: bool = True,
         dataset_version: str = "",
-        graph_enriched: bool = True,
+        graph_enriched: bool = False,
     ) -> TrainingResult:
         """
         Execute full training pipeline.
@@ -248,21 +248,21 @@ class BaseTrainer:
 class DemandTrainer(BaseTrainer):
     """Trainer for Demand Intelligence (LightGBM Regressor)."""
 
-    def train_demand(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = True) -> TrainingResult:
+    def train_demand(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False) -> TrainingResult:
         return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version, graph_enriched=graph_enriched)
 
 
 class SupplierTrainer(BaseTrainer):
     """Trainer for Supplier Intelligence (RandomForest Classifier)."""
 
-    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = True) -> TrainingResult:
+    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False) -> TrainingResult:
         return self.train(df, IntelligenceType.SUPPLIER, dataset_version=dataset_version, graph_enriched=graph_enriched)
 
 
 class LogisticsTrainer(BaseTrainer):
     """Trainer for Logistics Intelligence (LightGBM Classifier)."""
 
-    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = True) -> TrainingResult:
+    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False) -> TrainingResult:
         return self.train(df, IntelligenceType.LOGISTICS, dataset_version=dataset_version, graph_enriched=graph_enriched)
 
 
@@ -276,7 +276,7 @@ class TrainingOrchestrator:
         self.logistics_trainer = LogisticsTrainer(self.registry)
 
     def train_all(
-        self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = True
+        self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False
     ) -> dict[str, TrainingResult]:
         """
         Train all viable intelligence models on the same dataset.
@@ -298,7 +298,7 @@ class TrainingOrchestrator:
         df: pd.DataFrame,
         intelligence_type: IntelligenceType,
         dataset_version: str = "",
-        graph_enriched: bool = True,
+        graph_enriched: bool = False,
     ) -> TrainingResult:
         """Train a single intelligence model."""
         trainer = BaseTrainer(self.registry)

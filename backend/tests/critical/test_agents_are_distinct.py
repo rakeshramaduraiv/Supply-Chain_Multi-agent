@@ -37,8 +37,7 @@ def engineered_df():
 def agent_predictions(engineered_df):
     engine = PredictionEngine()
     preds = {}
-    for agent_type in [IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS,
-                       IntelligenceType.INVENTORY]:
+    for agent_type in [IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS]:
         result = engine.predict(engineered_df, agent_type, graph_context=CTX_NEUTRAL)
         preds[agent_type.value] = np.array(
             result.probabilities if result.probabilities else result.predictions

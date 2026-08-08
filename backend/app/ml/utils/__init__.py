@@ -69,27 +69,12 @@ DEMAND_FEATURES: list[str] = [
     "qty_roll_7", "qty_roll_30", "qty_lag_1", "qty_lag_7", "qty_lag_30",
     "demand_volatility", "demand_spike_flag", "demand_trend_slope",
     "demand_momentum", "price_ratio", "discount_rate",
-    "category_demand_rank",
     "order_month", "order_quarter", "order_dayofweek", "is_weekend",
     "is_holiday_period",
 ] + GRAPH_CONTEXT_FEATURES
 
 DEMAND_TARGET = "Order Item Quantity"
 
-# ── INVENTORY — LightGBM Classifier ──────────────────────────────────────────
-# Target: stockout_risk_flag (synthetic)
-# Banned: delivery_duration_days, delivery_gap, is_delayed, shipping_delay_ratio
-#         (post-shipment observables)
-# Banned: days_until_reorder, inventory_stress_index, demand_spike_flag
-#         (A1 fix: these are the exact inputs to build_stockout_target — tautology)
-INVENTORY_FEATURES: list[str] = [
-    "reorder_point", "demand_variability",
-    "qty_roll_7", "qty_roll_30", "demand_volatility", "demand_momentum",
-    "supplier_reliability_score", "supplier_hist_late_rate",
-    "order_month", "order_quarter", "is_holiday_period",
-] + GRAPH_CONTEXT_FEATURES
-
-INVENTORY_TARGET = "stockout_risk_flag"
 
 # ── SUPPLIER — Random Forest Classifier ──────────────────────────────────────
 # Target: Late_delivery_risk
@@ -136,15 +121,8 @@ _LEAKY: dict[str, set[str]] = {
         # Sales-derived (qty × price)
         "revenue_per_unit", "order_value_log",
         "Sales", "Order Item Total", "Order Profit Per Order",
-    },
-    "inventory": {
-        # Post-shipment observables
-        "delivery_duration_days", "delivery_gap",
-        "is_delayed", "shipping_delay_ratio",
-        # Full-df target encoding
-        "supplier_delay_rate",
-        # Tautological inputs to build_stockout_target (A1)
-        "days_until_reorder", "inventory_stress_index", "demand_spike_flag",
+        # Category-level qty aggregate — smoothed target regardless of shift
+        "category_demand_rank",
     },
     "supplier": {
         # Post-shipment observables
@@ -170,7 +148,6 @@ _LEAKY: dict[str, set[str]] = {
 
 _ALL_LISTS: dict[str, list[str]] = {
     "demand":    DEMAND_FEATURES,
-    "inventory": INVENTORY_FEATURES,
     "supplier":  SUPPLIER_FEATURES,
     "logistics": LOGISTICS_FEATURES,
 }
@@ -190,11 +167,6 @@ FEATURE_CONFIGS: dict[IntelligenceType, FeatureConfig] = {
         features=DEMAND_FEATURES,
         target=DEMAND_TARGET,
         task=ModelTask.REGRESSION,
-    ),
-    IntelligenceType.INVENTORY: FeatureConfig(
-        features=INVENTORY_FEATURES,
-        target=INVENTORY_TARGET,
-        task=ModelTask.CLASSIFICATION,
     ),
     IntelligenceType.SUPPLIER: FeatureConfig(
         features=SUPPLIER_FEATURES,
@@ -247,11 +219,6 @@ LIGHTGBM_CLASSIFIER_PARAMS: dict[str, Any] = {
     "verbose": -1,
 }
 
-LIGHTGBM_INVENTORY_PARAMS: dict[str, Any] = {
-    **LIGHTGBM_CLASSIFIER_PARAMS,
-    "is_unbalance": False,
-    "scale_pos_weight": 3.0,
-}
 
 RANDOM_FOREST_PARAMS: dict[str, Any] = {
     "n_estimators": 300,
@@ -395,46 +362,6 @@ def assert_agents_distinct(preds: dict[str, np.ndarray], threshold: float = 0.95
             )
 
 
-# ── Target builder ────────────────────────────────────────────────────────────
-
-def build_stockout_target(df: pd.DataFrame) -> pd.Series:
-    """
-    Binary stockout_risk_flag for the Inventory Agent.
-
-    Flag = 1 when:
-      (a) days_until_reorder < 5  (imminent reorder), OR
-      (b) inventory_stress_index > 1.5 AND demand_spike_flag == 1
-
-    Raises ValueError if the result is single-class.
-    """
-    reorder_cond = (
-        df["days_until_reorder"] < 5
-        if "days_until_reorder" in df.columns
-        else pd.Series(False, index=df.index)
-    )
-    stress_cond = (
-        df["inventory_stress_index"] > 1.5
-        if "inventory_stress_index" in df.columns
-        else pd.Series(False, index=df.index)
-    )
-    spike_cond = (
-        df["demand_spike_flag"] == 1
-        if "demand_spike_flag" in df.columns
-        else pd.Series(False, index=df.index)
-    )
-    target = (reorder_cond | (stress_cond & spike_cond)).astype(int)
-
-    n_pos = int(target.sum())
-    n_neg = int((target == 0).sum())
-    if n_pos == 0 or n_neg == 0:
-        raise ValueError(
-            f"build_stockout_target produced a single-class target "
-            f"(pos={n_pos}, neg={n_neg}). "
-            f"Check days_until_reorder formula — it must not clip to a constant."
-        )
-    logger.info(f"stockout_risk_flag: pos={n_pos} ({n_pos/(n_pos+n_neg):.1%}), neg={n_neg}")
-    return target
-
 
 # ── Feature preparation ───────────────────────────────────────────────────────
 
@@ -442,14 +369,7 @@ def prepare_features(
     df: pd.DataFrame,
     feature_config: FeatureConfig,
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Prepare X, y. Builds stockout target if missing."""
-    if (
-        feature_config.target == "stockout_risk_flag"
-        and feature_config.target not in df.columns
-    ):
-        df = df.copy()
-        df["stockout_risk_flag"] = build_stockout_target(df)
-
+    """Prepare X, y."""
     available = [
         f for f in feature_config.features
         if f in df.columns and f != feature_config.target

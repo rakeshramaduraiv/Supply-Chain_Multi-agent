@@ -5,9 +5,12 @@ Model training pipelines for all intelligence services.
 
 Services:
 - DemandTrainer: LightGBM Regressor for 7-day demand forecast
-- InventoryTrainer: LightGBM Classifier for stockout prediction
 - SupplierTrainer: RandomForest Classifier for late delivery risk
 - LogisticsTrainer: LightGBM Classifier for route delay risk
+
+Inventory agent permanently excluded: its synthetic stockout_risk_flag target
+is algebraically derived from rolling demand features. CV AUC = 0.479 with
+non-tautological features — no learnable signal in DataCo.
 """
 
 import logging
@@ -33,7 +36,6 @@ from app.ml.registry import ModelRegistry
 from app.ml.utils import (
     FEATURE_CONFIGS,
     LIGHTGBM_CLASSIFIER_PARAMS,
-    LIGHTGBM_INVENTORY_PARAMS,
     LIGHTGBM_REGRESSOR_PARAMS,
     RANDOM_FOREST_PARAMS,
     IntelligenceType,
@@ -95,9 +97,6 @@ class BaseTrainer:
             return LGBMRegressor(**LIGHTGBM_REGRESSOR_PARAMS)
         elif intelligence_type == IntelligenceType.SUPPLIER:
             return RandomForestClassifier(**RANDOM_FOREST_PARAMS)
-        elif intelligence_type == IntelligenceType.INVENTORY:
-            # stockout_risk_flag is rare — explicit scale_pos_weight makes it learnable
-            return LGBMClassifier(**LIGHTGBM_INVENTORY_PARAMS)
         else:
             return LGBMClassifier(**LIGHTGBM_CLASSIFIER_PARAMS)
 
@@ -107,8 +106,6 @@ class BaseTrainer:
             return LIGHTGBM_REGRESSOR_PARAMS.copy()
         elif intelligence_type == IntelligenceType.SUPPLIER:
             return RANDOM_FOREST_PARAMS.copy()
-        elif intelligence_type == IntelligenceType.INVENTORY:
-            return LIGHTGBM_INVENTORY_PARAMS.copy()
         else:
             return LIGHTGBM_CLASSIFIER_PARAMS.copy()
 
@@ -253,13 +250,6 @@ class DemandTrainer(BaseTrainer):
         return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version)
 
 
-class InventoryTrainer(BaseTrainer):
-    """Trainer for Inventory Intelligence (LightGBM Classifier)."""
-
-    def train_inventory(self, df: pd.DataFrame, dataset_version: str = "") -> TrainingResult:
-        return self.train(df, IntelligenceType.INVENTORY, dataset_version=dataset_version)
-
-
 class SupplierTrainer(BaseTrainer):
     """Trainer for Supplier Intelligence (RandomForest Classifier)."""
 
@@ -279,8 +269,7 @@ class TrainingOrchestrator:
 
     def __init__(self, registry: ModelRegistry | None = None):
         self.registry = registry or ModelRegistry()
-        self.demand_trainer = DemandTrainer(self.registry)
-        self.inventory_trainer = InventoryTrainer(self.registry)
+        self.demand_trainer   = DemandTrainer(self.registry)
         self.supplier_trainer = SupplierTrainer(self.registry)
         self.logistics_trainer = LogisticsTrainer(self.registry)
 

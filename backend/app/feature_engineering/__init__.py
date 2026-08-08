@@ -264,17 +264,30 @@ def _demand_rolling(df: pd.DataFrame) -> pd.DataFrame:
         if grp_cols and qty_col in df.columns
         else qty.shift(1).rolling(14, min_periods=2).std().fillna(0)
     )
-    df["demand_spike_flag"] = (qty > (df["qty_roll_7"] + 2 * std_14)).astype(int)
+    qty_prev = (
+        df.groupby(grp_cols)[qty_col].transform(lambda x: x.shift(1))
+        if grp_cols and qty_col in df.columns
+        else qty.shift(1)
+    )
+    df["demand_spike_flag"] = (
+        qty_prev > (df["qty_roll_7"] + 2 * std_14)
+    ).fillna(False).astype(int)
     df["demand_momentum"]   = (df["qty_roll_7"] / roll_30_safe).clip(0, 3).fillna(1.0)
 
     # Financial — kept for non-demand models; NOT in DEMAND_FEATURES
     df["order_value_log"]  = np.log1p(np.maximum(sales, 0))
     df["revenue_per_unit"] = np.where(qty > 0, sales / qty, 0.0)
 
+    # A7 fix: category_demand_rank — use expanding shifted mean per category
+    # so row i sees only historical qty, not the full-df sum (which leaks target).
     cat_col = "Category Name"
     if cat_col in df.columns and qty_col in df.columns:
-        cat_vol = df.groupby(cat_col)[qty_col].transform("sum")
-        df["category_demand_rank"] = cat_vol / max(cat_vol.max(), 1)
+        df["category_demand_rank"] = _expanding_group_mean(
+            df, [cat_col], qty_col, min_periods=1
+        )
+        # Normalise to [0, 1] using the global max of the expanding means
+        _max = df["category_demand_rank"].max()
+        df["category_demand_rank"] = (df["category_demand_rank"] / max(_max, 1)).clip(0, 1)
     else:
         df["category_demand_rank"] = 0.5
 

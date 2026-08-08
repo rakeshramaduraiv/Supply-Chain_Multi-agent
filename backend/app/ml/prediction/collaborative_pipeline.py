@@ -3,20 +3,13 @@ AMASCI Dynamic Dependency-Driven AgentCoordinator
 ==================================================
 Coordinates Multi-Agent predictions using dynamic dependency DAG rules.
 
-Agents:
-  - DemandAgent (dependencies = [])
+Agents (3 active):
+  - DemandAgent   (dependencies = [])
   - SupplierAgent (dependencies = ["DemandAgent"])
-  - InventoryAgent (dependencies = ["SupplierAgent"])
-  - LogisticsAgent (dependencies = ["InventoryAgent"])
+  - LogisticsAgent (dependencies = ["SupplierAgent"])
 
-Agents never communicate directly; all context distribution and signal passing
-is managed exclusively by AgentCoordinator. Every agent returns a standardized 6-field payload:
-  - prediction
-  - confidence
-  - reasoning
-  - business_impact
-  - execution_timestamp
-  - model_version
+Inventory agent permanently excluded: synthetic stockout_risk_flag target
+is algebraically derived from rolling demand features. CV AUC = 0.479.
 """
 
 import logging
@@ -26,7 +19,7 @@ from typing import Any
 
 import pandas as pd
 
-from app.ml.prediction import DemandAgent, InventoryAgent, LogisticsAgent, SupplierAgent
+from app.ml.prediction import DemandAgent, LogisticsAgent, SupplierAgent
 from app.ml.registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -85,16 +78,14 @@ class CollaborativeAgentPipeline:
 
     def __init__(self, registry: ModelRegistry | None = None):
         self.registry = registry or ModelRegistry()
-        self.demand_agent = DemandAgent(self.registry)
+        self.demand_agent   = DemandAgent(self.registry)
         self.supplier_agent = SupplierAgent(self.registry)
-        self.inventory_agent = InventoryAgent(self.registry)
         self.logistics_agent = LogisticsAgent(self.registry)
-        # Issue #11: Adaptive consensus weights
         self._performance: dict[str, list[float]] = {
-            "demand": [], "inventory": [], "supplier": [], "logistics": []
+            "demand": [], "supplier": [], "logistics": []
         }
         self._fixed_weights = {
-            "demand": 0.25, "inventory": 0.25, "supplier": 0.30, "logistics": 0.20
+            "demand": 0.35, "supplier": 0.30, "logistics": 0.35
         }
 
     def record_agent_performance(self, agent_name: str, score: float) -> None:
@@ -157,18 +148,14 @@ class AgentCoordinator:
 
     def _register_subscribers(self) -> None:
         """Register Coordinator handlers for all agent events."""
-        self.event_bus.subscribe("demand.predicted", self._on_demand_predicted)
+        self.event_bus.subscribe("demand.predicted",   self._on_demand_predicted)
         self.event_bus.subscribe("supplier.evaluated", self._on_supplier_evaluated)
-        self.event_bus.subscribe("inventory.evaluated", self._on_inventory_evaluated)
         self.event_bus.subscribe("logistics.evaluated", self._on_logistics_evaluated)
 
     def _on_demand_predicted(self, topic: str, payload: dict[str, Any]) -> None:
         self.event_bus.event_log.append(f"[Coordinator Router] Ingested '{topic}'. Impacted downstream agent: SupplierAgent.")
 
     def _on_supplier_evaluated(self, topic: str, payload: dict[str, Any]) -> None:
-        self.event_bus.event_log.append(f"[Coordinator Router] Ingested '{topic}'. Impacted downstream agent: InventoryAgent.")
-
-    def _on_inventory_evaluated(self, topic: str, payload: dict[str, Any]) -> None:
         self.event_bus.event_log.append(f"[Coordinator Router] Ingested '{topic}'. Impacted downstream agent: LogisticsAgent.")
 
     def _on_logistics_evaluated(self, topic: str, payload: dict[str, Any]) -> None:
@@ -230,33 +217,10 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Step 3: Inventory & Warehouse Agent triggered by EventBus, publishes "inventory.evaluated"
-        df_inv = df.copy()
-        df_inv["supplier_risk_signal"] = s_pred
-        inv_res = self.pipeline.inventory_agent.predict(df_inv)
-        i_dict = inv_res.to_dict()
-        i_pred = i_dict["predictions_summary"]["mean"]
-        i_conf = i_dict.get("mean_confidence", 0.93)
-        i_payload = AgentPredictionPayload(
-            agent_id="Inventory & Warehouse Agent",
-            prediction=i_pred,
-            confidence=i_conf,
-            reasoning=f"Inventory & Warehouse Agent estimated warehouse stockout probability at {i_pred:.4f} based on TPKE temporal patterns.",
-            business_impact="Triggers safety stock buffer adjustments for high-risk categories and regional distribution centers.",
-            execution_timestamp=now,
-            model_version=i_dict.get("model_version", "v2.1.0-inventory-lightgbm"),
-            raw_details=i_dict,
-        )
-        payloads["Inventory & Warehouse Agent"] = i_payload.to_dict()
-        self.event_bus.publish("inventory.evaluated", i_payload.to_dict())
-        try:
-            memory.store_agent_action("Inventory & Warehouse Agent", "evaluate_inventory_risk", i_payload.to_dict())
-        except Exception:
-            pass
-
-        # Step 4: Logistics & Transportation Agent triggered by EventBus, publishes "logistics.evaluated"
+        # Step 3: Logistics & Transportation Agent — receives supplier signal directly
+        # (Inventory agent excluded; supplier risk feeds logistics)
         df_log = df.copy()
-        df_log["stockout_risk_signal"] = i_pred
+        df_log["supplier_risk_signal"] = s_pred
         log_res = self.pipeline.logistics_agent.predict(df_log)
         l_dict = log_res.to_dict()
         l_pred = l_dict["predictions_summary"]["mean"]
@@ -278,26 +242,20 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Conflict Resolution & Overall Confidence Calculation (RWDAA Weight Allocation)
-        if s_pred >= 0.30 and i_pred <= 0.10:
-            conflicts.append("Conflict Detected: Supplier risk is HIGH (>=0.30) but Inventory risk is LOW (<=0.10). Raised safety stock buffer threshold.")
-            self.event_bus.event_log.append("[Coordinator Conflict Resolution] Overrode Inventory safety stock buffer to 15% minimum.")
-
-        rwdaa_w = {"Demand": 0.35, "Supplier": 0.25, "Inventory": 0.20, "Logistics": 0.20}
+        # Conflict resolution & overall confidence (3-agent RWDAA weights)
+        rwdaa_w = {"Demand": 0.35, "Supplier": 0.30, "Logistics": 0.35}
         overall_conf = round(
             (d_conf * rwdaa_w["Demand"]) +
             (s_conf * rwdaa_w["Supplier"]) +
-            (i_conf * rwdaa_w["Inventory"]) +
             (l_conf * rwdaa_w["Logistics"]),
             4
         )
 
-        # Decision Engine Execution
+        # Decision Engine
         from app.engine.decision_engine import DecisionEngine
         decision_engine = DecisionEngine()
         decision = decision_engine.compute_decision({
-            "supplier_risk": s_pred,
-            "inventory_risk": i_pred,
+            "supplier_risk":  s_pred,
             "logistics_risk": l_pred,
         })
 

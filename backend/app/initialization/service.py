@@ -56,6 +56,8 @@ class InitializationService:
         self._data_pipeline = DataEngineeringPipeline()
         self._training_orchestrator = TrainingOrchestrator()
         self._model_registry = ModelRegistry()
+        from app.graph.connection import get_connection_manager
+        self._graph_conn = get_connection_manager()
 
     def find_master_dataset(self) -> Path | None:
         """
@@ -183,6 +185,34 @@ class InitializationService:
                 f"{graph_result.get('nodes_created', 0)} nodes, "
                 f"{graph_result.get('relationships_created', 0)} relationships"
             )
+
+            # Step 4b: Enrich graph features from Neo4j (Tier-2 overwrite)
+            step_start = time.perf_counter()
+            logger.info("[4b/7] Enriching graph features from Neo4j...")
+            try:
+                from app.graph.enrichment import enrich_graph_features_from_neo4j
+                train_mask = pd.Series(
+                    [True] * int(len(df_features) * 0.8)
+                    + [False] * (len(df_features) - int(len(df_features) * 0.8)),
+                    index=df_features.index,
+                )
+                df_features = enrich_graph_features_from_neo4j(
+                    df_features, self._graph_conn, train_mask
+                )
+                result["steps"]["graph_enrichment"] = {
+                    "status": "completed",
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+                }
+                logger.info("[4b/7] Graph enrichment complete")
+            except Exception as enrich_err:
+                logger.warning(
+                    f"[4b/7] Graph enrichment skipped ({enrich_err}); "
+                    f"Tier-1 pandas aggregates retained."
+                )
+                result["steps"]["graph_enrichment"] = {
+                    "status": "skipped",
+                    "reason": str(enrich_err),
+                }
 
             # Step 5: Train ML Models (now sees real graph features from Step 4)
             step_start = time.perf_counter()

@@ -29,7 +29,7 @@ from app.api.v1.endpoints.ws import broadcast_event
 from app.graph.prediction_integration import auto_sync_predictions
 from app.core.config import get_settings
 from app.ml.forecasting import ForecastEngine
-from app.ml.prediction import PredictionEngine, DemandAgent, InventoryAgent, SupplierAgent, LogisticsAgent
+from app.ml.prediction import PredictionEngine, DemandAgent, SupplierAgent, LogisticsAgent
 from app.ml.registry import ModelRegistry
 from app.ml.training import TrainingOrchestrator
 from app.ml.utils import FEATURE_CONFIGS, IntelligenceType
@@ -217,11 +217,12 @@ async def predict(request: PredictRequest, file: UploadFile = File(...)):
         df = pd.read_csv(BytesIO(content))
 
         agent_map = {
-            IntelligenceType.DEMAND: DemandAgent(_registry),
-            IntelligenceType.INVENTORY: InventoryAgent(_registry),
-            IntelligenceType.SUPPLIER: SupplierAgent(_registry),
+            IntelligenceType.DEMAND:    DemandAgent(_registry),
+            IntelligenceType.SUPPLIER:  SupplierAgent(_registry),
             IntelligenceType.LOGISTICS: LogisticsAgent(_registry),
         }
+        if intel_type not in agent_map:
+            raise HTTPException(status_code=400, detail=f"{intel_type.value} agent is not available")
         agent = agent_map[intel_type]
         result = agent.predict(df, request.version_id)
         await auto_sync_predictions(df)
@@ -258,11 +259,12 @@ async def predict_from_dataset(request: PredictRequest):
     try:
         df = _load_processed_dataset()
         agent_map = {
-            IntelligenceType.DEMAND: DemandAgent(_registry),
-            IntelligenceType.INVENTORY: InventoryAgent(_registry),
-            IntelligenceType.SUPPLIER: SupplierAgent(_registry),
+            IntelligenceType.DEMAND:    DemandAgent(_registry),
+            IntelligenceType.SUPPLIER:  SupplierAgent(_registry),
             IntelligenceType.LOGISTICS: LogisticsAgent(_registry),
         }
+        if intel_type not in agent_map:
+            raise HTTPException(status_code=400, detail=f"{intel_type.value} agent is not available")
         agent = agent_map[intel_type]
         result = agent.predict(df, request.version_id)
         await auto_sync_predictions(df)

@@ -2076,6 +2076,400 @@
         }
       },
       "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_103701_141c46",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_103701_141c46.joblib",
+      "created_at": "2026-08-08T10:37:02.063096+00:00",
+      "training_duration_ms": 32950.01610000327,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "category_demand_rank",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.464879,
+        "rmse": 0.735541,
+        "mape": 31.710632,
+        "r2": 0.697949,
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_104113_bd1094",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_104113_bd1094.joblib",
+      "created_at": "2026-08-08T10:41:13.748637+00:00",
+      "training_duration_ms": 25799.515799997607,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "category_demand_rank",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.464879,
+        "rmse": 0.735541,
+        "mape": 31.710632,
+        "r2": 0.697949,
+        "n_samples": 35961
+      },
+      "dataset_version": "",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_104525_321135",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_104525_321135.joblib",
+      "created_at": "2026-08-08T10:45:25.746218+00:00",
+      "training_duration_ms": 33444.43799999135,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "category_demand_rank",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.464879,
+        "rmse": 0.735541,
+        "mape": 31.710632,
+        "r2": 0.697949,
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_105009_607608",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_105009_607608.joblib",
+      "created_at": "2026-08-08T10:50:09.219632+00:00",
+      "training_duration_ms": 35893.35850000498,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "category_demand_rank",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.481278,
+        "rmse": 0.774974,
+        "mape": 32.612972,
+        "r2": 0.664694,
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_105502_48437d",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_105502_48437d.joblib",
+      "created_at": "2026-08-08T10:55:02.643938+00:00",
+      "training_duration_ms": 35032.641699988744,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.484012,
+        "rmse": 0.788208,
+        "mape": 32.563779,
+        "r2": 0.653144,
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "demand_v_20260808_110012_a02661",
+      "intelligence_type": "demand",
+      "task": "regression",
+      "model_path": "data\\models\\demand\\demand_v_20260808_110012_a02661.joblib",
+      "created_at": "2026-08-08T11:00:13.027101+00:00",
+      "training_duration_ms": 38005.68809999095,
+      "features_used": [
+        "qty_roll_7",
+        "qty_roll_30",
+        "qty_lag_1",
+        "qty_lag_7",
+        "qty_lag_30",
+        "demand_volatility",
+        "demand_spike_flag",
+        "demand_trend_slope",
+        "demand_momentum",
+        "price_ratio",
+        "discount_rate",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "mae": 0.484012,
+        "rmse": 0.788208,
+        "mape": 32.563779,
+        "r2": 0.653144,
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "regression",
+        "metric": "rmse",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
       "is_active": true,
       "description": ""
     }
@@ -4069,6 +4463,396 @@
         "n_samples": 35961
       },
       "dataset_version": "track_a_gate",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_103938_556315",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_103938_556315.joblib",
+      "created_at": "2026-08-08T10:39:38.879829+00:00",
+      "training_duration_ms": 156522.1504999936,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_104346_3b9a68",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_104346_3b9a68.joblib",
+      "created_at": "2026-08-08T10:43:46.976124+00:00",
+      "training_duration_ms": 152926.70640000142,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_104800_eccacc",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_104800_eccacc.joblib",
+      "created_at": "2026-08-08T10:48:01.026470+00:00",
+      "training_duration_ms": 154984.95019999973,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_105245_681386",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_105245_681386.joblib",
+      "created_at": "2026-08-08T10:52:45.562672+00:00",
+      "training_duration_ms": 156017.30819999648,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_105743_731dfc",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_105743_731dfc.joblib",
+      "created_at": "2026-08-08T10:57:43.970464+00:00",
+      "training_duration_ms": 160997.95200000517,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "n_estimators": 300,
+        "max_depth": 12,
+        "min_samples_split": 10,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt",
+        "class_weight": "balanced",
+        "random_state": 42,
+        "n_jobs": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "supplier_v_20260808_110243_b63a59",
+      "intelligence_type": "supplier",
+      "task": "classification",
+      "model_path": "data\\models\\supplier\\supplier_v_20260808_110243_b63a59.joblib",
+      "created_at": "2026-08-08T11:02:43.691222+00:00",
+      "training_duration_ms": 150398.4768000082,
+      "features_used": [
+        "supplier_hist_late_rate",
+        "supplier_reliability_score",
+        "supplier_risk_index",
+        "supplier_order_volume",
+        "supplier_category_diversity",
+        "days_scheduled",
+        "order_month",
+        "order_quarter",
+        "order_dayofweek",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.692139,
+        "precision": 0.833256,
+        "recall": 0.545635,
+        "f1": 0.659448,
+        "roc_auc": 0.719271,
+        "confusion_matrix": [
+          [
+            14171,
+            2145
+          ],
+          [
+            8926,
+            10719
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
       "hyperparameters": {
         "n_estimators": 300,
         "max_depth": 12,
@@ -6395,49 +7179,126 @@
         }
       },
       "n_training_samples": 143867,
-      "is_active": true,
+      "is_active": false,
       "description": ""
-    }
-  ],
-  "inventory": [
+    },
     {
-      "version_id": "inventory_v_20260808_093647_b342e2",
-      "intelligence_type": "inventory",
+      "version_id": "logistics_v_20260808_104011_6725a3",
+      "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260808_093647_b342e2.joblib",
-      "created_at": "2026-08-08T09:36:47.340220+00:00",
-      "training_duration_ms": 13860.508900004788,
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_104011_6725a3.joblib",
+      "created_at": "2026-08-08T10:40:11.921312+00:00",
+      "training_duration_ms": 32842.6402000041,
       "features_used": [
-        "reorder_point",
-        "demand_variability",
-        "qty_roll_7",
-        "qty_roll_30",
-        "demand_volatility",
-        "demand_momentum",
-        "supplier_reliability_score",
-        "supplier_hist_late_rate",
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
         "order_month",
-        "order_quarter",
+        "order_dayofweek",
+        "is_weekend",
         "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
         "graph_supplier_reliability",
         "graph_inventory_stress",
         "graph_has_upcoming_event",
         "graph_avg_shipping_delay"
       ],
       "metrics": {
-        "accuracy": 0.980813,
-        "precision": 0.625502,
-        "recall": 0.662766,
-        "f1": 0.643595,
-        "roc_auc": 0.982407,
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
         "confusion_matrix": [
           [
-            34648,
-            373
+            14073,
+            2243
           ],
           [
-            317,
-            623
+            8864,
+            10781
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260808_104420_88f6eb",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_104420_88f6eb.joblib",
+      "created_at": "2026-08-08T10:44:20.713138+00:00",
+      "training_duration_ms": 33550.58789999748,
+      "features_used": [
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
+        "order_month",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
+        "confusion_matrix": [
+          [
+            14073,
+            2243
+          ],
+          [
+            8864,
+            10781
           ]
         ],
         "n_samples": 35961
@@ -6459,8 +7320,306 @@
         "random_state": 42,
         "n_jobs": -1,
         "verbose": -1,
-        "is_unbalance": false,
-        "scale_pos_weight": 3.0,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260808_104835_f4f45e",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_104835_f4f45e.joblib",
+      "created_at": "2026-08-08T10:48:35.913203+00:00",
+      "training_duration_ms": 34676.886799992644,
+      "features_used": [
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
+        "order_month",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
+        "confusion_matrix": [
+          [
+            14073,
+            2243
+          ],
+          [
+            8864,
+            10781
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260808_105321_0dbc8b",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_105321_0dbc8b.joblib",
+      "created_at": "2026-08-08T10:53:21.274385+00:00",
+      "training_duration_ms": 35513.9707000053,
+      "features_used": [
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
+        "order_month",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
+        "confusion_matrix": [
+          [
+            14073,
+            2243
+          ],
+          [
+            8864,
+            10781
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260808_105841_8b8362",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_105841_8b8362.joblib",
+      "created_at": "2026-08-08T10:58:41.851453+00:00",
+      "training_duration_ms": 57383.826199991745,
+      "features_used": [
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
+        "order_month",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
+        "confusion_matrix": [
+          [
+            14073,
+            2243
+          ],
+          [
+            8864,
+            10781
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
+        "tpke_params_at_training": {
+          "tpke_confidence_threshold": 0.7,
+          "tpke_top_k": 3,
+          "tpke_decay_rate": 0.05,
+          "tpke_removal_threshold": 0.1,
+          "tpke_window_size_days": 30
+        }
+      },
+      "n_training_samples": 143867,
+      "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260808_110317_cd30cf",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data\\models\\logistics\\logistics_v_20260808_110317_cd30cf.joblib",
+      "created_at": "2026-08-08T11:03:18.061906+00:00",
+      "training_duration_ms": 34182.826899996144,
+      "features_used": [
+        "shipping_mode_encoded",
+        "route_frequency",
+        "region_congestion_index",
+        "route_hist_late_rate",
+        "region_hist_late_rate",
+        "shipmode_hist_late_rate",
+        "days_scheduled",
+        "order_value_log",
+        "discount_rate",
+        "order_month",
+        "order_dayofweek",
+        "is_weekend",
+        "is_holiday_period",
+        "qty_roll_7",
+        "demand_spike_flag",
+        "graph_supplier_reliability",
+        "graph_inventory_stress",
+        "graph_has_upcoming_event",
+        "graph_avg_shipping_delay"
+      ],
+      "metrics": {
+        "accuracy": 0.691138,
+        "precision": 0.827779,
+        "recall": 0.548791,
+        "f1": 0.660014,
+        "roc_auc": 0.727946,
+        "confusion_matrix": [
+          [
+            14073,
+            2243
+          ],
+          [
+            8864,
+            10781
+          ]
+        ],
+        "n_samples": 35961
+      },
+      "dataset_version": "a6_fixed_v1",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1,
         "tpke_params_at_training": {
           "tpke_confidence_threshold": 0.7,
           "tpke_top_k": 3,

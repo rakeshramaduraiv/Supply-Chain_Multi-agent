@@ -13,7 +13,7 @@ import pytest
 
 from app.feature_engineering import engineer_features
 from app.ml.utils import (
-    DEMAND_FEATURES, INVENTORY_FEATURES, SUPPLIER_FEATURES, LOGISTICS_FEATURES,
+    DEMAND_FEATURES, SUPPLIER_FEATURES, LOGISTICS_FEATURES,
     FEATURE_CONFIGS, IntelligenceType, prepare_features, audit_feature_leakage,
 )
 
@@ -44,7 +44,6 @@ class TestBlacklist:
     @pytest.mark.parametrize("name,features", [
         ("SUPPLIER",  SUPPLIER_FEATURES),
         ("LOGISTICS", LOGISTICS_FEATURES),
-        ("INVENTORY", INVENTORY_FEATURES),
     ])
     def test_no_blacklisted_feature(self, name, features):
         hits = HARD_BLACKLIST & set(features)

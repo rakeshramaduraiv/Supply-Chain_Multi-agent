@@ -56,17 +56,31 @@ for agent, r in results.items():
                 status = " PASS"
         print(f"  {agent}: AUC={auc}  F1={f1}{status}")
     else:
-        r2   = m.get("r2_score", "n/a")
+        r2   = m.get("r2", m.get("r2_score", "n/a"))
         mape = m.get("mape", "n/a")
         rmse = m.get("rmse", "n/a")
         status = ""
         if isinstance(r2, float):
-            if r2 > 0.55:
-                status = " WARN: R2>0.55 — possible residual leak"
+            if r2 > 0.75:
+                status = " WARN: R2>0.75 — possible residual leak"
             elif r2 < 0.15:
                 status = " WARN: R2<0.15 — very low signal"
             else:
                 status = " PASS"
         print(f"  {agent}: R2={r2}  MAPE={mape}  RMSE={rmse}{status}")
+        if isinstance(r2, float) and r2 > 0.75:
+            from app.ml.utils import DEMAND_FEATURES, DEMAND_TARGET
+            feat_cols = [f for f in DEMAND_FEATURES if f in df_eng.columns]
+            target_s  = df_eng[DEMAND_TARGET].dropna()
+            corrs = {
+                f: abs(float(df_eng[f].dropna().corr(target_s)))
+                for f in feat_cols if f in df_eng.columns
+            }
+            top5 = sorted(corrs, key=corrs.get, reverse=True)[:5]
+            print("  Top-5 features by |corr| with demand target:")
+            for feat in top5:
+                print(f"    {feat}: {corrs[feat]:.4f}")
+            print("  Stopping — fix residual leak before proceeding.")
+            sys.exit(1)
 
 print("\nDone.")

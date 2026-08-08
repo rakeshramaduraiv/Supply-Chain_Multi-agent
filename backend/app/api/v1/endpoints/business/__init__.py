@@ -113,14 +113,14 @@ async def upload_actual_data(
     period: str = Form(..., description="Period identifier, e.g. 2024-01"),
     session: AsyncSession = Depends(get_db_session),
 ):
-    """Upload actual performance data. All downstream ops are best-effort."""
+    """Upload actual performance data and run the six-stage cycle pipeline."""
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are accepted")
 
     import pandas as pd
-    import random
     from app.data_engineering.upload import UploadService
     from app.core.enums import DatasetType
+    from app.services.cycle_service import run_upload_cycle
 
     upload_service = UploadService()
     metadata = await upload_service.process_upload(
@@ -128,149 +128,35 @@ async def upload_actual_data(
         description=f"Actual performance for {period}",
     )
     df_actual = upload_service.load_dataset(metadata["dataset_id"])
-    df_actual.columns = [c.strip() for c in df_actual.columns]
 
-    # Trigger 12-Stage Enterprise Continuous Learning Pipeline
-    ecle_res = None
-    try:
-        from app.services.enterprise_learning_engine import get_enterprise_learning_engine
-        engine = get_enterprise_learning_engine()
-        ecle_res = await engine.run_continuous_learning_cycle(
-            df_new=df_actual,
-            filename=file.filename or "actuals.csv",
-            period=period,
-        )
-    except Exception as e_ecle:
-        logger.warning(f"Enterprise Continuous Learning Engine fallback: {e_ecle}")
+    # Run six-stage cycle pipeline (raises 422 on schema/continuity failure)
+    cycle_result = await run_upload_cycle(
+        df_actual=df_actual,
+        period=period,
+        filename=file.filename or "actuals.csv",
+        session=session,
+    )
 
-    records_loaded   = metadata["row_count"]
-    records_matched  = 0
-    total_error      = 0.0
-    within_threshold = 0
-    minor_deviation  = 0
-    major_deviation  = 0
-    comparison_records = []
-    forecast_data      = []
-    actual_data        = []
-    latest_run         = None
+    # Extract summary from stage results for the response schema
+    s3 = next((s for s in cycle_result.stages if s.stage == 3), None)
+    metrics = s3.detail if s3 and s3.status == "COMPLETED" else {}
 
-    # 1. Load forecast run from Postgres (best-effort — session may be None)
-    if session is not None:
-        try:
-            from app.repositories.domain import ForecastRunRepository, ForecastResultRepository
-            latest_run = await ForecastRunRepository(session).get_latest()
-            if latest_run:
-                for r in await ForecastResultRepository(session).get_by_run(latest_run.id):
-                    predicted   = r.predicted_value
-                    entity_id   = r.entity_id
-                    entity_type = r.entity_type
-                    actual_val  = None
-
-                    if entity_type == "Product":
-                        for col in ("Product Card Id", "Product Name", "Category Name"):
-                            if col in df_actual.columns:
-                                sub = df_actual[df_actual[col].astype(str) == entity_id]
-                                if not sub.empty:
-                                    actual_val = sub["Order Item Quantity"].mean() if "Order Item Quantity" in sub.columns else 0.0
-                                    break
-                    else:
-                        lookup = {
-                            "Supplier":  ["Supplier Id", "Supplier Name"],
-                            "Shipment":  ["Shipping Mode"],
-                            "Warehouse": ["Warehouse ID", "Order Region"],
-                        }
-                        for col in lookup.get(entity_type, []):
-                            if col in df_actual.columns:
-                                sub = df_actual[df_actual[col].astype(str) == entity_id]
-                                if not sub.empty:
-                                    actual_val = sub["Late_delivery_risk"].mean() if "Late_delivery_risk" in sub.columns else 0.0
-                                    break
-
-                    if actual_val is None:
-                        actual_val = max(0.0, predicted * (1.0 + random.uniform(-0.15, 0.15)))
-
-                    records_matched += 1
-                    dev_pct = abs(actual_val - predicted) / predicted if predicted != 0.0 else 0.0
-                    if dev_pct < 0.10:
-                        within_threshold += 1
-                    elif dev_pct < 0.25:
-                        minor_deviation += 1
-                    else:
-                        major_deviation += 1
-                    total_error += dev_pct
-
-                    date_str = r.forecast_date.strftime("%Y-%m-%d") if r.forecast_date else period + "-01"
-                    forecast_data.append({"entity_id": entity_id, "entity_type": entity_type,
-                                          "predicted_value": predicted, "forecast_date": date_str,
-                                          "metadata": r.metadata_json or {}})
-                    actual_data.append({"entity_id": entity_id, "entity_type": entity_type,
-                                        "actual_value": actual_val, "date": date_str})
-                    comparison_records.append({"entity_id": entity_id, "entity_type": entity_type,
-                                               "predicted_value": predicted, "actual_value": actual_val,
-                                               "date": date_str, "deviation_pct": dev_pct})
-        except Exception as db_read_err:
-            logger.warning(f"Forecast DB read skipped: {db_read_err}")
-
-    # 2. Compute accuracy directly from CSV when no DB forecast available
-    if records_matched == 0 and "Late_delivery_risk" in df_actual.columns:
-        late_rate        = df_actual["Late_delivery_risk"].mean()
-        overall_accuracy = round(min(99.0, max(50.0, (1.0 - late_rate) * 100.0 * 0.95 + 5.0)), 2)
-        records_matched  = records_loaded
-        within_threshold = int(records_loaded * (1.0 - late_rate))
-        minor_deviation  = int(records_loaded * late_rate * 0.6)
-        major_deviation  = int(records_loaded * late_rate * 0.4)
-    else:
-        overall_accuracy = round(
-            min(100.0, max(0.0, 100.0 * (1.0 - total_error / records_matched)))
-            if records_matched > 0 else 87.5, 2
-        )
-
-    # 3. Persist to Postgres (best-effort)
-    if session is not None:
-        try:
-            from app.services.domain.actual_service import ActualUploadService
-            svc = ActualUploadService(session)
-            ps  = datetime.strptime(period + "-01", "%Y-%m-%d")
-            pe  = ps + pd.DateOffset(months=1) - pd.DateOffset(days=1)
-            ud  = await svc.create_upload(
-                dataset_id=metadata["dataset_id"], period_start=ps, period_end=pe,
-                total_records=records_loaded,
-                forecast_run_id=latest_run.id if latest_run else None,
-                uploaded_by=None,
-            )
-            await svc.record_comparison(
-                upload_id=ud["id"], matched_records=records_matched,
-                mape=total_error / records_matched if records_matched > 0 else 0.15,
-                rmse=0.25, bias=0.0, accuracy_pct=overall_accuracy,
-                comparison_json={
-                    "records": comparison_records[:200],
-                    "summary": {"within_threshold": within_threshold,
-                                "minor_deviation": minor_deviation,
-                                "major_deviation": major_deviation},
-                },
-            )
-        except Exception as db_write_err:
-            logger.warning(f"Comparison persist skipped: {db_write_err}")
-
-    # 4. TPKE evolution (best-effort — Neo4j may be offline)
-    try:
-        from app.graph.connection import get_connection_manager
-        from app.tpke.engine import TPKEEngine
-        await TPKEEngine(get_connection_manager(), session).run(
-            forecast_data=forecast_data, actual_data=actual_data, triggered_by="system"
-        )
-        logger.info("TPKE evolution completed")
-    except Exception as tpke_err:
-        logger.warning(f"TPKE skipped (Neo4j offline): {tpke_err}")
-
-    # 5. WebSocket broadcast (best-effort)
+    # WebSocket broadcast (best-effort)
     try:
         from app.api.v1.endpoints.ws import broadcast_event
-        await broadcast_event("Actual Uploaded",          {"dataset_id": metadata["dataset_id"]})
-        await broadcast_event("Forecast Validated",       {"dataset_id": metadata["dataset_id"]})
-        await broadcast_event("Knowledge Graph Updated",  {"dataset_id": metadata["dataset_id"]})
+        await broadcast_event("Actual Uploaded",         {"dataset_id": metadata["dataset_id"]})
+        await broadcast_event("Forecast Validated",      {"dataset_id": metadata["dataset_id"]})
+        await broadcast_event("Knowledge Graph Updated", {"dataset_id": metadata["dataset_id"]})
     except Exception as ws_err:
         logger.warning(f"WS broadcast skipped: {ws_err}")
+
+    records_loaded  = cycle_result.rows_ingested
+    records_matched = cycle_result.rows_matched
+    late_rate       = float(metrics.get("actual_late_rate", 0.0))
+    overall_accuracy = round(
+        min(100.0, max(0.0, (1.0 - late_rate) * 100.0))
+        if late_rate > 0 else 0.0, 2
+    )
 
     return ActualUploadResponse(
         upload_id=metadata["dataset_id"],
@@ -280,9 +166,9 @@ async def upload_actual_data(
         records_matched=records_matched,
         overall_accuracy=overall_accuracy,
         deviation_summary={
-            "within_threshold": within_threshold,
-            "minor_deviation":  minor_deviation,
-            "major_deviation":  major_deviation,
+            "within_threshold": 0,
+            "minor_deviation":  0,
+            "major_deviation":  0,
         },
         status="compared",
         uploaded_at=metadata.get("uploaded_at", datetime.now(timezone.utc).isoformat()),

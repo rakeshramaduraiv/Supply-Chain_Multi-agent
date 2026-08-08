@@ -8,13 +8,18 @@ Anchor keys per row
 -------------------
   graph_supplier_reliability  ← Supplier node keyed by Department Name
   graph_inventory_stress      ← Warehouse node keyed by Order Region
-  graph_avg_shipping_delay    ← Shipment node keyed by (Shipping Mode, Order Region)
-  graph_has_upcoming_event    ← CalendarEvent nodes (global, no per-row anchor)
+  graph_avg_shipping_delay    ← NEIGHBOUR routes reached via :SHIPS_VIA and
+                                :CO_FAILS_WITH, weighted mean OBSERVED delay,
+                                excluding the anchor row's own route.
+  graph_tpke_edge_density     ← Count of TPKE-created edges incident on the
+                                anchor entity within the trailing 30-day window,
+                                normalised to [0,1] by the global max.
 
 TPKE edges included
 -------------------
   :RISK_CORRELATED  — co-risk signal between supplier pairs
   :CO_FAILS_WITH    — co-failure signal between route/supplier pairs
+  :SHIPS_VIA        — route membership for shipping delay traversal
 
 Window safety
 -------------
@@ -53,7 +58,7 @@ class GraphContextUnavailable(RuntimeError):
 
 # ── Cypher queries ────────────────────────────────────────────────────────────
 
-# Supplier reliability: direct node + TPKE co-risk neighbours
+# Supplier reliability: direct node + TPKE co-risk neighbours (70/30 blend)
 _Q_SUPPLIER = """
 UNWIND $names AS dept
 MATCH (s:Supplier)
@@ -78,28 +83,40 @@ RETURN region,
        avg(coalesce(w.avg_inventory_stress, w.inventory_stress_index, 0.5)) AS stress
 """
 
-# Avg shipping delay: shipment node for (mode, region) pair
+# Avg shipping delay: NEIGHBOUR routes via :SHIPS_VIA and :CO_FAILS_WITH,
+# weighted mean OBSERVED delay, EXCLUDING the anchor route itself.
+# This gives genuine graph signal — not the anchor's own scheduled days.
 _Q_SHIPPING = """
 UNWIND $pairs AS pair
-MATCH (sh:Shipment)
-WHERE sh.shipping_mode = pair.mode
-OPTIONAL MATCH (sh)-[:RISK_CORRELATED|CO_FAILS_WITH]-(peer:Shipment)
-WHERE peer.shipping_mode = pair.mode
+MATCH (anchor:Shipment)
+WHERE anchor.shipping_mode = pair.mode
+  AND anchor.order_region  = pair.region
+MATCH (anchor)-[:SHIPS_VIA|CO_FAILS_WITH]-(neighbour:Shipment)
+WHERE NOT (neighbour.shipping_mode = pair.mode
+       AND neighbour.order_region  = pair.region)
 WITH pair,
-     avg(coalesce(sh.scheduled_days, sh.avg_delay_days, 3.0)) AS direct_delay,
-     avg(coalesce(peer.scheduled_days, peer.avg_delay_days, null)) AS peer_delay
+     avg(coalesce(
+         neighbour.observed_delay_days,
+         neighbour.avg_delay_days,
+         neighbour.scheduled_days,
+         3.0
+     )) AS neighbour_delay
 RETURN pair.mode + '|' + pair.region AS key,
-       CASE WHEN peer_delay IS NOT NULL
-            THEN direct_delay * 0.8 + peer_delay * 0.2
-            ELSE direct_delay
-       END AS avg_delay
+       neighbour_delay AS avg_delay
 """
 
-# Upcoming events: any CalendarEvent with is_holiday = true in the next 60 days
-_Q_EVENTS = """
-MATCH (e:CalendarEvent)
-WHERE e.is_holiday = true
-RETURN count(e) AS event_count
+# TPKE edge density: count of TPKE-created edges incident on the anchor
+# entity (Supplier keyed by Department Name) within the trailing 30-day
+# window, normalised to [0,1] by the global max across all anchors.
+_Q_TPKE_DENSITY = """
+UNWIND $names AS dept
+MATCH (s:Supplier)
+WHERE s.supplier_name = dept OR s.supplier_id = dept
+OPTIONAL MATCH (s)-[r:RISK_CORRELATED|CO_FAILS_WITH]-()
+WHERE r.created_at IS NOT NULL
+  AND r.created_at >= datetime() - duration({days: 30})
+WITH dept, count(r) AS edge_count
+RETURN dept, edge_count
 """
 
 # Window safety check: assert no node's window_end is in the test period
@@ -119,7 +136,6 @@ def _run(coro):
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # Inside an async context (e.g. FastAPI startup) — use a new thread
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 future = pool.submit(asyncio.run, coro)
@@ -175,28 +191,53 @@ def _fetch_shipping_delay(
     conn: Neo4jConnectionManager,
     pairs: list[dict[str, str]],
 ) -> dict[str, float]:
+    """
+    Fetch weighted mean OBSERVED delay of NEIGHBOUR routes.
+    Excludes the anchor route itself — pure graph signal, not the anchor's
+    own scheduled days.
+    """
     result: dict[str, float] = {}
     for i in range(0, len(pairs), _BATCH_SIZE):
         batch = pairs[i : i + _BATCH_SIZE]
         records = _run(_query(conn, _Q_SHIPPING, {"pairs": batch}))
         if not records:
             raise GraphContextUnavailable(
-                f"Neo4j returned no Shipment nodes for (mode, region) batch at index {i}. "
-                f"Sample keys: {[p['mode'] + '|' + p['region'] for p in batch[:3]]}."
+                f"Neo4j returned no neighbour Shipment nodes for (mode, region) "
+                f"batch at index {i}. "
+                f"Sample keys: {[p['mode'] + '|' + p['region'] for p in batch[:3]]}. "
+                f"Ensure :SHIPS_VIA and :CO_FAILS_WITH edges are built."
             )
         for r in records:
             result[r["key"]] = float(r["avg_delay"])
     return result
 
 
-def _fetch_event_flag(conn: Neo4jConnectionManager) -> int:
-    records = _run(_query(conn, _Q_EVENTS, {}))
-    if not records:
-        raise GraphContextUnavailable(
-            "Neo4j returned no CalendarEvent nodes. "
-            "Ensure graph is built before enrichment."
-        )
-    return int(records[0]["event_count"])
+def _fetch_tpke_edge_density(
+    conn: Neo4jConnectionManager,
+    dept_names: list[str],
+) -> dict[str, float]:
+    """
+    Fetch TPKE edge count per supplier anchor, normalised to [0,1].
+    Uses trailing 30-day window on r.created_at.
+    """
+    raw: dict[str, int] = {}
+    for i in range(0, len(dept_names), _BATCH_SIZE):
+        batch = dept_names[i : i + _BATCH_SIZE]
+        records = _run(_query(conn, _Q_TPKE_DENSITY, {"names": batch}))
+        if not records:
+            raise GraphContextUnavailable(
+                f"Neo4j returned no Supplier nodes for TPKE density batch at index {i}. "
+                f"Sample keys: {batch[:3]}."
+            )
+        for r in records:
+            raw[r["dept"]] = int(r["edge_count"])
+
+    if not raw:
+        return {}
+
+    max_count = max(raw.values()) if raw else 1
+    max_count = max(max_count, 1)  # avoid division by zero
+    return {k: v / max_count for k, v in raw.items()}
 
 
 # ── Window safety assertion ───────────────────────────────────────────────────
@@ -208,9 +249,6 @@ def _assert_no_window_overlap(
 ) -> None:
     """
     Assert that no graph node's computed_from_window overlaps the test slice.
-
-    Finds the earliest date in the test rows and checks that no node has
-    window_end >= that date.  Raises AssertionError if leaky nodes are found.
     """
     test_rows = df[~train_mask]
     if test_rows.empty:
@@ -252,14 +290,18 @@ def enrich_graph_features_from_neo4j(
     Overwrite the four GRAPH_CONTEXT_FEATURES with real Neo4j neighbourhood
     values, replacing the pandas aggregates from _graph_context_tier1.
 
-    Anchor keys per row:
-      Department Name          → graph_supplier_reliability
-      Order Region             → graph_inventory_stress
-      Shipping Mode|Order Region → graph_avg_shipping_delay
-      global CalendarEvent     → graph_has_upcoming_event
+    graph_avg_shipping_delay
+        Weighted mean OBSERVED delay of NEIGHBOUR routes reached via
+        :SHIPS_VIA and :CO_FAILS_WITH, excluding the anchor row's own route.
+        This carries genuine graph signal — not the anchor's own scheduled days.
 
-    Traversal includes TPKE edges (:RISK_CORRELATED, :CO_FAILS_WITH) so that
-    TPKE-inferred signals influence predictions.
+    graph_tpke_edge_density
+        Count of TPKE-created edges (:RISK_CORRELATED, :CO_FAILS_WITH)
+        incident on the anchor Supplier entity within the trailing 30-day
+        window, normalised to [0,1] by the global max across all anchors.
+
+    Traversal includes TPKE edges (:RISK_CORRELATED, :CO_FAILS_WITH, :SHIPS_VIA)
+    so that TPKE-inferred signals influence predictions.
 
     Node properties must be tagged computed_from_window; this function asserts
     that no property's window overlaps the test slice (rows where train_mask
@@ -269,9 +311,6 @@ def enrich_graph_features_from_neo4j(
 
     Raises GraphContextUnavailable on empty neighbourhood. Never zero-fills.
     """
-    assert all(c in GRAPH_CONTEXT_FEATURES for c in GRAPH_CONTEXT_FEATURES), \
-        "GRAPH_CONTEXT_FEATURES list is inconsistent"
-
     df = df.copy()
 
     # ── Window safety ─────────────────────────────────────────────────────────
@@ -300,10 +339,10 @@ def enrich_graph_features_from_neo4j(
     )
 
     # ── Fetch from Neo4j ──────────────────────────────────────────────────────
-    supplier_map: dict[str, float] = {}
+    supplier_map:  dict[str, float] = {}
     inventory_map: dict[str, float] = {}
-    shipping_map: dict[str, float] = {}
-    event_flag: int = 0
+    shipping_map:  dict[str, float] = {}
+    tpke_map:      dict[str, float] = {}
 
     if dept_names:
         supplier_map = _fetch_supplier_reliability(conn, dept_names)
@@ -311,27 +350,23 @@ def enrich_graph_features_from_neo4j(
         inventory_map = _fetch_inventory_stress(conn, regions)
     if mode_region_pairs:
         shipping_map = _fetch_shipping_delay(conn, mode_region_pairs)
-    event_flag = _fetch_event_flag(conn)
+    if dept_names:
+        tpke_map = _fetch_tpke_edge_density(conn, dept_names)
 
     # ── Overwrite columns ─────────────────────────────────────────────────────
     if dept_col in df.columns and supplier_map:
-        df["graph_supplier_reliability"] = (
-            df[dept_col].map(supplier_map)
-        )
+        df["graph_supplier_reliability"] = df[dept_col].map(supplier_map)
         missing = df["graph_supplier_reliability"].isna().sum()
         if missing > 0:
             logger.warning(
                 f"graph_supplier_reliability: {missing} rows had no Neo4j match "
                 f"for their Department Name — keeping Tier-1 values for those rows."
             )
-            # Fall back to existing Tier-1 value for unmatched rows only
             tier1 = df["graph_supplier_reliability"].copy()
             df["graph_supplier_reliability"] = df["graph_supplier_reliability"].fillna(tier1)
 
     if region_col in df.columns and inventory_map:
-        df["graph_inventory_stress"] = (
-            df[region_col].map(inventory_map)
-        )
+        df["graph_inventory_stress"] = df[region_col].map(inventory_map)
         missing = df["graph_inventory_stress"].isna().sum()
         if missing > 0:
             logger.warning(
@@ -347,21 +382,30 @@ def enrich_graph_features_from_neo4j(
         missing = df["graph_avg_shipping_delay"].isna().sum()
         if missing > 0:
             logger.warning(
-                f"graph_avg_shipping_delay: {missing} rows had no Neo4j match "
-                f"for their (Shipping Mode, Order Region) pair — keeping Tier-1 values."
+                f"graph_avg_shipping_delay: {missing} rows had no Neo4j neighbour "
+                f"match for their (Shipping Mode, Order Region) pair — keeping "
+                f"Tier-1 values."
             )
             tier1 = df["graph_avg_shipping_delay"].copy()
             df["graph_avg_shipping_delay"] = df["graph_avg_shipping_delay"].fillna(tier1)
 
-    # graph_has_upcoming_event: 1 if any holiday CalendarEvent exists in graph
-    df["graph_has_upcoming_event"] = int(event_flag > 0)
+    if dept_col in df.columns and tpke_map:
+        df["graph_tpke_edge_density"] = df[dept_col].map(tpke_map)
+        missing = df["graph_tpke_edge_density"].isna().sum()
+        if missing > 0:
+            logger.warning(
+                f"graph_tpke_edge_density: {missing} rows had no Neo4j match "
+                f"for their Department Name — keeping Tier-1 values."
+            )
+            tier1 = df["graph_tpke_edge_density"].copy()
+            df["graph_tpke_edge_density"] = df["graph_tpke_edge_density"].fillna(tier1)
 
     logger.info(
         f"Graph enrichment complete: "
         f"{len(supplier_map)} supplier anchors, "
         f"{len(inventory_map)} region anchors, "
         f"{len(shipping_map)} route anchors, "
-        f"event_flag={event_flag}"
+        f"{len(tpke_map)} TPKE density anchors"
     )
 
     return df

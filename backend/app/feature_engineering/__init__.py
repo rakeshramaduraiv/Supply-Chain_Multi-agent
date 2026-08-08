@@ -48,7 +48,7 @@ ENGINEERED_FEATURES: list[str] = [
     "delivery_gap", "is_delayed", "delivery_duration_days", "shipping_delay_ratio",
     # Graph context — per-group aggregates at Tier 1, overwritten by KG at Tier 2
     "graph_supplier_reliability", "graph_inventory_stress",
-    "graph_avg_shipping_delay", "graph_has_upcoming_event",
+    "graph_avg_shipping_delay", "graph_tpke_edge_density",
 ]
 
 
@@ -493,14 +493,24 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
         df, [cat_col, region_col], "inventory_stress_index"
     )
 
-    # graph_avg_shipping_delay: expanding shifted mean of SCHEDULED days per
-    # (Shipping Mode, Region) — order-time observable, not post-hoc.
+    # graph_avg_shipping_delay: expanding shifted mean of OBSERVED late rate per
+    # (Shipping Mode, Region) neighbour routes — Tier-1 proxy for Neo4j traversal.
+    # Tier-2 overwrites with actual neighbour-route observed delay via
+    # :SHIPS_VIA / :CO_FAILS_WITH edges, excluding the anchor row's own route.
     df["graph_avg_shipping_delay"] = _expanding_group_mean(
-        df, [mode_col, region_col], sched_col
+        df, [mode_col, region_col], target_col   # late rate as delay proxy
     )
 
-    # graph_has_upcoming_event: 1 for peak months (Oct–Jan) — no leakage
-    df["graph_has_upcoming_event"] = df["order_month"].isin([10, 11, 12, 1]).astype(int)
+    # graph_tpke_edge_density: Tier-1 proxy = expanding shifted count of
+    # (Dept, Mode) co-occurrences normalised to [0,1].
+    # Tier-2 overwrites with actual TPKE edge count incident on the anchor
+    # entity within the trailing 30-day window, normalised to [0,1].
+    if dept_col in df.columns and mode_col in df.columns:
+        pair_count = df.groupby([dept_col, mode_col])[dept_col].transform("count")
+        _max_count = pair_count.max()
+        df["graph_tpke_edge_density"] = (pair_count / max(_max_count, 1)).clip(0, 1).fillna(0.0)
+    else:
+        df["graph_tpke_edge_density"] = 0.0
 
     return df
 

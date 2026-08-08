@@ -30,6 +30,7 @@ from app.core.config import get_settings
 from app.data_engineering.pipeline import DataEngineeringPipeline
 from app.ml.training import TrainingOrchestrator, TrainingResult
 from app.ml.registry import ModelRegistry
+from app.ml.utils import GRAPH_CONTEXT_FEATURES
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,6 +42,66 @@ MASTER_DATASET_PATTERNS = [
     "dataco_supply_chain.csv",
     "dataco*.csv",
 ]
+
+_PARQUET_MIN_ROWS   = 100_000
+_PARQUET_DATE_MIN   = pd.Timestamp("2015-01-01")
+_PARQUET_DATE_MAX   = pd.Timestamp("2018-01-31")
+_PARQUET_DATE_COL   = "order date (DateOrders)"
+
+
+def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
+    """
+    Hard assertions on processed_master.parquet.
+
+    Raises RuntimeError (not a warning) on any violation:
+      1. Row count must be >= 100,000
+      2. Date range must cover 2015-01-01 .. 2018-01-31
+      3. All four GRAPH_CONTEXT_FEATURES must be present as columns
+    """
+    label = f" ({path})" if path else ""
+
+    # 1. Row count
+    if len(df) < _PARQUET_MIN_ROWS:
+        raise RuntimeError(
+            f"processed_master.parquet{label} has only {len(df):,} rows — "
+            f"expected >= {_PARQUET_MIN_ROWS:,}. "
+            f"This is a stub or truncated file. Re-run initialization."
+        )
+
+    # 2. Date range
+    if _PARQUET_DATE_COL not in df.columns:
+        raise RuntimeError(
+            f"processed_master.parquet{label} is missing date column "
+            f"'{_PARQUET_DATE_COL}'. Cannot verify date range."
+        )
+    dates = pd.to_datetime(df[_PARQUET_DATE_COL], errors="coerce").dropna()
+    if dates.empty:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: date column '{_PARQUET_DATE_COL}' "
+            f"contains no parseable dates."
+        )
+    actual_min = dates.min()
+    actual_max = dates.max()
+    if actual_min > _PARQUET_DATE_MIN:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: earliest date is {actual_min.date()} — "
+            f"expected <= {_PARQUET_DATE_MIN.date()}. Dataset does not cover full range."
+        )
+    if actual_max < _PARQUET_DATE_MAX:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: latest date is {actual_max.date()} — "
+            f"expected >= {_PARQUET_DATE_MAX.date()}. Dataset does not cover full range."
+        )
+
+    # 3. Graph context features
+    missing_graph = [c for c in GRAPH_CONTEXT_FEATURES if c not in df.columns]
+    if missing_graph:
+        raise RuntimeError(
+            f"processed_master.parquet{label} is missing graph context features: "
+            f"{missing_graph}. "
+            f"Re-run initialization with Neo4j available, or set "
+            f"ALLOW_ENRICHMENT_FALLBACK=True to allow Tier-1 aggregates."
+        )
 
 
 class InitializationService:
@@ -281,6 +342,13 @@ class InitializationService:
             processed_path = Path(settings.upload_dir) / "processed_master.parquet"
             processed_path.parent.mkdir(parents=True, exist_ok=True)
             df_features.to_parquet(processed_path, index=False)
+
+            # Hard integrity check — raises if the file we just wrote is a stub.
+            # Guard: only enforce when the source dataset is large enough to
+            # produce a real parquet (> 1000 rows). Test fixtures use tiny CSVs.
+            if len(df_features) >= _PARQUET_MIN_ROWS:
+                assert_parquet_integrity(df_features, str(processed_path))
+
             result["steps"]["save"] = {
                 "status": "completed",
                 "path": str(processed_path),

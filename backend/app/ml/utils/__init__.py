@@ -56,8 +56,8 @@ class FeatureConfig:
 GRAPH_CONTEXT_FEATURES: list[str] = [
     "graph_supplier_reliability",
     "graph_inventory_stress",
-    "graph_has_upcoming_event",
-    "graph_avg_shipping_delay",
+    "graph_tpke_edge_density",    # was graph_has_upcoming_event (pure calendar — no graph signal)
+    "graph_avg_shipping_delay",   # redefined: neighbour-route observed delay via :SHIPS_VIA/:CO_FAILS_WITH
 ]
 
 # ── DEMAND — LightGBM Regressor ───────────────────────────────────────────────

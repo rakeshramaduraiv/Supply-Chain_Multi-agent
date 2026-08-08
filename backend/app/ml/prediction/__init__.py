@@ -290,18 +290,12 @@ class PredictionEngine:
                 factor *= 1.15
                 reason.append("tpke_seasonal_edge")
 
-        elif intelligence_type == IntelligenceType.INVENTORY:
-            if float(graph_context.get("avg_supplier_reliability", 1.0)) < 0.5:
-                factor *= 1.30
-                reason.append("low_supplier_reliability")
-            if graph_context.get("holiday_risk_events"):
-                factor *= 1.20
-                reason.append("tpke_seasonal_stockout_edge")
-
         elif intelligence_type == IntelligenceType.SUPPLIER:
             if int(graph_context.get("amplified_supplier_count", 0)) > 0:
                 factor *= 1.20
                 reason.append("tpke_demand_spike_edge")
+
+        # NOTE: INVENTORY branch removed — agent excluded (CV AUC 0.479)
 
         if factor != 1.0:
             predictions = [float(p) * factor for p in predictions]
@@ -340,18 +334,6 @@ class DemandAgent:
         return self.engine.predict_single(record, IntelligenceType.DEMAND, version_id, graph_context)
 
 
-class InventoryAgent:
-    """Inventory Agent - predicts stockout risk."""
-    def __init__(self, registry: ModelRegistry | None = None):
-        self.engine = PredictionEngine(registry)
-
-    def predict(self, df: pd.DataFrame, version_id: str | None = None, graph_context: dict[str, Any] | None = None) -> PredictionResult:
-        return self.engine.predict(df, IntelligenceType.INVENTORY, version_id, graph_context)
-
-    def predict_single(self, record: dict[str, Any], version_id: str | None = None, graph_context: dict[str, Any] | None = None) -> PredictionRecord:
-        return self.engine.predict_single(record, IntelligenceType.INVENTORY, version_id, graph_context)
-
-
 class SupplierAgent:
     """Supplier Agent - predicts late delivery risk."""
     def __init__(self, registry: ModelRegistry | None = None):
@@ -383,8 +365,8 @@ def get_collaborative_pipeline(registry: ModelRegistry | None = None):
 
 
 # Aliases for test compatibility (CLAUDE.md section 11)
+# NOTE: InventoryAgent/InventoryPredictor removed — excluded agent (CV AUC 0.479)
 DemandPredictor    = DemandAgent
-InventoryPredictor = InventoryAgent
 SupplierPredictor  = SupplierAgent
 LogisticsPredictor = LogisticsAgent
 

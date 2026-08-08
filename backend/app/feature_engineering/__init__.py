@@ -225,14 +225,15 @@ def _demand_rolling(df: pd.DataFrame) -> pd.DataFrame:
     grp_cols = [c for c in ("Category Name", "Order Region") if c in df.columns]
     if grp_cols and qty_col in df.columns:
         g = df.groupby(grp_cols)[qty_col]
-        df["qty_roll_7"]  = g.transform(lambda x: x.rolling(7,  min_periods=1).mean())
-        df["qty_roll_30"] = g.transform(lambda x: x.rolling(30, min_periods=1).mean())
+        # A6 fix: shift(1) before rolling so row i never sees its own value
+        df["qty_roll_7"]  = g.transform(lambda x: x.shift(1).rolling(7,  min_periods=1).mean())
+        df["qty_roll_30"] = g.transform(lambda x: x.shift(1).rolling(30, min_periods=1).mean())
         df["qty_lag_1"]   = g.transform(lambda x: x.shift(1).fillna(x.mean()))
         df["qty_lag_7"]   = g.transform(lambda x: x.shift(7).fillna(x.mean()))
         df["qty_lag_30"]  = g.transform(lambda x: x.shift(30).fillna(x.mean()))
     else:
-        df["qty_roll_7"]  = qty.rolling(7,  min_periods=1).mean()
-        df["qty_roll_30"] = qty.rolling(30, min_periods=1).mean()
+        df["qty_roll_7"]  = qty.shift(1).rolling(7,  min_periods=1).mean()
+        df["qty_roll_30"] = qty.shift(1).rolling(30, min_periods=1).mean()
         df["qty_lag_1"]   = qty.shift(1).fillna(qty.mean())
         df["qty_lag_7"]   = qty.shift(7).fillna(qty.mean())
         df["qty_lag_30"]  = qty.shift(30).fillna(qty.mean())
@@ -247,19 +248,21 @@ def _demand_rolling(df: pd.DataFrame) -> pd.DataFrame:
 
     roll_30_safe = df["qty_roll_30"].replace(0, np.nan).fillna(1.0)
     std_30 = (
-        df.groupby(grp_cols)[qty_col].transform(lambda x: x.rolling(30, min_periods=2).std().fillna(0))
+        df.groupby(grp_cols)[qty_col].transform(lambda x: x.shift(1).rolling(30, min_periods=2).std().fillna(0))
         if grp_cols and qty_col in df.columns
-        else qty.rolling(30, min_periods=2).std().fillna(0)
+        else qty.shift(1).rolling(30, min_periods=2).std().fillna(0)
     )
     df["demand_volatility"]  = (std_30 / roll_30_safe).clip(0, 5).fillna(0.0)
     df["demand_trend_slope"] = (
         (df["qty_roll_7"] - df["qty_roll_30"]) / roll_30_safe
     ).clip(-2, 3).fillna(0.0)
 
+    # A6 fix: std_14 also shifted so demand_spike_flag compares qty against
+    # a window that excludes the current row
     std_14 = (
-        df.groupby(grp_cols)[qty_col].transform(lambda x: x.rolling(14, min_periods=2).std().fillna(0))
+        df.groupby(grp_cols)[qty_col].transform(lambda x: x.shift(1).rolling(14, min_periods=2).std().fillna(0))
         if grp_cols and qty_col in df.columns
-        else qty.rolling(14, min_periods=2).std().fillna(0)
+        else qty.shift(1).rolling(14, min_periods=2).std().fillna(0)
     )
     df["demand_spike_flag"] = (qty > (df["qty_roll_7"] + 2 * std_14)).astype(int)
     df["demand_momentum"]   = (df["qty_roll_7"] / roll_30_safe).clip(0, 3).fillna(1.0)

@@ -1,0 +1,46 @@
+{
+  "generator_version": "1.0.0",
+  "seed": 44,
+  "period": "2018-04",
+  "n_rows": 1890,
+  "base_late_rate": 0.55,
+  "actual_late_rate": 0.5804,
+  "injected_drift": {
+    "type": "supplier_degradation",
+    "magnitude": 0.18,
+    "start_period": "2018-04",
+    "entities": [
+      "Fan Shop",
+      "Golf Shop"
+    ]
+  },
+  "distribution_params": {
+    "tail_rows_mean": 2100,
+    "tail_rows_std": 200,
+    "qty_weights": [
+      0.55,
+      0.12,
+      0.11,
+      0.11,
+      0.11
+    ],
+    "price_range": [
+      10.0,
+      200.0
+    ],
+    "monthly_delta": {
+      "1": 0.01,
+      "2": -0.02,
+      "3": -0.01,
+      "4": 0.0,
+      "5": -0.01,
+      "6": -0.01,
+      "7": 0.01,
+      "8": 0.01,
+      "9": 0.0,
+      "10": 0.01,
+      "11": 0.01,
+      "12": 0.02
+    }
+  }
+}

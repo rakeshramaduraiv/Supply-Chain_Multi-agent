@@ -143,8 +143,9 @@ class DecisionEngine:
         ]
 
         supplier_risk  = float(agent_outputs.get("supplier_risk",  0.28))
-        inventory_risk = float(agent_outputs.get("inventory_risk", 0.35))
         logistics_risk = float(agent_outputs.get("logistics_risk", 0.20))
+        # NOTE: inventory_risk removed — Inventory agent excluded (CV AUC 0.479)
+        # Re-weighted: supplier 0.45, logistics 0.55
 
         threshold = p["supplier_risk_threshold"]
 
@@ -193,7 +194,7 @@ class DecisionEngine:
 
         roi = ((savings - impl_cost) / max(impl_cost, 1.0)) * 100.0 if impl_cost > 0 else 0.0
         confidence = round(
-            1.0 - (supplier_risk * 0.3 + inventory_risk * 0.3 + logistics_risk * 0.4), 4
+            1.0 - (supplier_risk * 0.45 + logistics_risk * 0.55), 4
         )
         confidence = max(0.70, min(0.98, confidence))
 

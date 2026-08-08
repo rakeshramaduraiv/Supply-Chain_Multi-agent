@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -529,6 +530,7 @@ async def run_upload_cycle(
     filename: str,
     session: Any = None,
     store: CumulativeStore | None = None,
+    on_stage: Callable[[StageResult], Awaitable[None]] | None = None,
 ) -> CycleResult:
     """
     Execute the six-stage upload cycle pipeline.
@@ -539,6 +541,8 @@ async def run_upload_cycle(
         filename:   Original filename for audit trail.
         session:    AsyncSession for DB access (stages 2, 4). May be None.
         store:      CumulativeStore instance. Defaults to the singleton.
+        on_stage:   Optional async callback invoked after each stage completes.
+                    A RUNNING sentinel is emitted before each stage starts.
 
     Returns:
         CycleResult with all stage outcomes.
@@ -555,29 +559,64 @@ async def run_upload_cycle(
 
     stages: list[StageResult] = []
 
+    async def _emit(result: StageResult) -> None:
+        if on_stage is not None:
+            try:
+                await on_stage(result)
+            except Exception as cb_err:
+                logger.warning(f"on_stage callback error (ignored): {cb_err}")
+
+    # Sentinel names for RUNNING events — must match stage names below
+    _STAGE_NAMES = [
+        (1, "Ingest & Validate"),
+        (2, "Match Forecast vs Actual"),
+        (3, "Compute Metrics"),
+        (4, "TPKE Evolution"),
+        (5, "Store & Retrain"),
+        (6, "Forecast Next Period"),
+    ]
+
+    async def _running(stage: int, name: str) -> None:
+        await _emit(StageResult(
+            stage=stage, name=name, status="RUNNING",
+            duration_ms=0.0, detail={}, error=None,
+        ))
+
     # Stage 1 — raises 422 on failure
+    await _running(1, "Ingest & Validate")
     s1, df_clean = _stage1_ingest_validate(df_actual, period, filename)
     stages.append(s1)
+    await _emit(s1)
 
     # Stage 2
+    await _running(2, "Match Forecast vs Actual")
     s2, df_matched, df_unmatched = _stage2_match_forecast(df_clean, session)
     stages.append(s2)
+    await _emit(s2)
 
     # Stage 3
+    await _running(3, "Compute Metrics")
     s3, metrics = _stage3_compute_metrics(df_matched)
     stages.append(s3)
+    await _emit(s3)
 
     # Stage 4
+    await _running(4, "TPKE Evolution")
     s4 = _stage4_tpke(df_matched, metrics, session)
     stages.append(s4)
+    await _emit(s4)
 
     # Stage 5
+    await _running(5, "Store & Retrain")
     s5, cumulative_rows = _stage5_store_and_retrain(df_clean, period, store)
     stages.append(s5)
+    await _emit(s5)
 
     # Stage 6
+    await _running(6, "Forecast Next Period")
     s6 = _stage6_forecast_next(store)
     stages.append(s6)
+    await _emit(s6)
 
     total_ms = (time.perf_counter() - wall_start) * 1000
 

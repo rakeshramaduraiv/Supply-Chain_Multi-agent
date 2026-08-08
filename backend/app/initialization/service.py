@@ -189,36 +189,64 @@ class InitializationService:
             # Step 4b: Enrich graph features from Neo4j (Tier-2 overwrite)
             step_start = time.perf_counter()
             logger.info("[4b/7] Enriching graph features from Neo4j...")
+
+            # Build train_mask from the real chronological boundary — must
+            # match the 80/20 split that train_all uses internally.
+            date_col = next(
+                (c for c in ("order_date", "order date (DateOrders)") if c in df_features.columns),
+                None,
+            )
+            if date_col is None:
+                raise RuntimeError(
+                    "Step 4b: no date column found in df_features. "
+                    "Cannot build chronological train_mask for graph enrichment."
+                )
+            dates = pd.to_datetime(df_features[date_col], errors="coerce")
+            if not dates.is_monotonic_increasing:
+                raise RuntimeError(
+                    "Step 4b: df_features is not sorted by date. "
+                    "Call _sort_chronologically before enrichment."
+                )
+            cutoff    = dates.quantile(0.8)
+            train_mask = dates <= cutoff
+
+            graph_enriched_flag = False
             try:
                 from app.graph.enrichment import enrich_graph_features_from_neo4j
-                train_mask = pd.Series(
-                    [True] * int(len(df_features) * 0.8)
-                    + [False] * (len(df_features) - int(len(df_features) * 0.8)),
-                    index=df_features.index,
-                )
                 df_features = enrich_graph_features_from_neo4j(
                     df_features, self._graph_conn, train_mask
                 )
+                graph_enriched_flag = True
                 result["steps"]["graph_enrichment"] = {
                     "status": "completed",
                     "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
                 logger.info("[4b/7] Graph enrichment complete")
             except Exception as enrich_err:
+                allow_fallback = settings.allow_enrichment_fallback
+                if not allow_fallback:
+                    raise RuntimeError(
+                        f"Graph enrichment failed and ALLOW_ENRICHMENT_FALLBACK=False. "
+                        f"Training on unenriched features is not permitted. "
+                        f"Original error: {enrich_err}"
+                    ) from enrich_err
+                # Fallback allowed — record degraded state, continue
                 logger.warning(
-                    f"[4b/7] Graph enrichment skipped ({enrich_err}); "
-                    f"Tier-1 pandas aggregates retained."
+                    f"[4b/7] Graph enrichment failed ({enrich_err}); "
+                    f"ALLOW_ENRICHMENT_FALLBACK=True — Tier-1 aggregates retained."
                 )
                 result["steps"]["graph_enrichment"] = {
                     "status": "skipped",
                     "reason": str(enrich_err),
+                    "degraded": True,
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
 
             # Step 5: Train ML Models (now sees real graph features from Step 4)
             step_start = time.perf_counter()
             logger.info("[5/7] Training ML models...")
             training_results = self._training_orchestrator.train_all(
-                df_features, dataset_version="master_v1"
+                df_features, dataset_version="master_v1", graph_enriched=graph_enriched_flag
             )
             result["steps"]["training"] = {
                 "status": "completed",

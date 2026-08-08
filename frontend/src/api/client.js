@@ -141,6 +141,9 @@ export const api = {
   uploadBusinessMonthly:(f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/monthly', fd) },
   uploadBusinessActual: (f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/actual', fd) },
 
+  // Cycle resync
+  getCycleStages:       (id) => http.get(`/api/v1/cycle/${id}/stages`),
+
   // Live Operations Enterprise Dashboard
   getLiveOpsEntities:        (params) => http.get('/api/v1/business/live-ops/entities', { params }),
   getLiveOpsEntityAnalytics: (params) => http.get('/api/v1/business/live-ops/entity-analytics', { params }),

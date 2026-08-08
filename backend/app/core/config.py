@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 500
     auto_initialize: bool = True
 
+    # --- Graph Enrichment ---
+    allow_enrichment_fallback: bool = False   # if False, enrichment failure aborts init
+
     # --- ML Configuration ---
     ml_model_version: str = "latest"
     lightgbm_n_estimators: int = 500

@@ -27,6 +27,7 @@ from app.graphrag.prompt_routes import router as prompt_composer_router
 from app.graphrag.copilot_routes import router as copilot_router
 from app.api.v1.endpoints.decision_routes import router as decision_router
 from app.ml.agent_memory.routes import router as agent_memory_router
+from app.api.v1.endpoints.cycle_routes import router as cycle_router
 
 api_router = APIRouter()
 
@@ -66,6 +67,7 @@ api_router.include_router(dashboard_router, prefix="")
 # --- Business Operations (Frontend-facing) ---
 api_router.include_router(business_router, prefix="")
 api_router.include_router(live_ops.router, prefix="")
+api_router.include_router(cycle_router, prefix="")
 
 # --- TPKE Evolution ---
 api_router.include_router(tpke_router, prefix="")

@@ -1,5 +1,6 @@
 import logging
 import json
+from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = logging.getLogger(__name__)
@@ -15,9 +16,7 @@ async def websocket_endpoint(websocket: WebSocket):
     logger.info(f"WebSocket client connected. Active: {len(active_connections)}")
     try:
         while True:
-            # Keep client connection open
             data = await websocket.receive_text()
-            # Simple echo support or heartbeats
             await websocket.send_text(json.dumps({"status": "heartbeat", "received": data}))
     except WebSocketDisconnect:
         active_connections.remove(websocket)
@@ -27,24 +26,57 @@ async def websocket_endpoint(websocket: WebSocket):
         if websocket in active_connections:
             active_connections.remove(websocket)
 
-async def broadcast_event(event_name: str, payload: dict | None = None):
-    """Broadcast real-time refresh event to all connected clients."""
+
+async def _broadcast_raw(msg: str) -> None:
+    """Send a pre-serialised message to all live clients, pruning dead ones."""
     if not active_connections:
         return
-    
-    msg = json.dumps({
-        "event": event_name,
-        "data": payload or {}
-    })
-    
-    dead_connections = []
+    dead: list[WebSocket] = []
     for ws in active_connections:
         try:
             await ws.send_text(msg)
         except Exception as e:
-            logger.warning(f"Failed to send websocket broadcast: {e}")
-            dead_connections.append(ws)
-            
-    for dead in dead_connections:
-        if dead in active_connections:
-            active_connections.remove(dead)
+            logger.warning(f"WS send failed: {e}")
+            dead.append(ws)
+    for d in dead:
+        if d in active_connections:
+            active_connections.remove(d)
+
+
+async def broadcast_event(event_name: str, payload: dict | None = None) -> None:
+    """Broadcast a generic named event (kept for non-cycle callers)."""
+    await _broadcast_raw(json.dumps({"event": event_name, "data": payload or {}}))
+
+
+async def broadcast_cycle_stage(
+    cycle_id: str,
+    stage: int,
+    name: str,
+    status: str,                  # RUNNING | COMPLETED | SKIPPED | FAILED
+    duration_ms: float | None,
+    detail: dict[str, Any],
+    error: str | None,
+) -> None:
+    """Typed cycle.stage event."""
+    await _broadcast_raw(json.dumps({
+        "type":        "cycle.stage",
+        "cycle_id":    cycle_id,
+        "stage":       stage,
+        "name":        name,
+        "status":      status,
+        "duration_ms": duration_ms,
+        "detail":      detail,
+        "error":       error,
+    }))
+
+
+async def broadcast_cycle_complete(
+    cycle_id: str,
+    summary: dict[str, Any],
+) -> None:
+    """Typed cycle.complete event."""
+    await _broadcast_raw(json.dumps({
+        "type":     "cycle.complete",
+        "cycle_id": cycle_id,
+        "summary":  summary,
+    }))

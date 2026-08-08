@@ -31,6 +31,7 @@ from app.database.postgres import get_db_session
 from app.api.v1.endpoints.business.schemas import (
     ActualUploadResponse,
     AnalyticsResponse,
+    CycleResponse,
     DashboardResponse,
     ForecastItem,
     ForecastResponse,
@@ -40,6 +41,8 @@ from app.api.v1.endpoints.business.schemas import (
     IntelligenceResponse,
     KPICard,
     MonthlyUploadResponse,
+    NumericField,
+    StageResultSchema,
     SystemResponse,
     AlertCenterResponse,
     AlertItem,
@@ -107,7 +110,7 @@ async def upload_monthly_data(
 # POST /upload/actual
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/upload/actual", response_model=ActualUploadResponse)
+@router.post("/upload/actual", response_model=CycleResponse)
 async def upload_actual_data(
     file: UploadFile = File(..., description="Actual performance CSV"),
     period: str = Form(..., description="Period identifier, e.g. 2024-01"),
@@ -117,7 +120,6 @@ async def upload_actual_data(
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are accepted")
 
-    import pandas as pd
     from app.data_engineering.upload import UploadService
     from app.core.enums import DatasetType
     from app.services.cycle_service import run_upload_cycle
@@ -129,49 +131,109 @@ async def upload_actual_data(
     )
     df_actual = upload_service.load_dataset(metadata["dataset_id"])
 
+    from app.api.v1.endpoints.ws import broadcast_cycle_stage, broadcast_cycle_complete
+    from app.services.cycle_store import record_event
+
+    # cycle_id is set inside run_upload_cycle; capture it via closure
+    _cycle_id_holder: list[str] = []
+
+    async def _on_stage(result) -> None:
+        # Grab cycle_id from the holder once it's been set
+        cid = _cycle_id_holder[0] if _cycle_id_holder else "pending"
+        event = {
+            "type":        "cycle.stage",
+            "cycle_id":    cid,
+            "stage":       result.stage,
+            "name":        result.name,
+            "status":      result.status,
+            "duration_ms": result.duration_ms if result.status != "RUNNING" else None,
+            "detail":      result.detail,
+            "error":       result.error,
+        }
+        record_event(cid, event)
+        await broadcast_cycle_stage(
+            cycle_id=cid,
+            stage=result.stage,
+            name=result.name,
+            status=result.status,
+            duration_ms=event["duration_ms"],
+            detail=result.detail,
+            error=result.error,
+        )
+
     # Run six-stage cycle pipeline (raises 422 on schema/continuity failure)
     cycle_result = await run_upload_cycle(
         df_actual=df_actual,
         period=period,
         filename=file.filename or "actuals.csv",
         session=session,
+        on_stage=_on_stage,
     )
+    # Backfill cycle_id so the closure uses the real one on replay
+    _cycle_id_holder.append(cycle_result.cycle_id)
 
-    # Extract summary from stage results for the response schema
-    s3 = next((s for s in cycle_result.stages if s.stage == 3), None)
-    metrics = s3.detail if s3 and s3.status == "COMPLETED" else {}
-
-    # WebSocket broadcast (best-effort)
+    # Broadcast cycle.complete
     try:
-        from app.api.v1.endpoints.ws import broadcast_event
-        await broadcast_event("Actual Uploaded",         {"dataset_id": metadata["dataset_id"]})
-        await broadcast_event("Forecast Validated",      {"dataset_id": metadata["dataset_id"]})
-        await broadcast_event("Knowledge Graph Updated", {"dataset_id": metadata["dataset_id"]})
+        statuses_set = {s.status for s in cycle_result.stages}
+        summary = {
+            "period":          cycle_result.period,
+            "rows_ingested":   cycle_result.rows_ingested,
+            "rows_matched":    cycle_result.rows_matched,
+            "cumulative_rows": cycle_result.cumulative_rows,
+            "status": (
+                "FAILED"    if "FAILED"  in statuses_set else
+                "PARTIAL"   if "SKIPPED" in statuses_set else
+                "COMPLETED"
+            ),
+        }
+        complete_event = {"type": "cycle.complete", "cycle_id": cycle_result.cycle_id, "summary": summary}
+        record_event(cycle_result.cycle_id, complete_event)
+        await broadcast_cycle_complete(cycle_result.cycle_id, summary)
     except Exception as ws_err:
-        logger.warning(f"WS broadcast skipped: {ws_err}")
+        logger.warning(f"WS cycle.complete broadcast skipped: {ws_err}")
 
-    records_loaded  = cycle_result.rows_ingested
-    records_matched = cycle_result.rows_matched
-    late_rate       = float(metrics.get("actual_late_rate", 0.0))
-    overall_accuracy = round(
-        min(100.0, max(0.0, (1.0 - late_rate) * 100.0))
-        if late_rate > 0 else 0.0, 2
+    # Stage 3: metrics — None when SKIPPED, never a default
+    s3 = next((s for s in cycle_result.stages if s.stage == 3), None)
+    metrics_out: dict | None = (
+        {k: {"value": v, "source": "measured"} for k, v in s3.detail.items()}
+        if s3 and s3.status == "COMPLETED" and s3.detail
+        else None
     )
 
-    return ActualUploadResponse(
+    # Stage 4: deviation_summary from TPKE detail — None when SKIPPED
+    s4 = next((s for s in cycle_result.stages if s.stage == 4), None)
+    deviation_summary_out: dict | None = (
+        {k: {"value": v, "source": "measured"} for k, v in s4.detail.items()}
+        if s4 and s4.status == "COMPLETED" and s4.detail
+        else None
+    )
+
+    # Derive overall status
+    statuses = {s.status for s in cycle_result.stages}
+    if "FAILED" in statuses:
+        overall_status = "FAILED"
+    elif "SKIPPED" in statuses:
+        overall_status = "PARTIAL"
+    else:
+        overall_status = "COMPLETED"
+
+    rows_ingested  = cycle_result.rows_ingested
+    rows_matched   = cycle_result.rows_matched
+    rows_unmatched = cycle_result.rows_excluded
+    match_rate     = round(rows_matched / rows_ingested, 4) if rows_ingested > 0 else 0.0
+
+    return CycleResponse(
         upload_id=metadata["dataset_id"],
         filename=metadata["filename"],
         period=period,
-        records_loaded=records_loaded,
-        records_matched=records_matched,
-        overall_accuracy=overall_accuracy,
-        deviation_summary={
-            "within_threshold": 0,
-            "minor_deviation":  0,
-            "major_deviation":  0,
-        },
-        status="compared",
-        uploaded_at=metadata.get("uploaded_at", datetime.now(timezone.utc).isoformat()),
+        rows_ingested=NumericField(value=rows_ingested,  source="measured"),
+        rows_matched=NumericField(value=rows_matched,    source="measured"),
+        rows_unmatched=NumericField(value=rows_unmatched, source="measured"),
+        match_rate=NumericField(value=match_rate,        source="measured"),
+        stages=[StageResultSchema(**s.to_dict()) for s in cycle_result.stages],
+        metrics=metrics_out,
+        deviation_summary=deviation_summary_out,
+        status=overall_status,
     )
 @router.get("/dashboard", response_model=DashboardResponse)
 async def get_dashboard():

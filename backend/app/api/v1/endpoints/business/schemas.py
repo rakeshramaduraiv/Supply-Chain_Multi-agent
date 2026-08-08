@@ -42,6 +42,36 @@ class ActualUploadResponse(BaseModel):
     uploaded_at: str
 
 
+class StageResultSchema(BaseModel):
+    stage: int
+    name: str
+    status: str          # COMPLETED | SKIPPED | FAILED
+    duration_ms: float
+    detail: dict[str, Any] = {}
+    error: str | None = None
+
+
+class NumericField(BaseModel):
+    """A numeric value with a mandatory provenance tag."""
+    value: float | int
+    source: str          # "measured" | "unavailable"
+
+
+class CycleResponse(BaseModel):
+    """Response after running the six-stage upload cycle pipeline."""
+    upload_id: str
+    filename: str
+    period: str
+    rows_ingested: NumericField
+    rows_matched: NumericField
+    rows_unmatched: NumericField
+    match_rate: NumericField
+    stages: list[StageResultSchema]
+    metrics: dict[str, Any] | None   # None when stage 3 SKIPPED — never a default
+    deviation_summary: dict[str, Any] | None  # from stage 4 TPKE detail; None when SKIPPED
+    status: str                      # FAILED | PARTIAL | COMPLETED
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DASHBOARD SCHEMAS
 # ─────────────────────────────────────────────────────────────────────────────

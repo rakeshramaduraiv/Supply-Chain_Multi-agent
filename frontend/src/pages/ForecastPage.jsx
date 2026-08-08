@@ -88,7 +88,8 @@ import styles from './ForecastPage.module.css'
 import { useSharedParams } from '../hooks/useSharedParams'
 
 
-import ActualUploadWorkflow from '../components/domain/ActualUploadWorkflow'
+import CycleStageTracker from '../components/domain/CycleStageTracker'
+import { useCycleStream } from '../hooks/useCycleStream'
 
 
 
@@ -313,10 +314,10 @@ export default function ForecastPage() {
   const [cycleStep, _setCycleStep] = useState(() => readLS('amasci_cycle_step', 1))
 
 
-  const [cycleMonth, _setCycleMonth] = useState(() => readLS('amasci_cycle_month', '2018-02'))
+  const [cycleMonth, _setCycleMonth] = useState(() => readLS('amasci_cycle_month', null))
 
 
-  const [cycleTrainedUntil, _setCycleTrainedUntil] = useState(() => readLS('amasci_cycle_trained_until', '2018-01'))
+  const [cycleTrainedUntil, _setCycleTrainedUntil] = useState(() => readLS('amasci_cycle_trained_until', null))
 
 
   const [cycleActualsUploaded, _setCycleActualsUploaded] = useState(() => readLS('amasci_cycle_actuals_uploaded', false))
@@ -419,8 +420,8 @@ export default function ForecastPage() {
         ]
         keys.forEach(k => localStorage.removeItem(k))
         _setCycleStep(1)
-        _setCycleMonth('2018-02')
-        _setCycleTrainedUntil('2018-01')
+        _setCycleMonth(null)
+        _setCycleTrainedUntil(null)
         _setCycleActualsUploaded(false)
         _setCycleModelRetrained(false)
         _setCycleUploadResult(null)
@@ -490,7 +491,19 @@ export default function ForecastPage() {
   const [validationResult, setValidationResult] = useState(null)
 
 
-  const [isIngestingActuals, setIsIngestingActuals] = useState(false)
+  const [isIngestingActuals, setIsIngestingActuals] = useState(false)
+
+
+  // Active cycle id — set when upload_actual returns; drives useCycleStream
+
+
+  const [activeCycleId, setActiveCycleId] = useState(() => readLS('amasci_active_cycle_id', null))
+
+
+  const setActiveCycleIdPersisted = (v) => { setActiveCycleId(v); writeLS('amasci_active_cycle_id', v) }
+
+
+  const { stages: cycleStages, complete: cycleComplete } = useCycleStream(activeCycleId)
 
 
 
@@ -910,7 +923,7 @@ export default function ForecastPage() {
 
 
 
-    const agentMap = ['Logistics Agent', 'Demand Agent', 'Inventory Agent', 'Supplier Agent', 'Logistics Agent', 'Demand Agent']
+    const agentMap = ['Logistics Agent', 'Demand Agent', 'Supplier Agent', 'Logistics Agent', 'Demand Agent', 'Supplier Agent']
 
 
 
@@ -2336,7 +2349,7 @@ export default function ForecastPage() {
             <span className={styles.execLabel}>Forecast Period</span>
 
 
-            <span className={styles.execVal} style={{ color: 'var(--blue)' }}>{forecastPeriod}</span>
+            <span className={styles.execVal} style={{ color: 'var(--blue)' }}>{forecastPeriod ?? '—'}</span>
 
 
           </div>
@@ -4583,19 +4596,19 @@ export default function ForecastPage() {
           {/* 8-Stage Live Actual Upload Pipeline Workflow */}
 
 
-          <ActualUploadWorkflow
+          <CycleStageTracker
 
 
-            uploadResult={cycleUploadResult}
+            stages={cycleStages}
 
 
-            period={cycleMonth}
+            complete={cycleComplete}
 
 
-            isIngesting={isIngestingActuals}
+            metrics={cycleUploadResult?.metrics ?? null}
 
 
-            onComplete={() => setIsIngestingActuals(false)}
+            period={cycleMonth || forecastPeriod || '—'}
 
 
           />

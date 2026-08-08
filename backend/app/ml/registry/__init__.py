@@ -37,6 +37,7 @@ class ModelVersion:
     n_training_samples: int = 0
     is_active: bool = True
     description: str = ""
+    graph_enriched: bool = True   # False when Tier-1 pandas aggregates were used
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,6 +103,7 @@ class ModelRegistry:
         dataset_version: str = "",
         n_training_samples: int = 0,
         description: str = "",
+        graph_enriched: bool = True,
     ) -> ModelVersion:
         """
         Save a trained model to the registry.
@@ -129,6 +131,7 @@ class ModelRegistry:
             n_training_samples=n_training_samples,
             is_active=True,
             description=description,
+            graph_enriched=graph_enriched,
         )
 
         # Deactivate previous versions

@@ -327,20 +327,19 @@ export default function ReportsPage({ defaultTab }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--ts)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Demand Agent (LGBM)</span>
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>94.2% Acc</span>
+                    <span>Demand Agent (LGBM Regressor)</span>
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>weight: 0.30</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Supplier Agent (RF)</span>
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>89.5% Acc</span>
+                    <span>Supplier Agent (Random Forest)</span>
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>weight: 0.45</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Inventory Agent (LGBM)</span>
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>91.8% Acc</span>
+                    <span>Logistics Agent (LGBM Classifier)</span>
+                    <span style={{ color: '#10b981', fontWeight: 700 }}>weight: 0.25</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Logistics Agent (LGBM)</span>
-                    <span style={{ color: '#10b981', fontWeight: 700 }}>87.2% Acc</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--b)', paddingTop: '4px', marginTop: '2px' }}>
+                    <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
                   </div>
                 </div>
               </div>

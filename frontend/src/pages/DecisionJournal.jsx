@@ -227,12 +227,12 @@ export default function DecisionJournal() {
 
             {/* Section 3: Multi-Agent Summary */}
             <div className={styles.sectionCard}>
-              <span className={styles.secTitle}><Cpu size={13} /> Section 3: Multi-Agent Accuracies</span>
+              <span className={styles.secTitle}><Cpu size={13} /> Section 3: Multi-Agent Fusion Weights</span>
               <div className={styles.secBody}>
-                Demand Agent: <span style={{ color: '#10b981' }}>{forecastHealth}% Acc</span><br />
-                Supplier Agent: <span style={{ color: '#10b981' }}>89.5% Acc</span><br />
-                Inventory Agent: <span style={{ color: '#10b981' }}>91.8% Acc</span><br />
-                Logistics Agent: <span style={{ color: '#10b981' }}>87.2% Acc</span>
+                Demand Agent: <span style={{ color: '#10b981' }}>weight 0.30</span><br />
+                Supplier Agent: <span style={{ color: '#10b981' }}>weight 0.45</span><br />
+                Logistics Agent: <span style={{ color: '#10b981' }}>weight 0.25</span><br />
+                <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
               </div>
             </div>
 

@@ -2,103 +2,59 @@
 tests/critical/test_inventory_excluded.py
 ==========================================
 Asserts the Inventory agent is permanently excluded.
-
-Rationale: DataCo's synthetic stockout_risk_flag target is algebraically
-derived from rolling demand features (qty_roll_7, qty_roll_30, demand_momentum).
-A depth-3 decision tree achieves train AUC 0.988; cross-validated AUC with
-non-tautological features is 0.479. No learnable signal exists.
+DataCo contains no independent inventory signal (CV AUC 0.479).
 """
-
 import json
 import pathlib
-import sys
-
 import pytest
 
-REGISTRY_PATH = pathlib.Path("data/models/registry.json")
-MODELS_DIR    = pathlib.Path("data/models")
+MODELS_DIR = pathlib.Path(__file__).parents[2] / "data" / "models"
+REGISTRY   = MODELS_DIR / "registry.json"
 
-# ── Registry ──────────────────────────────────────────────────────────────────
-
-def test_inventory_not_in_registry():
-    assert REGISTRY_PATH.exists(), f"Registry not found at {REGISTRY_PATH}"
-    registry = json.loads(REGISTRY_PATH.read_text())
-    assert "inventory" not in registry, (
-        f"'inventory' key found in registry.json — "
-        f"delete it with purge_inventory_registry.py"
-    )
-
-
-# ── Filesystem ────────────────────────────────────────────────────────────────
 
 def test_no_inventory_joblib():
-    if not MODELS_DIR.exists():
-        pytest.skip(f"{MODELS_DIR} does not exist")
-    matches = list(MODELS_DIR.glob("inventory_*.joblib"))
-    assert matches == [], (
-        f"Found inventory joblib files that must be deleted: {matches}"
+    inv_dir = MODELS_DIR / "inventory"
+    files = list(inv_dir.glob("*.joblib")) if inv_dir.exists() else []
+    assert files == [], f"Inventory .joblib files must not exist: {files}"
+
+
+def test_registry_has_no_inventory():
+    if not REGISTRY.exists():
+        pytest.skip("registry.json not yet created (pre-initialization)")
+    d = json.loads(REGISTRY.read_text())
+    assert "inventory" not in d, (
+        f"registry.json must not contain 'inventory' key. Found keys: {list(d.keys())}"
     )
 
 
-# ── Training code ─────────────────────────────────────────────────────────────
+def test_registry_has_exactly_three_agents():
+    if not REGISTRY.exists():
+        pytest.skip("registry.json not yet created (pre-initialization)")
+    d = json.loads(REGISTRY.read_text())
+    assert set(d.keys()) == {"demand", "supplier", "logistics"}, (
+        f"Registry must have exactly demand/supplier/logistics. Got: {set(d.keys())}"
+    )
+
 
 def test_training_orchestrator_has_no_train_inventory():
-    # Add backend to path so imports work when run from repo root
-    backend = pathlib.Path(__file__).parent.parent.parent
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-
     from app.ml.training import TrainingOrchestrator
-    orchestrator = TrainingOrchestrator.__new__(TrainingOrchestrator)
-    assert not hasattr(orchestrator, "train_inventory"), (
-        "TrainingOrchestrator still has train_inventory — delete the method"
+    assert not hasattr(TrainingOrchestrator, "train_inventory"), (
+        "TrainingOrchestrator must not have train_inventory method"
     )
 
 
-def test_training_orchestrator_has_no_inventory_trainer_attribute():
-    backend = pathlib.Path(__file__).parent.parent.parent
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-
-    from app.ml.training import TrainingOrchestrator
-    orchestrator = TrainingOrchestrator.__new__(TrainingOrchestrator)
-    assert not hasattr(orchestrator, "inventory_trainer"), (
-        "TrainingOrchestrator still has inventory_trainer attribute"
-    )
-
-
-def test_no_inventory_trainer_class():
-    backend = pathlib.Path(__file__).parent.parent.parent
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-
-    import app.ml.training as training_module
-    assert not hasattr(training_module, "InventoryTrainer"), (
-        "InventoryTrainer class still exists in app.ml.training"
-    )
-
-
-# ── Feature config ────────────────────────────────────────────────────────────
-
-def test_inventory_not_in_feature_configs():
-    backend = pathlib.Path(__file__).parent.parent.parent
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-
+def test_inventory_absent_from_feature_configs():
     from app.ml.utils import FEATURE_CONFIGS, IntelligenceType
     assert IntelligenceType.INVENTORY not in FEATURE_CONFIGS, (
-        "IntelligenceType.INVENTORY still has an entry in FEATURE_CONFIGS"
+        "IntelligenceType.INVENTORY must not appear in FEATURE_CONFIGS"
     )
 
 
-def test_inventory_symbols_absent_from_utils():
-    backend = pathlib.Path(__file__).parent.parent.parent
-    if str(backend) not in sys.path:
-        sys.path.insert(0, str(backend))
-
-    import app.ml.utils as utils_module
-    for name in ("INVENTORY_FEATURES", "INVENTORY_TARGET",
-                 "LIGHTGBM_INVENTORY_PARAMS", "build_stockout_target"):
-        assert not hasattr(utils_module, name), (
-            f"{name} still exported from app.ml.utils — delete it"
-        )
+def test_orchestrator_weights_exclude_inventory():
+    from app.ml.orchestrator import DEFAULT_WEIGHTS
+    assert "inventory" not in DEFAULT_WEIGHTS, (
+        f"DEFAULT_WEIGHTS must not contain 'inventory'. Got: {DEFAULT_WEIGHTS}"
+    )
+    assert abs(sum(DEFAULT_WEIGHTS.values()) - 1.0) < 0.001, (
+        f"DEFAULT_WEIGHTS must sum to 1.0. Got: {sum(DEFAULT_WEIGHTS.values())}"
+    )

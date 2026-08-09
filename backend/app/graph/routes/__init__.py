@@ -44,9 +44,15 @@ def _get_graph_service(session=None) -> GraphService:
 
 
 def _load_processed_dataset() -> pd.DataFrame:
-    """Load the most recently processed dataset."""
+    """Load the most recently processed dataset (parquet preferred, CSV fallback)."""
     settings = get_settings()
     data_dir = Path(settings.upload_dir)
+
+    parquet_path = data_dir / "processed_master.parquet"
+    if parquet_path.exists():
+        df = pd.read_parquet(parquet_path)
+        logger.info(f"Loaded dataset: processed_master.parquet ({len(df)} rows)")
+        return df
 
     candidates = sorted(data_dir.glob("*_processed.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not candidates:

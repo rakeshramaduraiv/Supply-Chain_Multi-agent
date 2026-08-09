@@ -326,7 +326,6 @@ export default function RiskPage() {
   // Counterfactual sliders (6 parameters)
   const [simSupplierDelay, setSimSupplierDelay] = useState(0)
   const [simWarehouseCap, setSimWarehouseCap] = useState(100)
-  const [simInventoryBuffer, setSimInventoryBuffer] = useState(15)
   const [simDemandLevel, setSimDemandLevel] = useState(100)
   const [simTransportDelay, setSimTransportDelay] = useState(0)
   const [simCarrierCap, setSimCarrierCap] = useState(100)
@@ -389,8 +388,7 @@ export default function RiskPage() {
     // Reset sliders
     setSimSupplierDelay(0)
     setSimWarehouseCap(100)
-    setSimInventoryBuffer(15)
-    setSimDemandLevel(100)
+        setSimDemandLevel(100)
     setSimTransportDelay(0)
     setSimCarrierCap(100)
   }, [selectedIssueId, selectedType])
@@ -547,7 +545,7 @@ export default function RiskPage() {
     const delayShift = (simSupplierDelay * 0.15) + (simTransportDelay * 0.22) - ((simWarehouseCap - 100) * 0.05) - ((simCarrierCap - 100) * 0.03)
     const delay = Math.max(0.2, Number((baseDelay + delayShift).toFixed(1)))
 
-    const riskShift = (simSupplierDelay * 0.005) - ((simInventoryBuffer - 15) * 0.008) + ((simDemandLevel - 100) * 0.003)
+    const riskShift = (simSupplierDelay * 0.005) + ((simDemandLevel - 100) * 0.003)
     const riskVal = Math.max(0.05, Math.min(0.99, baseRisk + riskShift))
     const risk = (riskVal * 100).toFixed(1) + '%'
 
@@ -560,7 +558,7 @@ export default function RiskPage() {
       : 'Maintain baseline buffers and request logistics override'
 
     return { delay, risk, loss, forecast: forecast.toFixed(1) + '%', savings, recommendation }
-  }, [simSupplierDelay, simWarehouseCap, simInventoryBuffer, simDemandLevel, simTransportDelay, simCarrierCap, inc])
+  }, [simSupplierDelay, simWarehouseCap, simDemandLevel, simTransportDelay, simCarrierCap, inc])
 
   // Mini Knowledge Graph representation (Step 4)
   const graphNodes = useMemo(() => [
@@ -1046,7 +1044,7 @@ export default function RiskPage() {
                     { node: inc.affectedSupplier, type: 'Supplier Origin', time: 'T+0h', severity: 'High', confidence: '98%', impact: '$142,000' },
                     { node: 'Inbound Carrier Freight', type: 'Transit Shipment', time: 'T+12h', severity: 'High', confidence: '96%', impact: '$210,000' },
                     { node: inc.affectedWarehouse, type: 'Distribution Center', time: 'T+24h', severity: 'Critical', confidence: '94%', impact: '$380,000' },
-                    { node: 'Central Buffer Inventory', type: 'Inventory Holding', time: 'T+36h', severity: 'Medium', confidence: '91%', impact: '$95,000' },
+                    { node: 'Secondary Carrier Route', type: 'Route Congestion', time: 'T+36h', severity: 'Medium', confidence: '91%', impact: '$95,000' },
                     { node: 'Market Customer Segments', type: 'Customer Delivery SLA', time: 'T+48h', severity: 'Medium', confidence: '89%', impact: '$120,000' },
                   ]).map((n, i, arr) => (
                     <div key={i} className={s.propStep}>
@@ -1143,7 +1141,7 @@ export default function RiskPage() {
                     {[
                       { label: 'Supplier Delay Shift', val: simSupplierDelay, set: setSimSupplierDelay, min: -10, max: 30, unit: ' days' },
                       { label: 'Warehouse Capacity', val: simWarehouseCap, set: setSimWarehouseCap, min: 50, max: 150, unit: '%' },
-                      { label: 'Inventory Buffer Size', val: simInventoryBuffer, set: setSimInventoryBuffer, min: 0, max: 50, unit: ' units' },
+
                       { label: 'Demand Load Shift', val: simDemandLevel, set: setSimDemandLevel, min: 50, max: 200, unit: '%' },
                       { label: 'Transport Delay Shift', val: simTransportDelay, set: setSimTransportDelay, min: -10, max: 20, unit: ' days' },
                       { label: 'Carrier Capacity Shift', val: simCarrierCap, set: setSimCarrierCap, min: 50, max: 150, unit: '%' },
@@ -1157,7 +1155,7 @@ export default function RiskPage() {
                       </div>
                     ))}
                     <button className={s.hdrBtn} style={{ marginTop: '8px', width: '100%' }} onClick={() => {
-                      setSimSupplierDelay(0); setSimWarehouseCap(100); setSimInventoryBuffer(15); setSimDemandLevel(100); setSimTransportDelay(0); setSimCarrierCap(100)
+                      setSimSupplierDelay(0); setSimWarehouseCap(100); setSimDemandLevel(100); setSimTransportDelay(0); setSimCarrierCap(100)
                     }}>Reset to Baseline</button>
                   </div>
                   <div className={s.simResults}>

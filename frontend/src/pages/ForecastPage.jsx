@@ -652,21 +652,6 @@ export default function ForecastPage() {
   })
 
 
-  const inventoryFI = useQuery({
-
-
-    queryKey: ['supplyChain', 'featureImportance', 'inventory'],
-
-
-    queryFn: () => api.getFeatureImportance('inventory').then(r => r.data),
-
-
-    staleTime: 120_000,
-
-
-  })
-
-
   const logisticsFI = useQuery({
 
 
@@ -910,7 +895,7 @@ export default function ForecastPage() {
 
 
 
-    const agentMap = ['Logistics Agent', 'Demand Agent', 'Inventory Agent', 'Supplier Agent', 'Logistics Agent', 'Demand Agent']
+    const agentMap = ['Logistics Agent', 'Demand Agent', 'Supplier Agent', 'Logistics Agent', 'Demand Agent', 'Supplier Agent']
 
 
 
@@ -1604,27 +1589,6 @@ export default function ForecastPage() {
 
 
 
-  const inventoryFeatures = useMemo(() => formatFI(inventoryFI.data, [
-
-
-    { name: 'Warehouse Stock Turn Rate', pct: 36.0 },
-
-
-    { name: 'Reorder Buffer Margin', pct: 29.5 },
-
-
-    { name: 'Category Volatility Std', pct: 18.0 },
-
-
-    { name: 'Regional Order Volume', pct: 11.5 },
-
-
-    { name: 'Lead Time Surcharge', pct: 5.0 },
-
-
-  ]), [inventoryFI.data])
-
-
 
 
 
@@ -2069,7 +2033,7 @@ export default function ForecastPage() {
       { name: 'Supplier Agent', accuracy: 89.5, color: '#e67e22' },
 
 
-      { name: 'Inventory Agent', accuracy: 91.8, color: '#d4a017' },
+
 
 
       { name: 'Logistics Agent', accuracy: 87.2, color: '#d63031' },
@@ -2213,7 +2177,7 @@ export default function ForecastPage() {
       reason:            'Ingest actuals in Step 2 to see real deviation',
 
 
-      responsible_agent: ['Logistics Agent', 'Inventory Agent', 'Supplier Agent', 'Demand Agent'][idx % 4],
+      responsible_agent: ['Logistics Agent', 'Supplier Agent', 'Demand Agent'][idx % 3],
 
 
       root_cause:        'Awaiting actual data ingestion for this period',
@@ -3614,88 +3578,21 @@ export default function ForecastPage() {
 
 
 
-                  {/* Inventory Agent */}
 
-
-                  <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #d4a017', boxShadow: '0 0 0 2px rgba(212,160,23,0.12)' } : {}}>
-
-
-                    <div className={styles.agentHead}>
-
-
-                      <div className={styles.agentName}><Warehouse size={15} style={{ color: '#d4a017' }} /> Inventory Agent</div>
-
-
-                      <span className="badge bdg-low">{invConf}% Conf</span>
-
-
+                  {/* Inventory Agent — excluded */}
+                  <div style={{
+                    border: '1.5px dashed var(--b)', borderRadius: '8px', padding: '14px 12px',
+                    background: 'var(--s0)', opacity: 0.65,
+                  }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--ts)', marginBottom: '4px' }}>Inventory</div>
+                    <div style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--tm)', marginBottom: '8px' }}>— excluded</div>
+                    <div style={{ fontSize: '9.5px', color: 'var(--tm)', lineHeight: '1.5' }}>
+                      DataCo contains no independent inventory signal (CV AUC 0.479).
+                      Excluding this agent rather than reporting a degenerate model.
                     </div>
-
-
-                    <div className={styles.agentPredVal} style={{ color: '#d4a017', display: 'flex', alignItems: 'baseline', gap: 6 }}>
-
-
-                      <span>{animStockRisk}% Risk</span>
-
-
-                      {forecastAnimating && <span style={{ fontSize: 10, color: '#d4a017', fontWeight: 700 }}>computing…</span>}
-
-
-                    </div>
-
-
-                    <div style={{ fontSize: '10px', color: '#00b894', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-
-
-                      <Minus size={12} /> Stock Buffer Status · {cycleMonth}
-
-
-                    </div>
-
-
-                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--ts)', marginTop: '4px' }}>Supporting Features (LightGBM):</div>
-
-
-                    <div className={styles.featureList}>
-
-
-                      {inventoryFeatures.map((feat, i) => (
-
-
-                        <div key={i}>
-
-
-                          <div className={styles.featureBarRow}><span>{feat.name}</span><span style={{ fontWeight: 700 }}>{feat.pct}%</span></div>
-
-
-                          <div className={styles.featureBarBg}><div className={styles.featureBarFill} style={{ width: forecastAnimating ? `${feat.pct * p}%` : `${feat.pct}%`, background: '#d4a017', transition: 'width 0.05s linear' }} /></div>
-
-
-                        </div>
-
-
-                      ))}
-
-
-                    </div>
-
-
-                    <div style={{ fontSize: '9.5px', color: 'var(--tm)', borderTop: '1px solid var(--b)', paddingTop: '6px' }}>
-
-
-                      Trained through: {cycleTrainedUntil} · Warehouse Zone 1
-
-
-                    </div>
-
-
                   </div>
 
-
-
-
-
-                  {/* Logistics Agent */}
+{/* Logistics Agent */}
 
 
                   <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #d63031', boxShadow: '0 0 0 2px rgba(214,48,49,0.12)' } : {}}>
@@ -3875,7 +3772,7 @@ export default function ForecastPage() {
                     <Warehouse size={16} style={{ color: '#d4a017' }} />
 
 
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tp)' }}>Inventory Agent</span>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded</span>
 
 
                     <span style={{ fontSize: '9px', color: 'var(--tm)' }}>Stock Buffer: OK</span>

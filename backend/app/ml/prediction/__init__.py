@@ -39,6 +39,9 @@ class PredictionResult:
     model_version: str
     predictions: list[float]
     probabilities: list[float] | None = None
+    # Raw model output — use for all evaluation, ablation, walk-forward metrics.
+    # Never contains amplification overlay.
+    probabilities_raw: list[float] | None = None
     confidence_scores: list[float] = field(default_factory=list)
     risk_levels: list[str] = field(default_factory=list)
     mean_confidence: float = 0.0
@@ -102,6 +105,7 @@ class PredictionEngine:
         intelligence_type: IntelligenceType,
         version_id: str | None = None,
         graph_context: dict[str, Any] | None = None,
+        apply_amplification: bool = True,
     ) -> PredictionResult:
         """
         Generate predictions for a dataframe.
@@ -134,38 +138,60 @@ class PredictionEngine:
         # ── GRAPH CONTEXT INJECTION ────────────────────────────────
         X = self._inject_graph_context(X, graph_context)
 
-        # Handle missing features by filling with 0
-        for feat in feature_config.features:
-            if feat not in X.columns:
-                X[feat] = 0
+        # ── MISSING FEATURE GUARD ─────────────────────────────────
+        missing = [f for f in feature_config.features if f not in X.columns]
+        if missing:
+            raise ValueError(
+                f"{intelligence_type.value} missing required features: {missing} "
+                f"— refusing to predict. Ensure feature engineering ran on this data."
+            )
 
         X = X[feature_config.features]
         X = X.fillna(0)
 
-        # Generate predictions
+        # Generate raw model outputs
         predictions = model.predict(X).tolist()
 
-        # ── GRAPH-DERIVED RISK AMPLIFICATION ───────────────────────
-        predictions, amplification_applied = self._apply_graph_amplification(
-            predictions, intelligence_type, graph_context
-        )
-
-        # Probabilities and confidence
+        # Probabilities, confidence, amplification
         probabilities = None
-        confidence_scores = []
-        risk_levels = []
+        amplification_applied: dict[str, Any] = {"amplified": False, "factor": 1.0, "reason": None}
+
+        confidence_scores: list[float] = []
+        risk_levels: list[str] = []
+        probabilities_raw: list[float] | None = None
 
         if feature_config.task == ModelTask.CLASSIFICATION:
             if hasattr(model, "predict_proba"):
-                prob_array = model.predict_proba(X)[:, 1]
-                probabilities = prob_array.tolist()
-                conf_result = compute_classification_confidence(prob_array)
+                prob_array_raw = model.predict_proba(X)[:, 1]
+                probabilities_raw = prob_array_raw.tolist()
+
+                if apply_amplification:
+                    prob_list, amplification_applied = self._apply_graph_amplification(
+                        prob_array_raw.tolist(), intelligence_type, graph_context
+                    )
+                    prob_array_final = np.clip(np.array(prob_list), 0.0, 1.0)
+                else:
+                    prob_array_final = prob_array_raw
+                    amplification_applied = {"amplified": False, "factor": 1.0, "reason": None}
+
+                # UI/decisions use final; metrics always use raw
+                probabilities = prob_array_final.tolist()
+                predictions = (prob_array_final >= 0.5).astype(int).tolist()
+                conf_result = compute_classification_confidence(prob_array_final)
                 confidence_scores = conf_result.confidence_scores
-                risk_levels = [_classify_risk(p) for p in prob_array]
+                risk_levels = [_classify_risk(p) for p in prob_array_final]
             else:
                 confidence_scores = [0.5] * len(predictions)
                 risk_levels = [_classify_risk(float(p)) for p in predictions]
         else:
+            raw_preds = predictions[:]
+            if apply_amplification:
+                predictions, amplification_applied = self._apply_graph_amplification(
+                    predictions, intelligence_type, graph_context
+                )
+            else:
+                amplification_applied = {"amplified": False, "factor": 1.0, "reason": None}
+            probabilities_raw = raw_preds
             conf_result = compute_regression_confidence(np.array(predictions))
             confidence_scores = conf_result.confidence_scores
 
@@ -186,6 +212,7 @@ class PredictionEngine:
             model_version=model_version,
             predictions=predictions,
             probabilities=probabilities,
+            probabilities_raw=probabilities_raw,
             confidence_scores=confidence_scores,
             risk_levels=risk_levels,
             mean_confidence=float(np.mean(confidence_scores)) if confidence_scores else 0.0,
@@ -197,6 +224,7 @@ class PredictionEngine:
             graph_amplification=amplification_applied,
             metadata={
                 "features_used": available_features,
+                "amplification_applied": apply_amplification,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
@@ -212,10 +240,12 @@ class PredictionEngine:
         X: pd.DataFrame, graph_context: dict[str, Any] | None
     ) -> pd.DataFrame:
         """
-        Injects live Knowledge Graph context as model features.
+        Maps GraphRAG internal names -> model feature names (graph_ prefix).
+        See CLAUDE.md section 5 "GraphRAG Context Naming Convention" for the
+        full two-stage transformation: avg_* (Neo4j) -> graph_* (ML model).
 
-        The 4 graph_* features exist at training time with neutral defaults.
-        At prediction time they are replaced with real values from Neo4j via GraphRAG.
+        The 4 graph_* columns exist at training time with neutral defaults.
+        At prediction time they are overwritten with live Neo4j values.
         """
         X = X.copy()
         if graph_context:
@@ -260,18 +290,12 @@ class PredictionEngine:
                 factor *= 1.15
                 reason.append("tpke_seasonal_edge")
 
-        elif intelligence_type == IntelligenceType.INVENTORY:
-            if float(graph_context.get("avg_supplier_reliability", 1.0)) < 0.5:
-                factor *= 1.30
-                reason.append("low_supplier_reliability")
-            if graph_context.get("holiday_risk_events"):
-                factor *= 1.20
-                reason.append("tpke_seasonal_stockout_edge")
-
         elif intelligence_type == IntelligenceType.SUPPLIER:
             if int(graph_context.get("amplified_supplier_count", 0)) > 0:
                 factor *= 1.20
                 reason.append("tpke_demand_spike_edge")
+
+        # NOTE: INVENTORY branch removed — agent excluded (CV AUC 0.479)
 
         if factor != 1.0:
             predictions = [float(p) * factor for p in predictions]
@@ -310,18 +334,6 @@ class DemandAgent:
         return self.engine.predict_single(record, IntelligenceType.DEMAND, version_id, graph_context)
 
 
-class InventoryAgent:
-    """Inventory Agent - predicts stockout risk."""
-    def __init__(self, registry: ModelRegistry | None = None):
-        self.engine = PredictionEngine(registry)
-
-    def predict(self, df: pd.DataFrame, version_id: str | None = None, graph_context: dict[str, Any] | None = None) -> PredictionResult:
-        return self.engine.predict(df, IntelligenceType.INVENTORY, version_id, graph_context)
-
-    def predict_single(self, record: dict[str, Any], version_id: str | None = None, graph_context: dict[str, Any] | None = None) -> PredictionRecord:
-        return self.engine.predict_single(record, IntelligenceType.INVENTORY, version_id, graph_context)
-
-
 class SupplierAgent:
     """Supplier Agent - predicts late delivery risk."""
     def __init__(self, registry: ModelRegistry | None = None):
@@ -350,4 +362,11 @@ class LogisticsAgent:
 def get_collaborative_pipeline(registry: ModelRegistry | None = None):
     from app.ml.prediction.collaborative_pipeline import CollaborativeAgentPipeline
     return CollaborativeAgentPipeline(registry)
+
+
+# Aliases for test compatibility (CLAUDE.md section 11)
+# NOTE: InventoryAgent/InventoryPredictor removed — excluded agent (CV AUC 0.479)
+DemandPredictor    = DemandAgent
+SupplierPredictor  = SupplierAgent
+LogisticsPredictor = LogisticsAgent
 

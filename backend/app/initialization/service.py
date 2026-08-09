@@ -30,6 +30,7 @@ from app.core.config import get_settings
 from app.data_engineering.pipeline import DataEngineeringPipeline
 from app.ml.training import TrainingOrchestrator, TrainingResult
 from app.ml.registry import ModelRegistry
+from app.ml.utils import GRAPH_CONTEXT_FEATURES
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,6 +42,82 @@ MASTER_DATASET_PATTERNS = [
     "dataco_supply_chain.csv",
     "dataco*.csv",
 ]
+
+_PARQUET_MIN_ROWS   = 100_000
+_PARQUET_DATE_MIN   = pd.Timestamp("2015-01-01")
+_PARQUET_DATE_MAX   = pd.Timestamp("2018-01-31")
+_PARQUET_DATE_COL   = "order date (DateOrders)"
+
+
+def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
+    """
+    Hard assertions on processed_master.parquet.
+
+    Raises RuntimeError (not a warning) on any violation:
+      1. Row count must be >= 100,000
+      2. Date range must cover 2015-01-01 .. 2018-01-31
+      3. All four GRAPH_CONTEXT_FEATURES must be present as columns
+    """
+    label = f" ({path})" if path else ""
+
+    # 1. Row count
+    if len(df) < _PARQUET_MIN_ROWS:
+        raise RuntimeError(
+            f"processed_master.parquet{label} has only {len(df):,} rows — "
+            f"expected >= {_PARQUET_MIN_ROWS:,}. "
+            f"This is a stub or truncated file. Re-run initialization."
+        )
+
+    # 2. Date range
+    if _PARQUET_DATE_COL not in df.columns:
+        raise RuntimeError(
+            f"processed_master.parquet{label} is missing date column "
+            f"'{_PARQUET_DATE_COL}'. Cannot verify date range."
+        )
+    dates = pd.to_datetime(df[_PARQUET_DATE_COL], errors="coerce").dropna()
+    if dates.empty:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: date column '{_PARQUET_DATE_COL}' "
+            f"contains no parseable dates."
+        )
+    actual_min = dates.min()
+    actual_max = dates.max()
+    if actual_min > _PARQUET_DATE_MIN:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: earliest date is {actual_min.date()} — "
+            f"expected <= {_PARQUET_DATE_MIN.date()}. Dataset does not cover full range."
+        )
+    if actual_max < _PARQUET_DATE_MAX:
+        raise RuntimeError(
+            f"processed_master.parquet{label}: latest date is {actual_max.date()} — "
+            f"expected >= {_PARQUET_DATE_MAX.date()}. Dataset does not cover full range."
+        )
+
+    # 3. Graph context features — must all be present (Tier-1 or Tier-2)
+    missing_graph = [c for c in GRAPH_CONTEXT_FEATURES if c not in df.columns]
+    if missing_graph:
+        raise RuntimeError(
+            f"processed_master.parquet{label} is missing graph context features: "
+            f"{missing_graph}. "
+            f"Ensure feature engineering ran to completion (Tier-1 aggregates "
+            f"must be present even when Neo4j enrichment is unavailable)."
+        )
+
+    # 4. Leaky columns must NOT appear in any agent's feature list
+    # (They may exist as raw columns in the parquet for RCA/display — that is fine.
+    # The ban is on using them as ML inputs, which is enforced at training time.)
+    from app.ml.utils import _LEAKY as _LEAKY_SETS, FEATURE_CONFIGS
+    all_feature_cols: set[str] = set()
+    for fc in FEATURE_CONFIGS.values():
+        all_feature_cols.update(fc.features)
+    all_leaky = set().union(*_LEAKY_SETS.values())
+    leaky_in_features = sorted(all_leaky & all_feature_cols & set(df.columns))
+    if leaky_in_features:
+        raise RuntimeError(
+            f"processed_master.parquet{label} has leaky columns present in "
+            f"agent feature lists: {leaky_in_features}. "
+            f"Remove them from FEATURE_CONFIGS before saving."
+        )
 
 
 class InitializationService:
@@ -56,6 +133,10 @@ class InitializationService:
         self._data_pipeline = DataEngineeringPipeline()
         self._training_orchestrator = TrainingOrchestrator()
         self._model_registry = ModelRegistry()
+        from app.graph.connection import Neo4jConnectionManager
+        # Do NOT connect here — the async driver must be connected and used
+        # within the same event loop.  Connection happens in _run_graph_steps().
+        self._graph_conn = Neo4jConnectionManager()
 
     def find_master_dataset(self) -> Path | None:
         """
@@ -86,7 +167,7 @@ class InitializationService:
 
         return None
 
-    def execute(self, dataset_path: Path | None = None) -> dict[str, Any]:
+    async def execute(self, dataset_path: Path | None = None) -> dict[str, Any]:
         """
         Execute the full initialization pipeline.
 
@@ -156,10 +237,11 @@ class InitializationService:
                 f"{pipeline_result.row_count_raw} → {pipeline_result.row_count_final} rows"
             )
 
-            # Step 3: Feature Engineering
+            # Step 3: Feature Engineering (Tier-1, no graph)
             step_start = time.perf_counter()
-            logger.info("[3/7] Feature engineering...")
-            df_features = self._engineer_features(df_processed)
+            logger.info("[3/7] Feature engineering (Tier-1)...")
+            from app.feature_engineering import engineer_features
+            df_features = engineer_features(df_processed)
             result["steps"]["feature_engineering"] = {
                 "status": "completed",
                 "features_created": len(df_features.columns) - len(df_processed.columns),
@@ -168,11 +250,130 @@ class InitializationService:
             }
             logger.info(f"[3/7] Feature engineering complete: {len(df_features.columns)} total columns")
 
-            # Step 4: Train ML Models
+            # Steps 4 + 4b: graph constraints + enrichment in ONE event loop
+            # The Neo4j async driver's transport is bound to the loop it is
+            # created in.  Running connect() and execute_query() in separate
+            # asyncio.run() calls destroys the transport between calls.
+            # Solution: one async function that connects, builds constraints,
+            # enriches, and disconnects — all within a single asyncio.run().
             step_start = time.perf_counter()
-            logger.info("[4/7] Training ML models...")
+            logger.info("[4/7] Building Knowledge Graph + enriching features...")
+
+            date_col = next(
+                (c for c in ("order_date", "order date (DateOrders)") if c in df_features.columns),
+                None,
+            )
+            if date_col is None:
+                raise RuntimeError(
+                    "Step 4b: no date column found in df_features. "
+                    "Cannot build chronological train_mask for graph enrichment."
+                )
+            dates = pd.to_datetime(df_features[date_col], errors="coerce")
+            if not dates.is_monotonic_increasing:
+                raise RuntimeError(
+                    "Step 4b: df_features is not sorted by date. "
+                    "Call _sort_chronologically before enrichment."
+                )
+            cutoff = dates.quantile(0.8)
+            train_mask = dates <= cutoff
+
+            from app.graph.enrichment import enrich_graph_features_from_neo4j
+            from app.graph.builder import GraphBuilder
+
+            async def _graph_steps(df_in: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
+                """Connect, build graph, enrich, disconnect — one loop."""
+                await self._graph_conn.connect()
+                try:
+                    builder = GraphBuilder(self._graph_conn)
+                    await builder.create_constraints()
+
+                    # Build graph nodes + relationships from the engineered DataFrame
+                    from app.graph.extractor import EntityExtractor
+                    extractor = EntityExtractor()
+
+                    # Fine-grained enrichment nodes — computed on training slice only
+                    window_end_str = str(cutoff.date()) if not pd.isna(cutoff) else ""
+                    supplier_routes = extractor.extract_supplier_routes(df_in, train_mask, window_end_str)
+                    routes          = extractor.extract_routes(df_in, train_mask, window_end_str)
+                    inventories     = extractor.extract_inventories(df_in, train_mask, window_end_str)
+
+                    # Coarse nodes for TPKE / RCA
+                    suppliers   = extractor.extract_suppliers(df_in)
+                    products    = extractor.extract_products(df_in)
+                    warehouses  = extractor.extract_warehouses(df_in)
+                    shipments   = extractor.extract_shipments(df_in)
+                    customers   = extractor.extract_customers(df_in)
+                    orders      = extractor.extract_orders(df_in, sample_size=5000)
+                    cal_events  = extractor.extract_calendar_events(df_in)
+                    rels        = extractor.extract_relationships(
+                        df_in, suppliers, products, warehouses,
+                        shipments, customers, orders, cal_events,
+                    )
+                    build_result = await builder.build_full_graph(
+                        suppliers=suppliers, products=products,
+                        warehouses=warehouses, shipments=shipments,
+                        customers=customers, orders=orders,
+                        calendar_events=cal_events, relationships=rels,
+                        dataset_version="master_v1",
+                        supplier_routes=supplier_routes,
+                        routes=routes,
+                        inventories=inventories,
+                    )
+                    logger.info(
+                        f"[4/7] Graph built: {build_result.nodes_created} nodes, "
+                        f"{build_result.relationships_created} rels"
+                    )
+
+                    df_out = await enrich_graph_features_from_neo4j(df_in, self._graph_conn, train_mask)
+                    return df_out, True
+                finally:
+                    await self._graph_conn.disconnect()
+
+            graph_enriched_flag = False
+            build_nodes = 0
+            build_rels = 0
+            try:
+                df_features, graph_enriched_flag = await _graph_steps(df_features)
+                result["steps"]["knowledge_graph"] = {
+                    "status": "completed",
+                    "nodes_created": build_nodes,
+                    "relationships_created": build_rels,
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+                }
+                result["steps"]["graph_enrichment"] = {
+                    "status": "completed",
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+                }
+                logger.info("[4/7] Graph constraints + enrichment complete")
+            except Exception as enrich_err:
+                allow_fallback = settings.allow_enrichment_fallback
+                if not allow_fallback:
+                    raise RuntimeError(
+                        f"Graph enrichment failed and ALLOW_ENRICHMENT_FALLBACK=False. "
+                        f"Training on unenriched features is not permitted. "
+                        f"Original error: {enrich_err}"
+                    ) from enrich_err
+                logger.warning(
+                    f"[4/7] Graph enrichment failed ({enrich_err}); "
+                    f"ALLOW_ENRICHMENT_FALLBACK=True — Tier-1 aggregates retained."
+                )
+                result["steps"]["knowledge_graph"] = {
+                    "status": "skipped", "reason": str(enrich_err),
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+                }
+                result["steps"]["graph_enrichment"] = {
+                    "status": "skipped", "reason": str(enrich_err), "degraded": True,
+                    "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
+                }
+
+            # Step 5: Train ML Models (now sees real graph features from Step 4)
+            step_start = time.perf_counter()
+            logger.info("[5/7] Training ML models...")
             training_results = self._training_orchestrator.train_all(
-                df_features, dataset_version="master_v1"
+                df_features, dataset_version="master_v1",
+                graph_enriched=graph_enriched_flag,
+                already_engineered=True,
+                training_path="initialization",
             )
             result["steps"]["training"] = {
                 "status": "completed",
@@ -187,23 +388,7 @@ class InitializationService:
                 },
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
-            logger.info(f"[4/7] Training complete: {len(training_results)} models")
-
-            # Step 5: Build Knowledge Graph
-            step_start = time.perf_counter()
-            logger.info("[5/7] Building Knowledge Graph...")
-            graph_result = self._build_knowledge_graph(df_features)
-            result["steps"]["knowledge_graph"] = {
-                "status": "completed",
-                "nodes_created": graph_result.get("nodes_created", 0),
-                "relationships_created": graph_result.get("relationships_created", 0),
-                "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
-            }
-            logger.info(
-                f"[5/7] Knowledge Graph built: "
-                f"{graph_result.get('nodes_created', 0)} nodes, "
-                f"{graph_result.get('relationships_created', 0)} relationships"
-            )
+            logger.info(f"[5/7] Training complete: {len(training_results)} models")
 
             # Step 6: Register models (already done in training step via registry)
             step_start = time.perf_counter()
@@ -222,7 +407,13 @@ class InitializationService:
             logger.info("[7/7] Saving processed dataset...")
             processed_path = Path(settings.upload_dir) / "processed_master.parquet"
             processed_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Hard pre-write guard — raises before touching disk if data is bad.
+            if len(df_features) >= _PARQUET_MIN_ROWS:
+                assert_parquet_integrity(df_features, str(processed_path))
+
             df_features.to_parquet(processed_path, index=False)
+
             result["steps"]["save"] = {
                 "status": "completed",
                 "path": str(processed_path),
@@ -235,8 +426,8 @@ class InitializationService:
             result["status"] = "completed"
             result["total_duration_ms"] = round(total_duration, 1)
             result["models_trained"] = len(training_results)
-            result["graph_nodes"] = graph_result.get("nodes_created", 0)
-            result["graph_relationships"] = graph_result.get("relationships_created", 0)
+            result["graph_nodes"] = result.get("steps", {}).get("knowledge_graph", {}).get("nodes_created", 0)
+            result["graph_relationships"] = result.get("steps", {}).get("knowledge_graph", {}).get("relationships_created", 0)
 
             logger.info(f"=== SYSTEM INITIALIZATION COMPLETED in {total_duration / 1000:.1f}s ===")
 
@@ -259,11 +450,11 @@ class InitializationService:
 
         # Shipping Intelligence
         if "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
-            df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+            df["shipping_delay"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
             df["shipping_delay_ratio"] = (
-                df["shipping_delay_days"] / df["Days for shipment (scheduled)"].replace(0, 1)
+                df["shipping_delay"] / df["Days for shipment (scheduled)"].replace(0, 1)
             )
-            df["is_delayed"] = (df["shipping_delay_days"] > 0).astype(int)
+            df["is_delayed"] = (df["shipping_delay"] > 0).astype(int)
 
         # Financial Intelligence
         if "Sales" in df.columns and "Order Item Quantity" in df.columns:
@@ -329,21 +520,22 @@ class InitializationService:
         """
         try:
             from app.graph.builder import GraphBuilder
-            from app.graph.connection import get_connection_manager
             import asyncio
 
-            conn = get_connection_manager()
-            builder = GraphBuilder(conn)
+            builder = GraphBuilder(self._graph_conn)
 
-            # Run async graph build synchronously inside the init pipeline
+            # Create constraints only — full node/rel build requires
+            # pre-extracted node lists (see GraphBuilder.build_full_graph signature).
+            # The orchestrator/extractor pipeline is responsible for the full build;
+            # here we just ensure indexes exist before enrichment runs.
             loop = asyncio.new_event_loop()
             try:
-                build_result = loop.run_until_complete(builder.build_full_graph(df))
+                loop.run_until_complete(builder.create_constraints())
             finally:
                 loop.close()
 
-            nodes_created = build_result.get("nodes_created", 0)
-            rels_created = build_result.get("relationships_created", 0)
+            nodes_created = 0
+            rels_created = 0
 
             # Persist metadata for startup reference
             import json

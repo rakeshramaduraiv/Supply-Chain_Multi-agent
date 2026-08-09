@@ -14,10 +14,13 @@ import pandas as pd
 from app.graph.nodes import (
     CalendarEventNode,
     CustomerNode,
+    InventoryNode,
     OrderNode,
     ProductNode,
+    RouteNode,
     ShipmentNode,
     SupplierNode,
+    SupplierRouteNode,
     WarehouseNode,
 )
 from app.graph.relationships import (
@@ -30,7 +33,7 @@ from app.graph.relationships import (
     create_stored_in,
     create_supplies,
 )
-from app.graph.utils import generate_node_id, safe_float, safe_int, safe_str, utc_now_iso
+from app.graph.utils import generate_node_id, safe_float, safe_int, safe_str, utc_now_iso, normalize_entity_name, slugify_entity_name
 
 logger = logging.getLogger(__name__)
 
@@ -42,15 +45,170 @@ class EntityExtractor:
     Aggregates row-level data into entity-level nodes with computed business features.
     """
 
+    def extract_supplier_routes(
+        self,
+        df: pd.DataFrame,
+        train_mask: pd.Series,
+        window_end: str = "",
+    ) -> list[SupplierRouteNode]:
+        """
+        Extract one SupplierRouteNode per (Department Name, Category Name, Order Region).
+        Properties computed on training slice only. Target: 714 nodes on DataCo.
+        """
+        dept_col   = "Department Name"
+        cat_col    = "Category Name"
+        region_col = "Order Region"
+        late_col   = "Late_delivery_risk"
+        real_col   = "Days for shipping (real)"
+        sched_col  = "Days for shipment (scheduled)"
+        rel_col    = "supplier_reliability_score"
+
+        required = [dept_col, cat_col, region_col]
+        if not all(c in df.columns for c in required):
+            return []
+
+        train_df = df[train_mask].copy()
+        nodes = []
+        grouped = train_df.groupby([dept_col, cat_col, region_col])
+
+        for (dept, cat, region), grp in grouped:
+            if not dept or not cat or not region:
+                continue
+            node_id = f"{safe_str(dept)}|{safe_str(cat)}|{safe_str(region)}"
+            n = len(grp)
+            late_rate = float(grp[late_col].mean()) if late_col in grp.columns else 0.3
+            reliability = float(grp[rel_col].mean()) if rel_col in grp.columns else max(0.0, 1.0 - late_rate)
+            if real_col in grp.columns and sched_col in grp.columns:
+                lead_vals = grp[real_col] - grp[sched_col]
+                lead_mean = float(lead_vals.mean())
+                lead_std  = float(lead_vals.std()) if len(lead_vals) > 1 else 0.0
+            else:
+                lead_mean = lead_std = 0.0
+            nodes.append(SupplierRouteNode(
+                node_id=node_id,
+                dept=safe_str(dept),
+                category=safe_str(cat),
+                region=safe_str(region),
+                reliability_score=round(reliability, 4),
+                hist_late_rate=round(late_rate, 4),
+                lead_time_mean=round(lead_mean, 3),
+                lead_time_std=round(lead_std, 3),
+                order_volume=n,
+                window_end=window_end,
+                computed_from_window=True,
+            ))
+
+        logger.info(f"Extracted {len(nodes)} SupplierRoute nodes")
+        return nodes
+
+    def extract_routes(
+        self,
+        df: pd.DataFrame,
+        train_mask: pd.Series,
+        window_end: str = "",
+    ) -> list[RouteNode]:
+        """
+        Extract one RouteNode per (Shipping Mode, Order Region, Order Country).
+        Properties computed on training slice only. Target: 572 nodes on DataCo.
+        """
+        mode_col    = "Shipping Mode"
+        region_col  = "Order Region"
+        country_col = "Order Country"
+        late_col    = "Late_delivery_risk"
+        real_col    = "Days for shipping (real)"
+        sched_col   = "Days for shipment (scheduled)"
+
+        required = [mode_col, region_col, country_col]
+        if not all(c in df.columns for c in required):
+            return []
+
+        train_df = df[train_mask].copy()
+        nodes = []
+        grouped = train_df.groupby([mode_col, region_col, country_col])
+
+        for (mode, region, country), grp in grouped:
+            if not mode or not region or not country:
+                continue
+            node_id = f"{safe_str(mode)}|{safe_str(region)}|{safe_str(country)}"
+            n = len(grp)
+            late_rate = float(grp[late_col].mean()) if late_col in grp.columns else 0.3
+            if real_col in grp.columns and sched_col in grp.columns:
+                avg_delay = float((grp[real_col] - grp[sched_col]).mean())
+            else:
+                avg_delay = 0.0
+            nodes.append(RouteNode(
+                node_id=node_id,
+                shipping_mode=safe_str(mode),
+                order_region=safe_str(region),
+                order_country=safe_str(country),
+                avg_delay=round(avg_delay, 3),
+                late_delivery_rate=round(late_rate, 4),
+                order_volume=n,
+                window_end=window_end,
+                computed_from_window=True,
+            ))
+
+        logger.info(f"Extracted {len(nodes)} Route nodes")
+        return nodes
+
+    def extract_inventories(
+        self,
+        df: pd.DataFrame,
+        train_mask: pd.Series,
+        window_end: str = "",
+    ) -> list[InventoryNode]:
+        """
+        Extract one InventoryNode per (Category Name, Order Region).
+        Properties computed on training slice only. Target: 691 nodes on DataCo.
+        """
+        cat_col    = "Category Name"
+        region_col = "Order Region"
+        late_col   = "Late_delivery_risk"
+        stress_col = "inventory_stress_index"
+
+        required = [cat_col, region_col]
+        if not all(c in df.columns for c in required):
+            return []
+
+        train_df = df[train_mask].copy()
+        nodes = []
+        grouped = train_df.groupby([cat_col, region_col])
+
+        for (cat, region), grp in grouped:
+            if not cat or not region:
+                continue
+            node_id = f"{safe_str(cat)}|{safe_str(region)}"
+            n = len(grp)
+            late_rate = float(grp[late_col].mean()) if late_col in grp.columns else 0.3
+            stress = float(grp[stress_col].mean()) if stress_col in grp.columns else late_rate
+            nodes.append(InventoryNode(
+                node_id=node_id,
+                category=safe_str(cat),
+                region=safe_str(region),
+                avg_inventory_stress=round(stress, 4),
+                avg_late_rate=round(late_rate, 4),
+                order_volume=n,
+                window_end=window_end,
+                computed_from_window=True,
+            ))
+
+        logger.info(f"Extracted {len(nodes)} Inventory nodes")
+        return nodes
+
     def extract_suppliers(self, df: pd.DataFrame) -> list[SupplierNode]:
         """Extract unique supplier nodes with aggregated metrics."""
         if "Department Name" not in df.columns:
             return []
 
         suppliers = []
-        grouped = df.groupby("Department Name")
+        # Normalize department names before grouping (#4)
+        df = df.copy()
+        df["_dept_norm"] = df["Department Name"].apply(normalize_entity_name)
+        grouped = df.groupby("_dept_norm")
 
         for name, group in grouped:
+            if not name:
+                continue
             supplier_id = generate_node_id("Supplier", name)
             total_orders = len(group)
 
@@ -107,9 +265,14 @@ class EntityExtractor:
             return []
 
         products = []
-        grouped = df.groupby(cat_col)
+        # Normalize category names before grouping (#4)
+        df = df.copy()
+        df["_cat_norm"] = df[cat_col].apply(normalize_entity_name)
+        grouped = df.groupby("_cat_norm")
 
         for category, group in grouped:
+            if not category:
+                continue
             product_id = generate_node_id("Product", category)
             qty_col = "Order Item Quantity"
 
@@ -171,9 +334,14 @@ class EntityExtractor:
             return []
 
         warehouses = []
-        grouped = df.groupby(city_col)
+        # Normalize city names before grouping (#4)
+        df = df.copy()
+        df["_city_norm"] = df[city_col].apply(normalize_entity_name)
+        grouped = df.groupby("_city_norm")
 
         for city, group in grouped:
+            if not city:
+                continue
             warehouse_id = generate_node_id("Warehouse", city)
             region = safe_str(group[region_col].iloc[0]) if region_col in group.columns else ""
             total = len(group)
@@ -282,27 +450,57 @@ class EntityExtractor:
         logger.info(f"Extracted {len(customers)} customer nodes")
         return customers
 
-    def extract_orders(self, df: pd.DataFrame, sample_size: int = 5000) -> list[OrderNode]:
-        """Extract order nodes (sampled for large datasets)."""
+    def extract_orders(
+        self,
+        df: pd.DataFrame,
+        sample_size: int = 5000,
+        strategy: str = "stratified",
+    ) -> list[OrderNode]:
+        """
+        Extract order nodes using a sampling strategy (#10).
+
+        strategy:
+          'stratified' — sample equally from each calendar month (default)
+          'all'        — load all orders (may be slow on 180k rows)
+          'recent'     — load orders from the most recent 6 months
+        """
         order_col = "Order Id"
         if order_col not in df.columns:
             return []
 
-        sampled = df.drop_duplicates(subset=[order_col])
-        if len(sampled) > sample_size:
-            sampled = sampled.sample(n=sample_size, random_state=42)
+        date_col = "order date (DateOrders)"
+        df = df.copy()
+        if date_col in df.columns:
+            df["_order_date"] = pd.to_datetime(df[date_col], errors="coerce")
+        else:
+            df["_order_date"] = pd.NaT
+
+        if strategy == "all":
+            sampled = df.drop_duplicates(subset=[order_col])
+        elif strategy == "recent":
+            max_date = df["_order_date"].max()
+            cutoff   = max_date - pd.Timedelta(days=180)
+            sampled  = df[df["_order_date"] >= cutoff].drop_duplicates(subset=[order_col])
+        else:  # stratified (default)
+            df["_month"] = df["_order_date"].dt.to_period("M").astype(str)
+            per_month = max(1, sample_size // max(df["_month"].nunique(), 1))
+            sampled = (
+                df.groupby("_month", group_keys=False)
+                .apply(lambda g: g.sample(n=min(per_month, len(g)), random_state=42))
+                .drop_duplicates(subset=[order_col])
+            )
 
         orders = []
         for _, row in sampled.iterrows():
             oid = safe_str(row.get(order_col))
             if not oid:
                 continue
-            node_id = generate_node_id("Order", oid)
-            order_date = safe_str(row.get("order date (DateOrders)", ""))
-            value = safe_float(row.get("Sales", 0))
-            qty = safe_int(row.get("Order Item Quantity", 0))
-            profit = safe_float(row.get("Order Profit Per Order", 0))
-            risk = safe_float(row.get("Late_delivery_risk", 0))
+            node_id    = generate_node_id("Order", oid)
+            order_date = safe_str(row.get(date_col, ""))
+            value      = safe_float(row.get("Sales", 0))
+            qty        = safe_int(row.get("Order Item Quantity", 0))
+            profit     = safe_float(row.get("Order Profit Per Order", 0))
+            risk       = safe_float(row.get("Late_delivery_risk", 0))
 
             orders.append(OrderNode(
                 node_id=node_id,
@@ -314,7 +512,7 @@ class EntityExtractor:
                 risk_score=round(risk, 4),
             ))
 
-        logger.info(f"Extracted {len(orders)} order nodes")
+        logger.info(f"Extracted {len(orders)} order nodes (strategy={strategy})")
         return orders
 
     def extract_calendar_events(self, df: pd.DataFrame) -> list[CalendarEventNode]:
@@ -335,7 +533,7 @@ class EntityExtractor:
             m = safe_int(month)
             if m < 1 or m > 12:
                 continue
-            event_id = generate_node_id("CalendarEvent", f"month_{m}")
+            event_id = generate_node_id("TemporalPeriod", f"month_{m}")
             events.append(CalendarEventNode(
                 node_id=event_id,
                 event_id=event_id,
@@ -346,7 +544,7 @@ class EntityExtractor:
 
         # Weekend events
         if "order_is_weekend" in df.columns:
-            weekend_id = generate_node_id("CalendarEvent", "weekend")
+            weekend_id = generate_node_id("TemporalPeriod", "weekend")
             events.append(CalendarEventNode(
                 node_id=weekend_id,
                 event_id=weekend_id,
@@ -475,72 +673,80 @@ class EntityExtractor:
                         updated_at=now,
                     ))
 
-        # PLACED: Customer → Order
-        if "Customer Id" in df.columns and "Order Id" in df.columns:
-            for order in orders:
-                matching = df[df["Order Id"].astype(str) == order.order_id]
-                if len(matching) > 0:
-                    cust_id = safe_str(matching.iloc[0].get("Customer Id"))
-                    customer = customer_map.get(cust_id)
-                    if customer:
-                        relationships.append(create_placed(
-                            source_id=customer.node_id,
-                            source_label="Customer",
-                            target_id=order.node_id,
-                            target_label="Order",
-                            relationship_strength=1.0,
-                            frequency=1,
-                            confidence=1.0,
-                            created_at=now,
-                            updated_at=now,
-                        ))
+        # PLACED: Customer → Order, CONTAINS: Order → Product, INFLUENCES: TemporalPeriod → Order
+        if "Order Id" in df.columns:
+            cols = [c for c in ["Order Id", "Customer Id", "Category Name", "order_month"] if c in df.columns]
+            subset_df = df[cols].copy()
+            subset_df["Order Id Str"] = subset_df["Order Id"].astype(str)
+            lookup_df = subset_df.drop_duplicates(subset="Order Id Str")
+            lookup_map = {
+                row["Order Id Str"]: (
+                    safe_str(row.get("Customer Id")),
+                    safe_str(row.get("Category Name")),
+                    safe_int(row.get("order_month"))
+                )
+                for _, row in lookup_df.iterrows()
+            }
 
-        # CONTAINS: Order → Product
-        if "Order Id" in df.columns and "Category Name" in df.columns:
-            for order in orders:
-                matching = df[df["Order Id"].astype(str) == order.order_id]
-                if len(matching) > 0:
-                    cat = safe_str(matching.iloc[0].get("Category Name"))
-                    product = product_map.get(cat)
-                    if product:
-                        relationships.append(create_contains(
-                            source_id=order.node_id,
-                            source_label="Order",
-                            target_id=product.node_id,
-                            target_label="Product",
-                            relationship_strength=1.0,
-                            frequency=1,
-                            confidence=1.0,
-                            created_at=now,
-                            updated_at=now,
-                        ))
-
-        # INFLUENCES: CalendarEvent → Order (monthly)
-        if "order_month" in df.columns and calendar_events:
-            month_event_map = {e.event_name: e for e in calendar_events if e.event_type == "monthly_period"}
+            month_event_map = {}
             month_names = {
                 1: "January", 2: "February", 3: "March", 4: "April",
                 5: "May", 6: "June", 7: "July", 8: "August",
                 9: "September", 10: "October", 11: "November", 12: "December",
             }
+            if "order_month" in df.columns and calendar_events:
+                month_event_map = {e.event_name: e for e in calendar_events if e.event_type == "monthly_period"}
+
             for order in orders:
-                matching = df[df["Order Id"].astype(str) == order.order_id]
-                if len(matching) > 0:
-                    month_val = safe_int(matching.iloc[0].get("order_month"))
-                    month_name = month_names.get(month_val)
-                    event = month_event_map.get(month_name) if month_name else None
-                    if event:
-                        relationships.append(create_influences(
-                            source_id=event.node_id,
-                            source_label="CalendarEvent",
-                            target_id=order.node_id,
-                            target_label="Order",
-                            relationship_strength=0.7,
-                            frequency=1,
-                            confidence=0.8,
-                            created_at=now,
-                            updated_at=now,
-                        ))
+                vals = lookup_map.get(order.order_id)
+                if vals:
+                    cust_id, cat, month_val = vals
+                    
+                    if "Customer Id" in df.columns:
+                        customer = customer_map.get(cust_id)
+                        if customer:
+                            relationships.append(create_placed(
+                                source_id=customer.node_id,
+                                source_label="Customer",
+                                target_id=order.node_id,
+                                target_label="Order",
+                                relationship_strength=1.0,
+                                frequency=1,
+                                confidence=1.0,
+                                created_at=now,
+                                updated_at=now,
+                            ))
+                            
+                    if "Category Name" in df.columns:
+                        product = product_map.get(cat)
+                        if product:
+                            relationships.append(create_contains(
+                                source_id=order.node_id,
+                                source_label="Order",
+                                target_id=product.node_id,
+                                target_label="Product",
+                                relationship_strength=1.0,
+                                frequency=1,
+                                confidence=1.0,
+                                created_at=now,
+                                updated_at=now,
+                            ))
+                            
+                    if "order_month" in df.columns and calendar_events:
+                        month_name = month_names.get(month_val)
+                        event = month_event_map.get(month_name) if month_name else None
+                        if event:
+                            relationships.append(create_influences(
+                                source_id=event.node_id,
+                                source_label="TemporalPeriod",
+                                target_id=order.node_id,
+                                target_label="Order",
+                                relationship_strength=0.7,
+                                frequency=1,
+                                confidence=0.8,
+                                created_at=now,
+                                updated_at=now,
+                            ))
 
         logger.info(f"Extracted {len(relationships)} relationships")
         return relationships

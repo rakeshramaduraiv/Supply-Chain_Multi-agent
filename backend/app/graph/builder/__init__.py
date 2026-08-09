@@ -14,10 +14,13 @@ from app.graph.nodes import (
     BaseNode,
     CalendarEventNode,
     CustomerNode,
+    InventoryNode,
     OrderNode,
     ProductNode,
+    RouteNode,
     ShipmentNode,
     SupplierNode,
+    SupplierRouteNode,
     WarehouseNode,
 )
 from app.graph.relationships import BaseRelationship
@@ -56,6 +59,24 @@ class BuildResult:
 # --- Cypher MERGE Templates ---
 
 _NODE_MERGE_TEMPLATES = {
+    "SupplierRoute": """
+        UNWIND $batch AS props
+        MERGE (n:SupplierRoute {node_id: props.node_id})
+        SET n += props, n.updated_at = $now
+        RETURN count(n) AS cnt
+    """,
+    "Route": """
+        UNWIND $batch AS props
+        MERGE (n:Route {node_id: props.node_id})
+        SET n += props, n.updated_at = $now
+        RETURN count(n) AS cnt
+    """,
+    "Inventory": """
+        UNWIND $batch AS props
+        MERGE (n:Inventory {node_id: props.node_id})
+        SET n += props, n.updated_at = $now
+        RETURN count(n) AS cnt
+    """,
     "Supplier": """
         UNWIND $batch AS props
         MERGE (n:Supplier {node_id: props.node_id})
@@ -92,9 +113,9 @@ _NODE_MERGE_TEMPLATES = {
         SET n += props, n.updated_at = $now
         RETURN count(n) AS cnt
     """,
-    "CalendarEvent": """
+    "TemporalPeriod": """
         UNWIND $batch AS props
-        MERGE (n:CalendarEvent {node_id: props.node_id})
+        MERGE (n:TemporalPeriod {node_id: props.node_id})
         SET n += props, n.updated_at = $now
         RETURN count(n) AS cnt
     """,
@@ -134,13 +155,16 @@ class GraphBuilder:
     async def create_constraints(self) -> None:
         """Create uniqueness constraints and indexes for all node types."""
         constraints = [
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (n:SupplierRoute) REQUIRE n.node_id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Route) REQUIRE n.node_id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Inventory) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Supplier) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Product) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Warehouse) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Shipment) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Customer) REQUIRE n.node_id IS UNIQUE",
             "CREATE CONSTRAINT IF NOT EXISTS FOR (n:Order) REQUIRE n.node_id IS UNIQUE",
-            "CREATE CONSTRAINT IF NOT EXISTS FOR (n:CalendarEvent) REQUIRE n.node_id IS UNIQUE",
+            "CREATE CONSTRAINT IF NOT EXISTS FOR (n:TemporalPeriod) REQUIRE n.node_id IS UNIQUE",
         ]
         for cypher in constraints:
             try:
@@ -233,6 +257,9 @@ class GraphBuilder:
         relationships: list[BaseRelationship],
         dataset_version: str = "",
         clear_existing: bool = False,
+        supplier_routes: list[SupplierRouteNode] | None = None,
+        routes: list[RouteNode] | None = None,
+        inventories: list[InventoryNode] | None = None,
     ) -> BuildResult:
         """
         Build the complete Knowledge Graph.
@@ -254,17 +281,31 @@ class GraphBuilder:
             if clear_existing:
                 await self.clear_graph()
 
-            # Build nodes
+            # Fine-grained enrichment nodes first (enrichment Cypher depends on them)
+            if supplier_routes:
+                result.nodes_created += await self.build_nodes(supplier_routes, "SupplierRoute")
+            if routes:
+                result.nodes_created += await self.build_nodes(routes, "Route")
+            if inventories:
+                result.nodes_created += await self.build_nodes(inventories, "Inventory")
+
+            # Coarse nodes (TPKE / RCA)
             result.nodes_created += await self.build_nodes(suppliers, "Supplier")
             result.nodes_created += await self.build_nodes(products, "Product")
             result.nodes_created += await self.build_nodes(warehouses, "Warehouse")
             result.nodes_created += await self.build_nodes(shipments, "Shipment")
             result.nodes_created += await self.build_nodes(customers, "Customer")
             result.nodes_created += await self.build_nodes(orders, "Order")
-            result.nodes_created += await self.build_nodes(calendar_events, "CalendarEvent")
+            result.nodes_created += await self.build_nodes(calendar_events, "TemporalPeriod")
 
             # Build relationships
             result.relationships_created = await self.build_relationships(relationships)
+
+            # Build peer edges — must run AFTER all fine-grained nodes exist.
+            # These cross-key edges are what make enrichment traversal
+            # structurally different from a pandas groupby.
+            peer_edges = await self.build_peer_edges()
+            result.relationships_created += peer_edges
 
         except Exception as e:
             result.errors.append(str(e))
@@ -276,6 +317,93 @@ class GraphBuilder:
             f"{result.relationships_created} rels, {result.duration_ms:.1f}ms"
         )
         return result
+
+    async def build_peer_edges(self) -> int:
+        """
+        Create cross-key peer edges on the training-slice nodes.
+        These edges are what make enrichment structurally different from a groupby.
+
+        :SIMILAR_TO   — SupplierRoute pairs sharing dept OR category (not both).
+                        weight = 1 / (1 + |reliability_score_a - reliability_score_b|)
+                        so closer peers get higher weight in the blend.
+
+        :SHARES_LANE  — Route pairs sharing region but different shipping_mode.
+                        weight = 1 / (1 + |avg_delay_a - avg_delay_b|)
+
+        :SAME_CATEGORY — Inventory pairs sharing category but different region.
+                        weight = 1 / (1 + |avg_inventory_stress_a - avg_inventory_stress_b|)
+        """
+        total = 0
+
+        # :SIMILAR_TO on SupplierRoute — same dept, different category
+        q_similar_dept = """
+        MATCH (a:SupplierRoute), (b:SupplierRoute)
+        WHERE a.dept = b.dept
+          AND a.category <> b.category
+          AND a.node_id < b.node_id
+        WITH a, b,
+             1.0 / (1.0 + abs(a.reliability_score - b.reliability_score)) AS w
+        ORDER BY w DESC LIMIT 2000
+        MERGE (a)-[r:SIMILAR_TO]-(b)
+        SET r.weight = w, r.basis = 'dept'
+        RETURN count(r) AS cnt
+        """
+        # :SIMILAR_TO on SupplierRoute — same category, different dept
+        q_similar_cat = """
+        MATCH (a:SupplierRoute), (b:SupplierRoute)
+        WHERE a.category = b.category
+          AND a.dept <> b.dept
+          AND a.node_id < b.node_id
+        WITH a, b,
+             1.0 / (1.0 + abs(a.reliability_score - b.reliability_score)) AS w
+        ORDER BY w DESC LIMIT 2000
+        MERGE (a)-[r:SIMILAR_TO]-(b)
+        SET r.weight = w, r.basis = 'category'
+        RETURN count(r) AS cnt
+        """
+        # :SHARES_LANE on Route — same region, different shipping_mode
+        q_shares_lane = """
+        MATCH (a:Route), (b:Route)
+        WHERE a.order_region = b.order_region
+          AND a.shipping_mode <> b.shipping_mode
+          AND a.node_id < b.node_id
+        WITH a, b,
+             1.0 / (1.0 + abs(a.avg_delay - b.avg_delay)) AS w
+        ORDER BY w DESC LIMIT 2000
+        MERGE (a)-[r:SHARES_LANE]-(b)
+        SET r.weight = w
+        RETURN count(r) AS cnt
+        """
+        # :SAME_CATEGORY on Inventory — same category, different region
+        q_same_cat = """
+        MATCH (a:Inventory), (b:Inventory)
+        WHERE a.category = b.category
+          AND a.region <> b.region
+          AND a.node_id < b.node_id
+        WITH a, b,
+             1.0 / (1.0 + abs(a.avg_inventory_stress - b.avg_inventory_stress)) AS w
+        ORDER BY w DESC LIMIT 2000
+        MERGE (a)-[r:SAME_CATEGORY]-(b)
+        SET r.weight = w
+        RETURN count(r) AS cnt
+        """
+
+        for label, query in [
+            ("SIMILAR_TO (dept)",    q_similar_dept),
+            ("SIMILAR_TO (category)", q_similar_cat),
+            ("SHARES_LANE",          q_shares_lane),
+            ("SAME_CATEGORY",        q_same_cat),
+        ]:
+            try:
+                records = await self._conn.execute_write(query)
+                cnt = records[0].get("cnt", 0) if records else 0
+                logger.info(f"build_peer_edges: {cnt} {label} edges created/updated")
+                total += cnt
+            except Exception as e:
+                logger.error(f"build_peer_edges {label} failed: {e}")
+
+        logger.info(f"build_peer_edges complete: {total} total peer edges")
+        return total
 
     async def delete_nodes_by_label(self, label: str) -> int:
         """Delete all nodes of a specific label."""

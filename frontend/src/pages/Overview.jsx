@@ -32,10 +32,9 @@ import styles from './EntityPage.module.css'
 import { useSharedParams } from '../hooks/useSharedParams'
 
 export const MULTI_AGENTS = [
-  { key: 'DemandAgent',    label: 'Demand',     icon: TrendingUp,  color: '#10b981', entityType: 'Product',   agentName: 'Demand Planning Agent',           rwdaaWeight: '0.35', confidence: '94.0%', taskTarget: 'Master Order Volume & SKUs' },
-  { key: 'SupplierAgent',  label: 'Supplier',   icon: Factory,     color: '#f59e0b', entityType: 'Supplier',  agentName: 'Supplier Intelligence Agent',     rwdaaWeight: '0.25', confidence: '91.0%', taskTarget: 'Supplier Delays & Lead-Time' },
-  { key: 'InventoryAgent', label: 'Inventory',  icon: Building2,   color: '#8b5cf6', entityType: 'Warehouse', agentName: 'Inventory & Warehouse Agent',     rwdaaWeight: '0.20', confidence: '93.0%', taskTarget: 'Warehouse Capacity & Stockout' },
-  { key: 'LogisticsAgent', label: 'Logistics',  icon: Truck,       color: '#ec4899', entityType: 'Shipment',  agentName: 'Logistics & Transportation Agent',rwdaaWeight: '0.20', confidence: '89.0%', taskTarget: 'Carrier SLA & Transit Routes' },
+  { key: 'DemandAgent',    label: 'Demand',    icon: TrendingUp, color: '#10b981', entityType: 'Product',  agentName: 'Demand Planning Agent',           rwdaaWeight: '0.30', confidence: '94.0%', taskTarget: 'Master Order Volume & SKUs' },
+  { key: 'SupplierAgent',  label: 'Supplier',  icon: Factory,    color: '#f59e0b', entityType: 'Supplier', agentName: 'Supplier Intelligence Agent',     rwdaaWeight: '0.45', confidence: '91.0%', taskTarget: 'Supplier Delays & Lead-Time' },
+  { key: 'LogisticsAgent', label: 'Logistics', icon: Truck,      color: '#ec4899', entityType: 'Shipment', agentName: 'Logistics & Transportation Agent', rwdaaWeight: '0.25', confidence: '89.0%', taskTarget: 'Carrier SLA & Transit Routes' },
 ]
 
 export const ENTITY_TYPES = MULTI_AGENTS
@@ -261,11 +260,11 @@ export default function Overview() {
           <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--b)' }}>
             <div style={{ fontSize: '11px', fontWeight: 850, color: 'var(--tp)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>Multi-Agent Explorer</span>
-              <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe' }}>4 BI Decision Agents</span>
+              <span style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '4px', background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe' }}>3 BI Decision Agents</span>
             </div>
 
             {/* Multi-Agent Type Tabs (4 Enterprise BI Decision Agents) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', marginBottom: '10px' }}>
               {MULTI_AGENTS.map(agent => {
                 const Icon = agent.icon
                 const isActive = selectedType === agent.entityType || selectedType === agent.key

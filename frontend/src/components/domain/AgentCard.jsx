@@ -2,13 +2,105 @@ import RiskGauge from '../ui/RiskGauge'
 import RiskBadge from '../ui/RiskBadge'
 
 const AGENTS = {
-  demand:    { label: 'Demand Forecasting', color: 'var(--dem)', model: 'LightGBM Regressor' },
-  inventory: { label: 'Inventory Health',   color: 'var(--inv)', model: 'LightGBM Classifier' },
-  supplier:  { label: 'Supplier Risk',      color: 'var(--sup)', model: 'Random Forest + LightGBM' },
-  logistics: { label: 'Logistics Risk',     color: 'var(--log)', model: 'LightGBM Classifier' },
+  demand:    { label: 'Demand Forecasting', color: 'var(--dem)', model: 'LightGBM Regressor',    primaryMetric: 'R²',  secondaryMetric: 'MAPE' },
+  supplier:  { label: 'Supplier Risk',      color: 'var(--sup)', model: 'Random Forest',          primaryMetric: 'AUC', secondaryMetric: 'F1'   },
+  logistics: { label: 'Logistics Risk',     color: 'var(--log)', model: 'LightGBM Classifier',    primaryMetric: 'AUC', secondaryMetric: 'F1'   },
 }
 
-export default function AgentCard({ type, score = 0, metrics = [], period }) {
+function KGBadge({ graphEnriched, coverage }) {
+  if (graphEnriched && coverage >= 0.5) {
+    return (
+      <span style={{
+        fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px',
+        background: 'rgba(0,184,148,0.12)', color: '#00b894', border: '1px solid rgba(0,184,148,0.3)',
+        display: 'inline-block', marginBottom: '6px',
+      }}>
+        KG-enriched ({Math.round(coverage * 100)}%)
+      </span>
+    )
+  }
+  return (
+    <span style={{
+      fontSize: '9px', fontWeight: 700, padding: '2px 7px', borderRadius: '4px',
+      background: 'rgba(230,126,34,0.12)', color: '#e67e22', border: '1px solid rgba(230,126,34,0.3)',
+      display: 'inline-block', marginBottom: '6px',
+    }}>
+      Tier-1 only
+    </span>
+  )
+}
+
+export function AgentMetricsPanel({ agents = {} }) {
+  // agents: { demand: { score, metrics, graphEnriched, coverage }, supplier: {...}, logistics: {...} }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) 1fr', gap: '12px', alignItems: 'start' }}>
+      {['demand', 'supplier', 'logistics'].map(type => {
+        const cfg = AGENTS[type]
+        const data = agents[type] || {}
+        const score = data.score ?? 0
+        const level = score >= 0.65 ? 'high' : score >= 0.35 ? 'med' : 'low'
+        const metrics = data.metrics || []
+
+        // Ensure accuracy is never shown alone — require companion metrics
+        const hasCompanion = metrics.some(m =>
+          ['precision', 'recall', 'auc', 'f1', 'mape', 'r2', 'rmse'].some(k =>
+            m.label?.toLowerCase().includes(k)
+          )
+        )
+        const safeMetrics = hasCompanion ? metrics : metrics.filter(m =>
+          !m.label?.toLowerCase().includes('accuracy')
+        )
+
+        return (
+          <div key={type} className="agent-card">
+            <div className="agent-accent" style={{ background: cfg.color }} />
+            <div className="agent-body">
+              <div className="agent-head">
+                <div>
+                  <div className="agent-name">{cfg.label}</div>
+                  <div className="agent-model">{cfg.model}</div>
+                </div>
+                <RiskBadge level={level} />
+              </div>
+              <KGBadge graphEnriched={data.graphEnriched} coverage={data.coverage ?? 0} />
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0 8px' }}>
+                <RiskGauge score={score} size={90} color={cfg.color} label="Risk" />
+              </div>
+              <div className="agent-metrics">
+                {safeMetrics.slice(0, 4).map((m, i) => (
+                  <div key={i}>
+                    <div className="agent-metric-lbl">{m.label}</div>
+                    <div className="agent-metric-val">{m.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Excluded inventory tile — dashed border, muted, methodological note */}
+      <div style={{
+        border: '1.5px dashed var(--b)', borderRadius: '8px', padding: '14px 12px',
+        background: 'var(--s0)', opacity: 0.7,
+      }}>
+        <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--ts)', marginBottom: '4px' }}>
+          Inventory
+        </div>
+        <div style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--tm)', marginBottom: '8px' }}>
+          — excluded
+        </div>
+        <div style={{ fontSize: '9.5px', color: 'var(--tm)', lineHeight: '1.5' }}>
+          DataCo contains no independent inventory signal (CV AUC 0.479).
+          Excluding this agent rather than reporting a degenerate model.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Legacy single-card export kept for backward compat
+export default function AgentCard({ type, score = 0, metrics = [], period, graphEnriched, coverage }) {
   const cfg = AGENTS[type] || AGENTS.demand
   const level = score >= 0.65 ? 'high' : score >= 0.35 ? 'med' : 'low'
 
@@ -23,8 +115,9 @@ export default function AgentCard({ type, score = 0, metrics = [], period }) {
           </div>
           <RiskBadge level={level} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
-          <RiskGauge score={score} size={100} color={cfg.color} label="Risk" />
+        <KGBadge graphEnriched={graphEnriched} coverage={coverage ?? 0} />
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0 8px' }}>
+          <RiskGauge score={score} size={90} color={cfg.color} label="Risk" />
         </div>
         <div className="agent-metrics">
           {metrics.slice(0, 4).map((m, i) => (

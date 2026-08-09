@@ -50,11 +50,11 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Default business importance weights (must sum to 1.0)
+# NOTE: inventory excluded — CV AUC 0.479, no independent signal in DataCo
 DEFAULT_WEIGHTS: dict[str, float] = {
     "demand":    0.30,
-    "supplier":  0.35,
-    "inventory": 0.20,
-    "logistics": 0.15,
+    "supplier":  0.45,
+    "logistics": 0.25,
 }
 
 
@@ -110,7 +110,9 @@ class OrchestratorResult:
 
 class WeightedOrchestrator:
     """
-    Computes a weighted overall risk score from all four agent predictions.
+    Computes a weighted overall risk score from three agent predictions.
+    Inventory is excluded — DataCo contains no independent inventory signal
+    (CV AUC 0.479). See tests/critical/test_inventory_excluded.py.
 
     Effective weight = base_weight × historical_accuracy × mean_confidence
     Weights are normalised to sum to 1.0 before the final dot product.

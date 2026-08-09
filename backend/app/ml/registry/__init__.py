@@ -37,6 +37,9 @@ class ModelVersion:
     n_training_samples: int = 0
     is_active: bool = True
     description: str = ""
+    graph_enriched: bool = False
+    graph_enrichment_coverage: float = 0.0
+    training_path: str = "unknown"  # "initialization" | "other" | "unknown" (never silently claims enriched path)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,7 +70,9 @@ class ModelRegistry:
                 data = json.loads(self._registry_file.read_text())
                 for intel_type, versions in data.items():
                     self._versions[intel_type] = [
-                        ModelVersion(**v) for v in versions
+                        ModelVersion(**{k: val for k, val in v.items()
+                                       if k in ModelVersion.__dataclass_fields__})
+                        for v in versions
                     ]
             except (json.JSONDecodeError, TypeError) as e:
                 logger.warning(f"Registry file corrupted, starting fresh: {e}")
@@ -102,6 +107,9 @@ class ModelRegistry:
         dataset_version: str = "",
         n_training_samples: int = 0,
         description: str = "",
+        graph_enriched: bool = False,
+        graph_enrichment_coverage: float = 0.0,
+        training_path: str = "unknown",
     ) -> ModelVersion:
         """
         Save a trained model to the registry.
@@ -119,7 +127,7 @@ class ModelRegistry:
             version_id=version_id,
             intelligence_type=intelligence_type.value,
             task=task.value,
-            model_path=str(model_path.resolve()),
+            model_path=str(model_path),
             created_at=datetime.now(timezone.utc).isoformat(),
             training_duration_ms=training_duration_ms,
             features_used=features_used,
@@ -129,6 +137,9 @@ class ModelRegistry:
             n_training_samples=n_training_samples,
             is_active=True,
             description=description,
+            graph_enriched=graph_enriched,
+            graph_enrichment_coverage=graph_enrichment_coverage,
+            training_path=training_path,
         )
 
         # Deactivate previous versions
@@ -139,6 +150,21 @@ class ModelRegistry:
             v.is_active = False
 
         self._versions[key].append(version)
+
+        # Prune to latest 3 versions — delete excess .joblib files from disk
+        _KEEP = 3
+        all_versions = self._versions[key]
+        if len(all_versions) > _KEEP:
+            to_prune = all_versions[:-_KEEP]
+            for old in to_prune:
+                old_path = Path(old.model_path)
+                if old_path.exists():
+                    try:
+                        old_path.unlink()
+                    except OSError as prune_err:
+                        logger.warning(f"Could not delete old model file {old_path}: {prune_err}")
+            self._versions[key] = all_versions[-_KEEP:]
+
         self._save_registry()
 
         logger.info(f"Model saved: {version_id} ({intelligence_type.value})")
@@ -158,13 +184,6 @@ class ModelRegistry:
             )
 
         model_path = Path(version.model_path)
-        # Normalize Windows-style paths stored in registry (e.g. data\models\...)
-        if not model_path.is_absolute() or not model_path.exists():
-            # Extract the filename and reconstruct from base_dir
-            intel_dir = self._base_dir / version.intelligence_type
-            candidate = intel_dir / Path(version.model_path.replace("\\", "/")).name
-            if candidate.exists():
-                model_path = candidate
         if not model_path.exists():
             raise FileNotFoundError(f"Model file not found: {model_path}")
 

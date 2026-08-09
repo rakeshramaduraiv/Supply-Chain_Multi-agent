@@ -96,7 +96,7 @@ async def check_and_initialize() -> None:
 
     # Execute initialization
     start_time = time.perf_counter()
-    result = init_service.execute(dataset_path)
+    result = await init_service.execute(dataset_path)
     duration_ms = (time.perf_counter() - start_time) * 1000
 
     if result["status"] == "completed":

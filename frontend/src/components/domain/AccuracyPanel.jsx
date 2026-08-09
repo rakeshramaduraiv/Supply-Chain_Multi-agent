@@ -18,7 +18,6 @@ export default function AccuracyPanel({ accuracy, chartData }) {
 
   const rows = [
     { agent: 'Demand', metric: 'MAPE', score: accuracy.demand_mape, _metric: 'MAPE' },
-    { agent: 'Inventory', metric: 'F1', score: accuracy.inventory_f1, _metric: 'F1' },
     { agent: 'Supplier', metric: 'F1 + AUC', score: accuracy.supplier_f1, _metric: 'F1' },
     { agent: 'Logistics', metric: 'F1', score: accuracy.logistics_f1, _metric: 'F1' },
   ]

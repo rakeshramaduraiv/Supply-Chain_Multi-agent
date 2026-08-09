@@ -5,9 +5,12 @@ Model training pipelines for all intelligence services.
 
 Services:
 - DemandTrainer: LightGBM Regressor for 7-day demand forecast
-- InventoryTrainer: LightGBM Classifier for stockout prediction
 - SupplierTrainer: RandomForest Classifier for late delivery risk
 - LogisticsTrainer: LightGBM Classifier for route delay risk
+
+Inventory agent permanently excluded: its synthetic stockout_risk_flag target
+is algebraically derived from rolling demand features. CV AUC = 0.479 with
+non-tautological features — no learnable signal in DataCo.
 """
 
 import logging
@@ -37,10 +40,13 @@ from app.ml.utils import (
     RANDOM_FOREST_PARAMS,
     IntelligenceType,
     ModelTask,
+    TautologicalTargetError,
+    assert_target_not_reconstructible,
     chronological_split,
     prepare_features,
 )
 from app.ml.validation import WalkForwardValidator
+from app.feature_engineering import engineer_features, engineer_features_on_test
 
 logger = logging.getLogger(__name__)
 
@@ -109,38 +115,77 @@ class BaseTrainer:
         intelligence_type: IntelligenceType,
         run_walk_forward: bool = True,
         dataset_version: str = "",
+        graph_enriched: bool = False,
+        already_engineered: bool = False,
+        training_path: str = "initialization",
     ) -> TrainingResult:
         """
         Execute full training pipeline.
 
         Steps:
-        1. Feature preparation
-        2. Chronological split
-        3. Walk-forward validation (optional)
-        4. Final model training
-        5. Evaluation on holdout
-        6. Feature importance computation
-        7. Confidence estimation
-        8. Model persistence via registry
+        1. Chronological split on RAW data (before feature engineering)
+        2. Engineer train set independently (skipped when already_engineered=True)
+        3. Engineer test set anchored on train statistics (skipped when already_engineered=True)
+        4. Walk-forward validation on train set only
+        5. Final model training on engineered train set
+        6. Evaluation on leakage-free test set
+        7. Feature importance, confidence, registry persistence
         """
         start_time = time.perf_counter()
         feature_config = FEATURE_CONFIGS[intelligence_type]
 
-        self.logger.info(f"Training {intelligence_type.value} model...")
+        self.logger.info(f"Training {intelligence_type.value} model (already_engineered={already_engineered})...")
 
-        # Prepare features
-        X, y = prepare_features(df, feature_config)
-        train_df, test_df = chronological_split(df, train_ratio=0.8)
+        # Step 1: Chronological split
+        train_raw, test_raw = chronological_split(df, train_ratio=0.8)
+
+        if already_engineered:
+            # Caller already ran engineer_features + graph enrichment — use as-is
+            train_df = train_raw
+            test_df  = test_raw
+        else:
+            # Step 2 & 3: Engineer each split independently
+            train_df = engineer_features(train_raw)
+            test_df  = engineer_features_on_test(test_raw, train_raw)
+
+        # Compute graph_enrichment_coverage: fraction of rows where graph_*
+        # values differ from what Tier-1 aggregates would produce.
+        # If coverage == 0.0, the enrichment had no effect — force flag False.
+        if graph_enriched and already_engineered:
+            from app.feature_engineering import engineer_features as _eng
+            from app.ml.utils import GRAPH_CONTEXT_FEATURES as _GCF
+            _tier1 = _eng(train_raw)
+            _gcols = [c for c in _GCF if c in train_df.columns and c in _tier1.columns]
+            if _gcols:
+                _diff = (train_df[_gcols].fillna(0).values !=
+                         _tier1[_gcols].fillna(0).values)
+                coverage = float(_diff.any(axis=1).mean())
+            else:
+                coverage = 0.0
+            if coverage == 0.0:
+                graph_enriched = False
+                self.logger.warning(
+                    "graph_enrichment_coverage=0.0 — enriched values are "
+                    "identical to Tier-1 aggregates. Forcing graph_enriched=False."
+                )
+        else:
+            coverage = 0.0
 
         X_train, y_train = prepare_features(train_df, feature_config)
-        X_test, y_test = prepare_features(test_df, feature_config)
+        X_test,  y_test  = prepare_features(test_df,  feature_config)
+
+        # A1: tautology guard — classification agents only
+        if feature_config.task == ModelTask.CLASSIFICATION:
+            assert_target_not_reconstructible(
+                X_train, y_train, label=intelligence_type.value
+            )
 
         features_used = X_train.columns.tolist()
-        hyperparams = self._get_hyperparameters(intelligence_type)
+        hyperparams   = self._get_hyperparameters(intelligence_type)
 
-        # Walk-forward validation
+        # Step 4: Walk-forward validation on train set only
         wf_result = None
-        if run_walk_forward and len(X) > 500:
+        if run_walk_forward and len(X_train) > 500:
             validator = WalkForwardValidator(n_splits=5)
             wf_result_obj = validator.validate(
                 df=train_df,
@@ -149,11 +194,11 @@ class BaseTrainer:
             )
             wf_result = wf_result_obj.to_dict()
 
-        # Train final model on full training set
+        # Step 5: Train final model on full training set
         model = self._create_model(intelligence_type)
         model.fit(X_train, y_train)
 
-        # Evaluate on holdout
+        # Step 6: Evaluate on leakage-free holdout
         y_pred = model.predict(X_test)
 
         if feature_config.task == ModelTask.CLASSIFICATION:
@@ -181,6 +226,19 @@ class BaseTrainer:
 
         training_duration_ms = (time.perf_counter() - start_time) * 1000
 
+        # Include active TPKE parameters in registry entry so the evolution
+        # timeline is reconstructable: we know which graph state each model saw.
+        from app.core.config import get_settings
+        _s = get_settings()
+        tpke_params_at_training = {
+            "tpke_confidence_threshold": _s.tpke_confidence_threshold,
+            "tpke_top_k":                _s.tpke_top_k,
+            "tpke_decay_rate":           _s.tpke_decay_rate,
+            "tpke_removal_threshold":    _s.tpke_removal_threshold,
+            "tpke_window_size_days":     _s.tpke_window_size_days,
+        }
+        hyperparams["tpke_params_at_training"] = tpke_params_at_training
+
         # Save to registry
         version = self.registry.save_model(
             model=model,
@@ -192,6 +250,9 @@ class BaseTrainer:
             hyperparameters=hyperparams,
             dataset_version=dataset_version,
             n_training_samples=len(X_train),
+            graph_enriched=graph_enriched,
+            graph_enrichment_coverage=coverage,
+            training_path=training_path,
         )
 
         result = TrainingResult(
@@ -219,29 +280,22 @@ class BaseTrainer:
 class DemandTrainer(BaseTrainer):
     """Trainer for Demand Intelligence (LightGBM Regressor)."""
 
-    def train_demand(self, df: pd.DataFrame, dataset_version: str = "") -> TrainingResult:
-        return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version)
-
-
-class InventoryTrainer(BaseTrainer):
-    """Trainer for Inventory Intelligence (LightGBM Classifier)."""
-
-    def train_inventory(self, df: pd.DataFrame, dataset_version: str = "") -> TrainingResult:
-        return self.train(df, IntelligenceType.INVENTORY, dataset_version=dataset_version)
+    def train_demand(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
+        return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
 
 
 class SupplierTrainer(BaseTrainer):
     """Trainer for Supplier Intelligence (RandomForest Classifier)."""
 
-    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "") -> TrainingResult:
-        return self.train(df, IntelligenceType.SUPPLIER, dataset_version=dataset_version)
+    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
+        return self.train(df, IntelligenceType.SUPPLIER, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
 
 
 class LogisticsTrainer(BaseTrainer):
     """Trainer for Logistics Intelligence (LightGBM Classifier)."""
 
-    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "") -> TrainingResult:
-        return self.train(df, IntelligenceType.LOGISTICS, dataset_version=dataset_version)
+    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
+        return self.train(df, IntelligenceType.LOGISTICS, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
 
 
 class TrainingOrchestrator:
@@ -249,22 +303,25 @@ class TrainingOrchestrator:
 
     def __init__(self, registry: ModelRegistry | None = None):
         self.registry = registry or ModelRegistry()
-        self.demand_trainer = DemandTrainer(self.registry)
-        self.inventory_trainer = InventoryTrainer(self.registry)
+        self.demand_trainer   = DemandTrainer(self.registry)
         self.supplier_trainer = SupplierTrainer(self.registry)
         self.logistics_trainer = LogisticsTrainer(self.registry)
 
     def train_all(
-        self, df: pd.DataFrame, dataset_version: str = ""
+        self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False,
+        already_engineered: bool = False, training_path: str = "initialization",
     ) -> dict[str, TrainingResult]:
-        """Train all intelligence models on the same dataset."""
+        """
+        Train all viable intelligence models on the same dataset.
+
+        already_engineered=True: df has already been through engineer_features
+        and graph enrichment. Skip re-engineering inside each trainer.
+        training_path: recorded in registry — "initialization" or "other".
+        """
         results = {}
-
-        results["demand"] = self.demand_trainer.train_demand(df, dataset_version)
-        results["inventory"] = self.inventory_trainer.train_inventory(df, dataset_version)
-        results["supplier"] = self.supplier_trainer.train_supplier(df, dataset_version)
-        results["logistics"] = self.logistics_trainer.train_logistics(df, dataset_version)
-
+        results["demand"]    = self.demand_trainer.train_demand(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+        results["supplier"]  = self.supplier_trainer.train_supplier(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+        results["logistics"] = self.logistics_trainer.train_logistics(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
         logger.info(f"All models trained: {list(results.keys())}")
         return results
 
@@ -273,7 +330,10 @@ class TrainingOrchestrator:
         df: pd.DataFrame,
         intelligence_type: IntelligenceType,
         dataset_version: str = "",
+        graph_enriched: bool = False,
+        already_engineered: bool = False,
+        training_path: str = "initialization",
     ) -> TrainingResult:
         """Train a single intelligence model."""
         trainer = BaseTrainer(self.registry)
-        return trainer.train(df, intelligence_type, dataset_version=dataset_version)
+        return trainer.train(df, intelligence_type, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)

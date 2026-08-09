@@ -158,6 +158,13 @@ class ModelRegistry:
             )
 
         model_path = Path(version.model_path)
+        # Normalize Windows-style paths stored in registry (e.g. data\models\...)
+        if not model_path.is_absolute() or not model_path.exists():
+            # Extract the filename and reconstruct from base_dir
+            intel_dir = self._base_dir / version.intelligence_type
+            candidate = intel_dir / Path(version.model_path.replace("\\", "/")).name
+            if candidate.exists():
+                model_path = candidate
         if not model_path.exists():
             raise FileNotFoundError(f"Model file not found: {model_path}")
 

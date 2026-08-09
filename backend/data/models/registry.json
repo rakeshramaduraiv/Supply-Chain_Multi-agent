@@ -4,7 +4,7 @@
       "version_id": "demand_v_20260714_151322_70b811",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260714_151322_70b811.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260714_151322_70b811.joblib",
       "created_at": "2026-07-14T15:13:22.962714+00:00",
       "training_duration_ms": 17172.011599992402,
       "features_used": [
@@ -54,7 +54,7 @@
       "version_id": "demand_v_20260714_151503_8b1e4d",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260714_151503_8b1e4d.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260714_151503_8b1e4d.joblib",
       "created_at": "2026-07-14T15:15:03.859970+00:00",
       "training_duration_ms": 53323.143500019796,
       "features_used": [
@@ -97,14 +97,14 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": false,
+      "is_active": true,
       "description": ""
     },
     {
       "version_id": "demand_v_20260804_113514_c63c11",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260804_113514_c63c11.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260804_113514_c63c11.joblib",
       "created_at": "2026-08-04T11:35:14.684816+00:00",
       "training_duration_ms": 20527.222699995036,
       "features_used": [
@@ -154,7 +154,7 @@
       "version_id": "demand_v_20260804_121022_412cd8",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260804_121022_412cd8.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260804_121022_412cd8.joblib",
       "created_at": "2026-08-04T12:10:22.804049+00:00",
       "training_duration_ms": 15687.55190000229,
       "features_used": [
@@ -204,7 +204,7 @@
       "version_id": "demand_v_20260804_133936_f68694",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260804_133936_f68694.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260804_133936_f68694.joblib",
       "created_at": "2026-08-04T13:39:37.339872+00:00",
       "training_duration_ms": 77650.73399999528,
       "features_used": [
@@ -254,7 +254,7 @@
       "version_id": "demand_v_20260804_173337_e6434d",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260804_173337_e6434d.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260804_173337_e6434d.joblib",
       "created_at": "2026-08-04T17:33:37.619131+00:00",
       "training_duration_ms": 29043.353299988667,
       "features_used": [
@@ -304,7 +304,7 @@
       "version_id": "demand_v_20260804_205304_599f16",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260804_205304_599f16.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260804_205304_599f16.joblib",
       "created_at": "2026-08-04T20:53:04.948177+00:00",
       "training_duration_ms": 100897.64740000828,
       "features_used": [
@@ -354,7 +354,7 @@
       "version_id": "demand_v_20260805_040807_f25b44",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_040807_f25b44.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_040807_f25b44.joblib",
       "created_at": "2026-08-05T04:08:07.827759+00:00",
       "training_duration_ms": 17517.02280002064,
       "features_used": [
@@ -404,7 +404,7 @@
       "version_id": "demand_v_20260805_041145_49e47c",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_041145_49e47c.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_041145_49e47c.joblib",
       "created_at": "2026-08-05T04:11:45.417690+00:00",
       "training_duration_ms": 17333.96819999325,
       "features_used": [
@@ -454,7 +454,7 @@
       "version_id": "demand_v_20260805_042815_57e749",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_042815_57e749.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_042815_57e749.joblib",
       "created_at": "2026-08-05T04:28:15.636933+00:00",
       "training_duration_ms": 16315.328399999999,
       "features_used": [
@@ -504,7 +504,7 @@
       "version_id": "demand_v_20260805_052525_f69e56",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_052525_f69e56.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_052525_f69e56.joblib",
       "created_at": "2026-08-05T05:25:25.297040+00:00",
       "training_duration_ms": 16411.355299991556,
       "features_used": [
@@ -554,7 +554,7 @@
       "version_id": "demand_v_20260805_054114_36f023",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_054114_36f023.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_054114_36f023.joblib",
       "created_at": "2026-08-05T05:41:14.300533+00:00",
       "training_duration_ms": 13555.602300009923,
       "features_used": [
@@ -604,7 +604,7 @@
       "version_id": "demand_v_20260805_055349_b3891c",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_055349_b3891c.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_055349_b3891c.joblib",
       "created_at": "2026-08-05T05:53:49.864310+00:00",
       "training_duration_ms": 16178.154299996095,
       "features_used": [
@@ -654,7 +654,7 @@
       "version_id": "demand_v_20260805_055644_521962",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_055644_521962.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_055644_521962.joblib",
       "created_at": "2026-08-05T05:56:44.218680+00:00",
       "training_duration_ms": 16368.611000012606,
       "features_used": [
@@ -704,7 +704,7 @@
       "version_id": "demand_v_20260805_060812_012093",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_060812_012093.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_060812_012093.joblib",
       "created_at": "2026-08-05T06:08:12.778877+00:00",
       "training_duration_ms": 16250.232999998843,
       "features_used": [
@@ -754,7 +754,7 @@
       "version_id": "demand_v_20260805_061039_b5071b",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_061039_b5071b.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_061039_b5071b.joblib",
       "created_at": "2026-08-05T06:10:39.360799+00:00",
       "training_duration_ms": 13797.795499995118,
       "features_used": [
@@ -804,7 +804,7 @@
       "version_id": "demand_v_20260805_065103_d53d77",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_065103_d53d77.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_065103_d53d77.joblib",
       "created_at": "2026-08-05T06:51:04.111564+00:00",
       "training_duration_ms": 17938.197100011166,
       "features_used": [
@@ -854,7 +854,7 @@
       "version_id": "demand_v_20260805_071406_75f5b9",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_071406_75f5b9.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_071406_75f5b9.joblib",
       "created_at": "2026-08-05T07:14:06.702303+00:00",
       "training_duration_ms": 13626.972300000489,
       "features_used": [
@@ -904,7 +904,7 @@
       "version_id": "demand_v_20260805_090818_c54d77",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_090818_c54d77.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_090818_c54d77.joblib",
       "created_at": "2026-08-05T09:08:18.939523+00:00",
       "training_duration_ms": 27727.843799977563,
       "features_used": [
@@ -954,7 +954,7 @@
       "version_id": "demand_v_20260805_163805_011f6f",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_163805_011f6f.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_163805_011f6f.joblib",
       "created_at": "2026-08-05T16:38:05.420577+00:00",
       "training_duration_ms": 57190.09620000725,
       "features_used": [
@@ -1004,7 +1004,7 @@
       "version_id": "demand_v_20260805_174829_242431",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_174829_242431.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_174829_242431.joblib",
       "created_at": "2026-08-05T17:48:29.565482+00:00",
       "training_duration_ms": 49856.197899993276,
       "features_used": [
@@ -1054,7 +1054,7 @@
       "version_id": "demand_v_20260805_183136_5a5407",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260805_183136_5a5407.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260805_183136_5a5407.joblib",
       "created_at": "2026-08-05T18:31:36.918920+00:00",
       "training_duration_ms": 16266.072800004622,
       "features_used": [
@@ -1104,7 +1104,7 @@
       "version_id": "demand_v_20260806_055510_10a44a",
       "intelligence_type": "demand",
       "task": "regression",
-      "model_path": "data\\models\\demand\\demand_v_20260806_055510_10a44a.joblib",
+      "model_path": "/app/data/models/demand/demand_v_20260806_055510_10a44a.joblib",
       "created_at": "2026-08-06T05:55:10.312758+00:00",
       "training_duration_ms": 15734.848599997349,
       "features_used": [
@@ -1160,7 +1160,7 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": true,
+      "is_active": false,
       "description": ""
     }
   ],
@@ -1169,7 +1169,7 @@
       "version_id": "inventory_v_20260714_151528_1413c8",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260714_151528_1413c8.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260714_151528_1413c8.joblib",
       "created_at": "2026-07-14T15:15:28.193975+00:00",
       "training_duration_ms": 24200.442100060172,
       "features_used": [
@@ -1223,14 +1223,14 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": false,
+      "is_active": true,
       "description": ""
     },
     {
       "version_id": "inventory_v_20260804_113536_4af06e",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260804_113536_4af06e.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260804_113536_4af06e.joblib",
       "created_at": "2026-08-04T11:35:36.996515+00:00",
       "training_duration_ms": 22175.745800006553,
       "features_used": [
@@ -1291,7 +1291,7 @@
       "version_id": "inventory_v_20260804_121040_84d42b",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260804_121040_84d42b.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260804_121040_84d42b.joblib",
       "created_at": "2026-08-04T12:10:40.982097+00:00",
       "training_duration_ms": 18040.802599993185,
       "features_used": [
@@ -1352,7 +1352,7 @@
       "version_id": "inventory_v_20260804_134103_f919bd",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260804_134103_f919bd.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260804_134103_f919bd.joblib",
       "created_at": "2026-08-04T13:41:04.241627+00:00",
       "training_duration_ms": 86422.95950000698,
       "features_used": [
@@ -1413,7 +1413,7 @@
       "version_id": "inventory_v_20260804_173400_3dab20",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260804_173400_3dab20.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260804_173400_3dab20.joblib",
       "created_at": "2026-08-04T17:34:00.968722+00:00",
       "training_duration_ms": 23142.448799975682,
       "features_used": [
@@ -1474,7 +1474,7 @@
       "version_id": "inventory_v_20260804_205436_7e7086",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260804_205436_7e7086.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260804_205436_7e7086.joblib",
       "created_at": "2026-08-04T20:54:37.252803+00:00",
       "training_duration_ms": 91558.43890001415,
       "features_used": [
@@ -1535,7 +1535,7 @@
       "version_id": "inventory_v_20260805_040827_e107e6",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_040827_e107e6.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_040827_e107e6.joblib",
       "created_at": "2026-08-05T04:08:27.704601+00:00",
       "training_duration_ms": 19711.669599986635,
       "features_used": [
@@ -1596,7 +1596,7 @@
       "version_id": "inventory_v_20260805_041204_141b23",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_041204_141b23.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_041204_141b23.joblib",
       "created_at": "2026-08-05T04:12:04.756360+00:00",
       "training_duration_ms": 19127.114499977324,
       "features_used": [
@@ -1657,7 +1657,7 @@
       "version_id": "inventory_v_20260805_042831_e97f84",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_042831_e97f84.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_042831_e97f84.joblib",
       "created_at": "2026-08-05T04:28:31.138614+00:00",
       "training_duration_ms": 15368.006300006527,
       "features_used": [
@@ -1718,7 +1718,7 @@
       "version_id": "inventory_v_20260805_052540_22b8b2",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_052540_22b8b2.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_052540_22b8b2.joblib",
       "created_at": "2026-08-05T05:25:40.526454+00:00",
       "training_duration_ms": 15106.15449998295,
       "features_used": [
@@ -1779,7 +1779,7 @@
       "version_id": "inventory_v_20260805_054129_426ec0",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_054129_426ec0.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_054129_426ec0.joblib",
       "created_at": "2026-08-05T05:41:29.342557+00:00",
       "training_duration_ms": 14915.447400009725,
       "features_used": [
@@ -1840,7 +1840,7 @@
       "version_id": "inventory_v_20260805_055404_6901b8",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_055404_6901b8.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_055404_6901b8.joblib",
       "created_at": "2026-08-05T05:54:04.911092+00:00",
       "training_duration_ms": 14914.104299998144,
       "features_used": [
@@ -1901,7 +1901,7 @@
       "version_id": "inventory_v_20260805_055703_0a2258",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_055703_0a2258.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_055703_0a2258.joblib",
       "created_at": "2026-08-05T05:57:03.318977+00:00",
       "training_duration_ms": 18915.57459998876,
       "features_used": [
@@ -1962,7 +1962,7 @@
       "version_id": "inventory_v_20260805_060832_ba7a28",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_060832_ba7a28.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_060832_ba7a28.joblib",
       "created_at": "2026-08-05T06:08:32.154599+00:00",
       "training_duration_ms": 19201.852999976836,
       "features_used": [
@@ -2023,7 +2023,7 @@
       "version_id": "inventory_v_20260805_061055_a85157",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_061055_a85157.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_061055_a85157.joblib",
       "created_at": "2026-08-05T06:10:55.279266+00:00",
       "training_duration_ms": 15720.744599995669,
       "features_used": [
@@ -2084,7 +2084,7 @@
       "version_id": "inventory_v_20260805_065129_bb896d",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_065129_bb896d.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_065129_bb896d.joblib",
       "created_at": "2026-08-05T06:51:29.477596+00:00",
       "training_duration_ms": 25201.147100015078,
       "features_used": [
@@ -2145,7 +2145,7 @@
       "version_id": "inventory_v_20260805_071423_64388b",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_071423_64388b.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_071423_64388b.joblib",
       "created_at": "2026-08-05T07:14:23.595264+00:00",
       "training_duration_ms": 16762.437699973816,
       "features_used": [
@@ -2206,7 +2206,7 @@
       "version_id": "inventory_v_20260805_090840_10096f",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_090840_10096f.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_090840_10096f.joblib",
       "created_at": "2026-08-05T09:08:41.086964+00:00",
       "training_duration_ms": 21957.83830000437,
       "features_used": [
@@ -2267,7 +2267,7 @@
       "version_id": "inventory_v_20260805_163915_57f7a7",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_163915_57f7a7.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_163915_57f7a7.joblib",
       "created_at": "2026-08-05T16:39:15.869286+00:00",
       "training_duration_ms": 69874.6639000019,
       "features_used": [
@@ -2328,7 +2328,7 @@
       "version_id": "inventory_v_20260805_174923_387f64",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_174923_387f64.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_174923_387f64.joblib",
       "created_at": "2026-08-05T17:49:23.374904+00:00",
       "training_duration_ms": 53567.38049999694,
       "features_used": [
@@ -2389,7 +2389,7 @@
       "version_id": "inventory_v_20260805_183156_ae6d51",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260805_183156_ae6d51.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260805_183156_ae6d51.joblib",
       "created_at": "2026-08-05T18:31:56.667882+00:00",
       "training_duration_ms": 19544.123100000434,
       "features_used": [
@@ -2450,7 +2450,7 @@
       "version_id": "inventory_v_20260806_055511_67ba80",
       "intelligence_type": "inventory",
       "task": "classification",
-      "model_path": "data\\models\\inventory\\inventory_v_20260806_055511_67ba80.joblib",
+      "model_path": "/app/data/models/inventory/inventory_v_20260806_055511_67ba80.joblib",
       "created_at": "2026-08-06T05:55:11.996307+00:00",
       "training_duration_ms": 1629.8260999610648,
       "features_used": [
@@ -2506,7 +2506,7 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": true,
+      "is_active": false,
       "description": ""
     }
   ],
@@ -2515,7 +2515,7 @@
       "version_id": "supplier_v_20260714_151614_d400d5",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260714_151614_d400d5.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260714_151614_d400d5.joblib",
       "created_at": "2026-07-14T15:16:14.318437+00:00",
       "training_duration_ms": 45946.41730003059,
       "features_used": [
@@ -2561,14 +2561,14 @@
         "n_jobs": -1
       },
       "n_training_samples": 144415,
-      "is_active": false,
+      "is_active": true,
       "description": ""
     },
     {
       "version_id": "supplier_v_20260804_113639_354604",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260804_113639_354604.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260804_113639_354604.joblib",
       "created_at": "2026-08-04T11:36:39.458455+00:00",
       "training_duration_ms": 62250.646799991955,
       "features_used": [
@@ -2621,7 +2621,7 @@
       "version_id": "supplier_v_20260804_121143_c2ee35",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260804_121143_c2ee35.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260804_121143_c2ee35.joblib",
       "created_at": "2026-08-04T12:11:43.251333+00:00",
       "training_duration_ms": 62106.471299994155,
       "features_used": [
@@ -2674,7 +2674,7 @@
       "version_id": "supplier_v_20260804_134413_5cf04d",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260804_134413_5cf04d.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260804_134413_5cf04d.joblib",
       "created_at": "2026-08-04T13:44:14.166454+00:00",
       "training_duration_ms": 189273.8110000064,
       "features_used": [
@@ -2727,7 +2727,7 @@
       "version_id": "supplier_v_20260804_173517_d02a02",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260804_173517_d02a02.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260804_173517_d02a02.joblib",
       "created_at": "2026-08-04T17:35:17.724950+00:00",
       "training_duration_ms": 76502.73130001733,
       "features_used": [
@@ -2780,7 +2780,7 @@
       "version_id": "supplier_v_20260804_205629_938162",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260804_205629_938162.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260804_205629_938162.joblib",
       "created_at": "2026-08-04T20:56:29.512468+00:00",
       "training_duration_ms": 111940.68099997821,
       "features_used": [
@@ -2833,7 +2833,7 @@
       "version_id": "supplier_v_20260805_040928_326d73",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_040928_326d73.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_040928_326d73.joblib",
       "created_at": "2026-08-05T04:09:28.998307+00:00",
       "training_duration_ms": 61080.70160000352,
       "features_used": [
@@ -2886,7 +2886,7 @@
       "version_id": "supplier_v_20260805_041305_1e4b01",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_041305_1e4b01.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_041305_1e4b01.joblib",
       "created_at": "2026-08-05T04:13:05.997555+00:00",
       "training_duration_ms": 61020.024699973874,
       "features_used": [
@@ -2939,7 +2939,7 @@
       "version_id": "supplier_v_20260805_042924_b4a8f5",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_042924_b4a8f5.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_042924_b4a8f5.joblib",
       "created_at": "2026-08-05T04:29:24.616138+00:00",
       "training_duration_ms": 53326.69730001362,
       "features_used": [
@@ -2992,7 +2992,7 @@
       "version_id": "supplier_v_20260805_052632_279f39",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_052632_279f39.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_052632_279f39.joblib",
       "created_at": "2026-08-05T05:26:32.823839+00:00",
       "training_duration_ms": 52131.45010001608,
       "features_used": [
@@ -3045,7 +3045,7 @@
       "version_id": "supplier_v_20260805_054223_5b5344",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_054223_5b5344.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_054223_5b5344.joblib",
       "created_at": "2026-08-05T05:42:23.716143+00:00",
       "training_duration_ms": 54058.25980001828,
       "features_used": [
@@ -3098,7 +3098,7 @@
       "version_id": "supplier_v_20260805_055456_e8e535",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_055456_e8e535.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_055456_e8e535.joblib",
       "created_at": "2026-08-05T05:54:56.853206+00:00",
       "training_duration_ms": 51814.6601000044,
       "features_used": [
@@ -3151,7 +3151,7 @@
       "version_id": "supplier_v_20260805_055754_fbfd2f",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_055754_fbfd2f.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_055754_fbfd2f.joblib",
       "created_at": "2026-08-05T05:57:55.023337+00:00",
       "training_duration_ms": 51562.06359999487,
       "features_used": [
@@ -3204,7 +3204,7 @@
       "version_id": "supplier_v_20260805_060937_252008",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_060937_252008.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_060937_252008.joblib",
       "created_at": "2026-08-05T06:09:37.754474+00:00",
       "training_duration_ms": 65419.226300000446,
       "features_used": [
@@ -3257,7 +3257,7 @@
       "version_id": "supplier_v_20260805_061146_d793f8",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_061146_d793f8.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_061146_d793f8.joblib",
       "created_at": "2026-08-05T06:11:46.952255+00:00",
       "training_duration_ms": 51517.98599999165,
       "features_used": [
@@ -3310,7 +3310,7 @@
       "version_id": "supplier_v_20260805_065217_bb9a04",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_065217_bb9a04.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_065217_bb9a04.joblib",
       "created_at": "2026-08-05T06:52:17.371824+00:00",
       "training_duration_ms": 47729.162200004794,
       "features_used": [
@@ -3363,7 +3363,7 @@
       "version_id": "supplier_v_20260805_071511_82ebe9",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_071511_82ebe9.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_071511_82ebe9.joblib",
       "created_at": "2026-08-05T07:15:11.620497+00:00",
       "training_duration_ms": 47887.43649999378,
       "features_used": [
@@ -3416,7 +3416,7 @@
       "version_id": "supplier_v_20260805_090956_678bd4",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_090956_678bd4.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_090956_678bd4.joblib",
       "created_at": "2026-08-05T09:09:56.893226+00:00",
       "training_duration_ms": 75622.03230001614,
       "features_used": [
@@ -3469,7 +3469,7 @@
       "version_id": "supplier_v_20260805_164237_f5d7d9",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_164237_f5d7d9.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_164237_f5d7d9.joblib",
       "created_at": "2026-08-05T16:42:38.009059+00:00",
       "training_duration_ms": 201419.74009998376,
       "features_used": [
@@ -3522,7 +3522,7 @@
       "version_id": "supplier_v_20260805_175033_69038c",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_175033_69038c.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_175033_69038c.joblib",
       "created_at": "2026-08-05T17:50:33.534869+00:00",
       "training_duration_ms": 69985.56339999777,
       "features_used": [
@@ -3575,7 +3575,7 @@
       "version_id": "supplier_v_20260805_183301_8ab3de",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260805_183301_8ab3de.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260805_183301_8ab3de.joblib",
       "created_at": "2026-08-05T18:33:01.260839+00:00",
       "training_duration_ms": 64444.106299983105,
       "features_used": [
@@ -3628,7 +3628,7 @@
       "version_id": "supplier_v_20260806_055600_b30ab5",
       "intelligence_type": "supplier",
       "task": "classification",
-      "model_path": "data\\models\\supplier\\supplier_v_20260806_055600_b30ab5.joblib",
+      "model_path": "/app/data/models/supplier/supplier_v_20260806_055600_b30ab5.joblib",
       "created_at": "2026-08-06T05:56:00.365303+00:00",
       "training_duration_ms": 48063.91700002132,
       "features_used": [
@@ -3682,7 +3682,7 @@
         "n_jobs": -1
       },
       "n_training_samples": 144415,
-      "is_active": true,
+      "is_active": false,
       "description": ""
     }
   ],
@@ -3691,7 +3691,7 @@
       "version_id": "logistics_v_20260714_151633_3f543d",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260714_151633_3f543d.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260714_151633_3f543d.joblib",
       "created_at": "2026-07-14T15:16:33.510582+00:00",
       "training_duration_ms": 19069.415100035258,
       "features_used": [
@@ -3745,14 +3745,14 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": false,
+      "is_active": true,
       "description": ""
     },
     {
       "version_id": "logistics_v_20260804_113658_67f970",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260804_113658_67f970.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260804_113658_67f970.joblib",
       "created_at": "2026-08-04T11:36:58.382521+00:00",
       "training_duration_ms": 18773.233999992954,
       "features_used": [
@@ -3813,7 +3813,7 @@
       "version_id": "logistics_v_20260804_121201_9ef5d3",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260804_121201_9ef5d3.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260804_121201_9ef5d3.joblib",
       "created_at": "2026-08-04T12:12:01.638843+00:00",
       "training_duration_ms": 18255.38869999582,
       "features_used": [
@@ -3874,7 +3874,7 @@
       "version_id": "logistics_v_20260804_134518_f4cc6b",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260804_134518_f4cc6b.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260804_134518_f4cc6b.joblib",
       "created_at": "2026-08-04T13:45:19.068050+00:00",
       "training_duration_ms": 64442.5373999984,
       "features_used": [
@@ -3935,7 +3935,7 @@
       "version_id": "logistics_v_20260804_173540_8dc715",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260804_173540_8dc715.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260804_173540_8dc715.joblib",
       "created_at": "2026-08-04T17:35:40.588741+00:00",
       "training_duration_ms": 22671.536799985915,
       "features_used": [
@@ -3996,7 +3996,7 @@
       "version_id": "logistics_v_20260804_205652_87a3c1",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260804_205652_87a3c1.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260804_205652_87a3c1.joblib",
       "created_at": "2026-08-04T20:56:52.257167+00:00",
       "training_duration_ms": 22572.20110000344,
       "features_used": [
@@ -4057,7 +4057,7 @@
       "version_id": "logistics_v_20260805_040947_fdba0a",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_040947_fdba0a.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_040947_fdba0a.joblib",
       "created_at": "2026-08-05T04:09:47.643384+00:00",
       "training_duration_ms": 18464.52219999628,
       "features_used": [
@@ -4118,7 +4118,7 @@
       "version_id": "logistics_v_20260805_041324_cc4197",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_041324_cc4197.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_041324_cc4197.joblib",
       "created_at": "2026-08-05T04:13:24.545852+00:00",
       "training_duration_ms": 18378.536700009136,
       "features_used": [
@@ -4179,7 +4179,7 @@
       "version_id": "logistics_v_20260805_042940_2fc76f",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_042940_2fc76f.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_042940_2fc76f.joblib",
       "created_at": "2026-08-05T04:29:40.207192+00:00",
       "training_duration_ms": 15462.890299997525,
       "features_used": [
@@ -4240,7 +4240,7 @@
       "version_id": "logistics_v_20260805_052648_801f66",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_052648_801f66.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_052648_801f66.joblib",
       "created_at": "2026-08-05T05:26:48.695699+00:00",
       "training_duration_ms": 15736.885999998776,
       "features_used": [
@@ -4301,7 +4301,7 @@
       "version_id": "logistics_v_20260805_054248_29bee1",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_054248_29bee1.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_054248_29bee1.joblib",
       "created_at": "2026-08-05T05:42:48.762659+00:00",
       "training_duration_ms": 24796.846200013533,
       "features_used": [
@@ -4362,7 +4362,7 @@
       "version_id": "logistics_v_20260805_055515_6c8c7f",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_055515_6c8c7f.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_055515_6c8c7f.joblib",
       "created_at": "2026-08-05T05:55:15.702104+00:00",
       "training_duration_ms": 18702.31579997926,
       "features_used": [
@@ -4423,7 +4423,7 @@
       "version_id": "logistics_v_20260805_055810_2caabf",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_055810_2caabf.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_055810_2caabf.joblib",
       "created_at": "2026-08-05T05:58:10.275592+00:00",
       "training_duration_ms": 15116.102500003763,
       "features_used": [
@@ -4484,7 +4484,7 @@
       "version_id": "logistics_v_20260805_060959_31531c",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_060959_31531c.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_060959_31531c.joblib",
       "created_at": "2026-08-05T06:09:59.946260+00:00",
       "training_duration_ms": 22007.77999998536,
       "features_used": [
@@ -4545,7 +4545,7 @@
       "version_id": "logistics_v_20260805_061202_dc773c",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_061202_dc773c.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_061202_dc773c.joblib",
       "created_at": "2026-08-05T06:12:02.271291+00:00",
       "training_duration_ms": 15185.702600021614,
       "features_used": [
@@ -4606,7 +4606,7 @@
       "version_id": "logistics_v_20260805_065232_541317",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_065232_541317.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_065232_541317.joblib",
       "created_at": "2026-08-05T06:52:32.508189+00:00",
       "training_duration_ms": 15017.266200011363,
       "features_used": [
@@ -4667,7 +4667,7 @@
       "version_id": "logistics_v_20260805_071534_bc0452",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_071534_bc0452.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_071534_bc0452.joblib",
       "created_at": "2026-08-05T07:15:34.183774+00:00",
       "training_duration_ms": 22396.55340000172,
       "features_used": [
@@ -4728,7 +4728,7 @@
       "version_id": "logistics_v_20260805_091016_fa5a7a",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_091016_fa5a7a.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_091016_fa5a7a.joblib",
       "created_at": "2026-08-05T09:10:16.783159+00:00",
       "training_duration_ms": 19718.932799994946,
       "features_used": [
@@ -4789,7 +4789,7 @@
       "version_id": "logistics_v_20260805_164351_42129f",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_164351_42129f.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_164351_42129f.joblib",
       "created_at": "2026-08-05T16:43:51.799570+00:00",
       "training_duration_ms": 73157.06269998918,
       "features_used": [
@@ -4850,7 +4850,7 @@
       "version_id": "logistics_v_20260805_175051_49e19e",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_175051_49e19e.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_175051_49e19e.joblib",
       "created_at": "2026-08-05T17:50:51.448690+00:00",
       "training_duration_ms": 17753.238199977204,
       "features_used": [
@@ -4911,7 +4911,7 @@
       "version_id": "logistics_v_20260805_183319_0d6400",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260805_183319_0d6400.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260805_183319_0d6400.joblib",
       "created_at": "2026-08-05T18:33:19.298653+00:00",
       "training_duration_ms": 17868.940399988787,
       "features_used": [
@@ -4972,7 +4972,7 @@
       "version_id": "logistics_v_20260806_055621_f098b8",
       "intelligence_type": "logistics",
       "task": "classification",
-      "model_path": "data\\models\\logistics\\logistics_v_20260806_055621_f098b8.joblib",
+      "model_path": "/app/data/models/logistics/logistics_v_20260806_055621_f098b8.joblib",
       "created_at": "2026-08-06T05:56:21.727427+00:00",
       "training_duration_ms": 21192.12650001282,
       "features_used": [
@@ -5034,7 +5034,7 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": true,
+      "is_active": false,
       "description": ""
     }
   ]

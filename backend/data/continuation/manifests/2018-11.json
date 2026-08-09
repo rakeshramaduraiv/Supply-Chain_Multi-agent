@@ -1,0 +1,24 @@
+{
+  "generator_version": "2.0.0",
+  "seed": 201811,
+  "period": "2018-11",
+  "n_rows": 2162,
+  "base_late_rate": 0.55,
+  "actual_late_rate": 0.5666,
+  "injected_drift": {
+    "type": "demand_shift",
+    "magnitude": 0.2,
+    "start_period": "2018-11",
+    "entities": [
+      "Cleats",
+      "Men's Footwear"
+    ],
+    "n_affected": 315,
+    "qty_multiplier": 1.2
+  },
+  "distribution_params": {
+    "pool_source": "DataCo 2017-08..2018-01",
+    "rows_target": 2100,
+    "rows_sigma": 315
+  }
+}

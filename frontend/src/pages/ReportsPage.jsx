@@ -480,12 +480,12 @@ export default function ReportsPage({ defaultTab }) {
               </div>
 
               <div className="card" style={{ padding: '14px', background: 'var(--s1)' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#5b8aff', display: 'flex', alignItems: 'center', gap: '6px' }}><Cpu size={13} /> Section 3: Multi-Agent Accuracies</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#5b8aff', display: 'flex', alignItems: 'center', gap: '6px' }}><Cpu size={13} /> Section 3: Multi-Agent Fusion Weights</span>
                 <div style={{ fontSize: '11px', color: 'var(--ts)', marginTop: '8px', lineHeight: 1.6 }}>
-                  Demand Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>{forecastHealth}%</span><br />
-                  Supplier Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>89.5%</span><br />
-                  Inventory Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>91.8%</span><br />
-                  Logistics Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>87.2%</span>
+                  Demand Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.30</span><br />
+                  Supplier Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.45</span><br />
+                  Logistics Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.25</span><br />
+                  <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
                 </div>
               </div>
 

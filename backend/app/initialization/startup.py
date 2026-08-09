@@ -15,6 +15,7 @@ On subsequent startups:
 - Does NOT retrain
 """
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -38,8 +39,31 @@ _INIT_LOCK_FILE = Path(settings.model_dir) / ".initialized"
 
 
 def is_initialized_on_disk() -> bool:
-    """Quick check via filesystem (no DB required)."""
-    return _INIT_LOCK_FILE.exists()
+    """Check marker AND verify registry + model files exist."""
+    if not _INIT_LOCK_FILE.exists():
+        return False
+    registry = Path(settings.model_dir) / "registry.json"
+    if not registry.exists():
+        logger.warning(".initialized present but registry.json missing — treating as uninitialized")
+        return False
+    try:
+        entries = json.loads(registry.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"registry.json unreadable: {e}")
+        return False
+    expected = {"demand", "supplier", "logistics"}
+    if set(entries.keys()) != expected:
+        logger.warning(f"registry has {set(entries.keys())}, expected {expected}")
+        return False
+    for agent, versions in entries.items():
+        if not versions:
+            logger.warning(f"{agent} has no versions in registry")
+            return False
+        latest_path = Path(versions[-1]["model_path"])
+        if not latest_path.exists():
+            logger.warning(f"{agent} model file missing: {latest_path}")
+            return False
+    return True
 
 
 def mark_initialized_on_disk(metadata: dict) -> None:

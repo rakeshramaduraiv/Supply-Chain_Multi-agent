@@ -665,7 +665,7 @@ export default function GraphPage() {
                     version: e.version || activeVerObj.ver,
                   }))
                 : [
-                    { pattern: 'Late Delivery → Inventory Shortage', confidence: 0.924, action: 'Edge Strengthened', frequency: activeVerObj.tpkeEdges, version: activeVerObj.ver },
+                    { pattern: 'Late Delivery → Stockout Risk', confidence: 0.924, action: 'Edge Strengthened', frequency: activeVerObj.tpkeEdges, version: activeVerObj.ver },
                     { pattern: 'Carrier Delay → Customer SLA Breach', confidence: 0.891, action: 'Edge Created', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.7), version: activeVerObj.ver },
                     { pattern: 'Demand Spike → Warehouse Overload', confidence: 0.856, action: 'Confidence Updated', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.5), version: activeVerObj.ver },
                     { pattern: 'Supplier Delay → Forecast Deviation', confidence: 0.812, action: 'Edge Decayed', frequency: Math.ceil(activeVerObj.tpkeEdges * 0.4), version: activeVerObj.ver },

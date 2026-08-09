@@ -119,7 +119,7 @@ class ModelRegistry:
             version_id=version_id,
             intelligence_type=intelligence_type.value,
             task=task.value,
-            model_path=str(model_path),
+            model_path=str(model_path.resolve()),
             created_at=datetime.now(timezone.utc).isoformat(),
             training_duration_ms=training_duration_ms,
             features_used=features_used,

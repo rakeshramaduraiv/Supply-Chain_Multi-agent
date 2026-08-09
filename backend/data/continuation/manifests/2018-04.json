@@ -1,0 +1,26 @@
+{
+  "generator_version": "3.0.0",
+  "seed": 201804,
+  "period": "2018-04",
+  "n_rows": 2592,
+  "base_late_rate": 0.55,
+  "actual_late_rate": 0.6312,
+  "injected_drift": {
+    "type": "supplier_degradation",
+    "magnitude": 0.18,
+    "start_period": "2018-04",
+    "n_affected": 1087,
+    "affected_rate": 0.7323,
+    "unaffected_rate": 0.5581,
+    "entities": [
+      "Fan Shop",
+      "Golf",
+      "Outdoors"
+    ]
+  },
+  "distribution_params": {
+    "pool_source": "DataCo 2017-08..2018-01",
+    "rows_target": 2100,
+    "rows_sigma": 315
+  }
+}

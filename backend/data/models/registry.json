@@ -3902,7 +3902,7 @@
         "verbose": -1
       },
       "n_training_samples": 144415,
-      "is_active": true,
+      "is_active": false,
       "description": ""
     },
     {
@@ -5192,6 +5192,70 @@
       },
       "n_training_samples": 144415,
       "is_active": false,
+      "description": ""
+    },
+    {
+      "version_id": "logistics_v_20260809_191934_4c358a",
+      "intelligence_type": "logistics",
+      "task": "classification",
+      "model_path": "data/models/logistics/logistics_v_20260809_191934_4c358a.joblib",
+      "created_at": "2026-08-09T19:19:34.817371+00:00",
+      "training_duration_ms": 107769.73877900002,
+      "features_used": [
+        "delivery_duration_days",
+        "shipping_delay_ratio",
+        "is_delayed",
+        "delivery_gap",
+        "delay_rolling_mean_3m",
+        "Days for shipping (real)",
+        "Days for shipment (scheduled)",
+        "order_value_log",
+        "revenue_per_unit",
+        "Order Item Quantity",
+        "supplier_delay_rate",
+        "composite_risk_score",
+        "order_month",
+        "order_day_of_week",
+        "order_is_weekend"
+      ],
+      "metrics": {
+        "accuracy": 0.975327,
+        "precision": 0.956998,
+        "recall": 0.999901,
+        "f1": 0.97798,
+        "roc_auc": 0.975261,
+        "confusion_matrix": [
+          [
+            15800,
+            910
+          ],
+          [
+            2,
+            20252
+          ]
+        ],
+        "n_samples": 36964
+      },
+      "dataset_version": "retrain",
+      "hyperparameters": {
+        "objective": "binary",
+        "metric": "binary_logloss",
+        "boosting_type": "gbdt",
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "num_leaves": 63,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "reg_alpha": 0.1,
+        "reg_lambda": 0.1,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "n_training_samples": 147854,
+      "is_active": true,
       "description": ""
     }
   ]

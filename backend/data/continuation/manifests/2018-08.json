@@ -1,18 +1,21 @@
 {
-  "generator_version": "2.0.0",
+  "generator_version": "3.0.0",
   "seed": 201808,
   "period": "2018-08",
   "n_rows": 2496,
   "base_late_rate": 0.55,
-  "actual_late_rate": 0.5617,
+  "actual_late_rate": 0.5781,
   "injected_drift": {
     "type": "route_congestion",
     "magnitude": 0.15,
     "start_period": "2018-08",
+    "n_affected": 731,
+    "affected_rate": 0.6553,
+    "unaffected_rate": 0.5462,
     "entities": [
-      "First Class"
-    ],
-    "n_affected": 0
+      "Northern Europe",
+      "Southern Europe"
+    ]
   },
   "distribution_params": {
     "pool_source": "DataCo 2017-08..2018-01",

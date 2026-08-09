@@ -2360,7 +2360,7 @@ export default function ForecastPage() {
             <span className={styles.execLabel}>Agent Status</span>
 
 
-            <span className={styles.execVal} style={{ color: '#00b894' }}>4/4 Active</span>
+            <span className={styles.execVal} style={{ color: '#00b894' }}>3/4 Active (1 excluded)</span>
 
 
           </div>

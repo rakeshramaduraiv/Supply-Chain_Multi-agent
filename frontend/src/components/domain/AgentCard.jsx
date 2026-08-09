@@ -3,9 +3,13 @@ import RiskBadge from '../ui/RiskBadge'
 
 const AGENTS = {
   demand:    { label: 'Demand Forecasting', color: 'var(--dem)', model: 'LightGBM Regressor',    primaryMetric: 'R²',  secondaryMetric: 'MAPE' },
-  supplier:  { label: 'Supplier Risk',      color: 'var(--sup)', model: 'Random Forest',          primaryMetric: 'AUC', secondaryMetric: 'F1'   },
-  logistics: { label: 'Logistics Risk',     color: 'var(--log)', model: 'LightGBM Classifier',    primaryMetric: 'AUC', secondaryMetric: 'F1'   },
+  supplier:  { label: 'Supplier Risk',      color: 'var(--sup)', model: 'Random Forest',          primaryMetric: 'AUC', secondaryMetric: 'F1', fusionWeight: 0.45 },
+  logistics: { label: 'Logistics Risk',     color: 'var(--log)', model: 'LightGBM Classifier',    primaryMetric: 'AUC', secondaryMetric: 'F1', fusionWeight: 0.55 },
 }
+
+// Two-agent prediction fusion weights (supplier + logistics only)
+// Demand is a regressor — it does not participate in the binary risk fusion.
+const FUSION_WEIGHTS = { supplier: 0.45, logistics: 0.55 }
 
 function KGBadge({ graphEnriched, coverage }) {
   if (graphEnriched && coverage >= 0.5) {
@@ -70,9 +74,14 @@ export function AgentMetricsPanel({ agents = {} }) {
                 {safeMetrics.slice(0, 4).map((m, i) => (
                   <div key={i}>
                     <div className="agent-metric-lbl">{m.label}</div>
-                    <div className="agent-metric-val">{m.value}</div>
+                    <div className="agent-metric-val">{m.value ?? '\u2014'}</div>
                   </div>
                 ))}
+                {FUSION_WEIGHTS[type] != null && (
+                  <div style={{ gridColumn: '1 / -1', marginTop: 4, fontSize: '9px', color: 'var(--tm)', borderTop: '1px solid var(--b)', paddingTop: 4 }}>
+                    Fusion weight: <strong>{FUSION_WEIGHTS[type]}</strong>
+                  </div>
+                )}
               </div>
             </div>
           </div>

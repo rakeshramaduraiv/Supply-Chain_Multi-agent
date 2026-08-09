@@ -39,7 +39,8 @@ class ModelVersion:
     description: str = ""
     graph_enriched: bool = False
     graph_enrichment_coverage: float = 0.0
-    training_path: str = "unknown"  # "initialization" | "other" | "unknown" (never silently claims enriched path)
+    training_path: str = "unknown"  # "initialization" | "other" | "unknown"
+    holidays_available: bool = False  # True iff holidays pkg was installed at train time
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -110,6 +111,7 @@ class ModelRegistry:
         graph_enriched: bool = False,
         graph_enrichment_coverage: float = 0.0,
         training_path: str = "unknown",
+        holidays_available: bool = False,
     ) -> ModelVersion:
         """
         Save a trained model to the registry.
@@ -140,6 +142,7 @@ class ModelRegistry:
             graph_enriched=graph_enriched,
             graph_enrichment_coverage=graph_enrichment_coverage,
             training_path=training_path,
+            holidays_available=holidays_available,
         )
 
         # Deactivate previous versions

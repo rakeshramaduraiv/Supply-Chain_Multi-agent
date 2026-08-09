@@ -154,3 +154,14 @@ export const api = {
   // Enterprise AI Investigation Copilot
   queryCopilot:           (b) => http.post('/api/v1/graphrag/copilot/query', b),
 }
+
+// WebSocket connection — backend mounts at /api/v1/ws (ws.router with prefix="")
+// Previous attempts used /api/v1/ws which is correct; this helper makes it explicit.
+const WS_BASE = BASE.replace(/^http/, 'ws')
+export function createWebSocket(onMessage, onClose) {
+  const ws = new WebSocket(`${WS_BASE}/api/v1/ws`)
+  ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)) } catch {} }
+  ws.onclose   = onClose || (() => {})
+  ws.onerror   = () => ws.close()
+  return ws
+}

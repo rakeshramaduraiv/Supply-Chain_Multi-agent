@@ -230,14 +230,13 @@ def _compute_holiday_flag(df: pd.DataFrame, date_col: str | None) -> pd.Series:
     """
     try:
         import holidays as hol_pkg
-    except ImportError:
-        logger.warning(
-            "holidays package not installed — is_holiday_period falls back to "
-            "Q4/Jan heuristic. Add holidays==0.46 to requirements.txt."
-        )
-        if "order_month" in df.columns:
-            return df["order_month"].isin([10, 11, 12, 1]).astype(int)
-        return pd.Series(0, index=df.index)
+    except ImportError as exc:
+        raise ImportError(
+            "holidays package not installed — is_holiday_period cannot be computed. "
+            "Add holidays==0.46 to requirements.txt and reinstall. "
+            "A silent fallback would change the feature definition without any record, "
+            "which is how the original is_delayed leak survived undetected."
+        ) from exc
 
     if date_col is None or date_col not in df.columns:
         if "order_month" in df.columns:

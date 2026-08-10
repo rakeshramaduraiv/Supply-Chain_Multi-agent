@@ -1,12 +1,17 @@
 """
-AMASCI Dynamic Dependency-Driven AgentCoordinator
-==================================================
-Coordinates Multi-Agent predictions using dynamic dependency DAG rules.
+AMASCI Multi-Agent Prediction Pipeline
+=======================================
+Three specialised agents over a shared knowledge graph.
 
 Agents (3 active):
-  - DemandAgent   (dependencies = [])
-  - SupplierAgent (dependencies = ["DemandAgent"])
-  - LogisticsAgent (dependencies = ["SupplierAgent"])
+  - DemandAgent    — LightGBM regressor, demand/lag/temporal features
+  - SupplierAgent  — RandomForest classifier, supplier-history features
+  - LogisticsAgent — LightGBM classifier, route/mode/region features
+
+All three agents consume the same GRAPH_CONTEXT_FEATURES (graph_supplier_
+reliability, graph_inventory_stress, graph_avg_shipping_delay) written by
+the KG enrichment layer. The agents run sequentially but independently —
+no upstream prediction is passed as a feature to a downstream model.
 
 Inventory agent permanently excluded: synthetic stockout_risk_flag target
 is algebraically derived from rolling demand features. CV AUC = 0.479.
@@ -194,9 +199,7 @@ class AgentCoordinator:
             pass
 
         # Step 2: Supplier Intelligence Agent triggered by EventBus, publishes "supplier.evaluated"
-        df_sup = df.copy()
-        df_sup["demand_signal"] = d_pred
-        sup_res = self.pipeline.supplier_agent.predict(df_sup)
+        sup_res = self.pipeline.supplier_agent.predict(df)
         s_dict = sup_res.to_dict()
         s_pred = s_dict["predictions_summary"]["mean"]
         s_conf = s_dict.get("mean_confidence", 0.91)
@@ -207,7 +210,7 @@ class AgentCoordinator:
             reasoning=f"Supplier Intelligence Agent evaluated supplier lead-time variance and delay risk at {s_pred:.4f} enriched by GraphRAG centrality & demand signals.",
             business_impact="Identifies tier-1 supplier lead-time variance and potential port congestion risks.",
             execution_timestamp=now,
-            model_version=s_dict.get("model_version", "v2.1.0-supplier-lightgbm"),
+            model_version=s_dict.get("model_version", "v2.1.0-supplier-randomforest"),
             raw_details=s_dict,
         )
         payloads["Supplier Intelligence Agent"] = s_payload.to_dict()
@@ -217,11 +220,8 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Step 3: Logistics & Transportation Agent — receives supplier signal directly
-        # (Inventory agent excluded; supplier risk feeds logistics)
-        df_log = df.copy()
-        df_log["supplier_risk_signal"] = s_pred
-        log_res = self.pipeline.logistics_agent.predict(df_log)
+        # Step 3: Logistics & Transportation Agent
+        log_res = self.pipeline.logistics_agent.predict(df)
         l_dict = log_res.to_dict()
         l_pred = l_dict["predictions_summary"]["mean"]
         l_conf = l_dict.get("mean_confidence", 0.89)

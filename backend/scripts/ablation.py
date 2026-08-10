@@ -8,10 +8,27 @@ Precondition: processed_master.parquet must exist (run initialization first).
 Usage (from supply-chain/ root):
     docker exec amasci-api-dev python /app/scripts/ablation.py
 
-Both arms use:
-  - Identical seed, walk-forward split boundaries, hyperparameters, feature set
-  - Same training rows
-  - The SOLE difference: graph context columns zeroed in the ablated arm
+Methodology:
+    For each agent and each walk-forward fold, TWO SEPARATE MODELS are trained:
+
+      arm 'with_graph':
+          feature_list = FEATURE_CONFIGS[intel_type].features
+          (includes GRAPH_CONTEXT_FEATURES)
+
+      arm 'graph_ablated':
+          feature_list = [f for f in FEATURE_CONFIGS[intel_type].features
+                          if f not in GRAPH_CONTEXT_FEATURES]
+          (graph columns REMOVED from the design matrix — never zeroed)
+
+    Everything else is byte-identical between arms:
+      - same random_state (seed 42 from hyperparameter dicts)
+      - same fold boundaries from WalkForwardValidator
+      - same training rows and same test rows
+      - same hyperparameters
+      - same target
+
+    Zeroing graph columns in a model trained WITH them measures OOD sensitivity,
+    not information contribution. This script avoids that error.
 
 Results written to ablation_runs table.
 """
@@ -26,7 +43,6 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ablation")
 
-# Ensure app is importable
 BACKEND = Path(__file__).parent.parent
 sys.path.insert(0, str(BACKEND))
 
@@ -42,6 +58,36 @@ def _pg():
     )
 
 
+def _fit_and_score(
+    X_tr, y_tr, X_te, y_te,
+    feature_list: list[str],
+    intel_type,
+    trainer,
+    fc,
+):
+    """
+    Train a fresh model on X_tr[feature_list] and score on X_te[feature_list].
+    Returns metric dict. A new estimator is instantiated per call — never reused.
+    """
+    from app.ml.utils import ModelTask
+    from app.ml.metrics import compute_classification_metrics, compute_regression_metrics
+
+    available = [f for f in feature_list if f in X_tr.columns]
+    X_tr_arm = X_tr[available]
+    X_te_arm = X_te[available]
+
+    model = trainer._create_model(intel_type)
+    model.fit(X_tr_arm, y_tr)
+
+    y_arr = y_te.values
+    yp = model.predict(X_te_arm)
+    if fc.task == ModelTask.CLASSIFICATION:
+        ypr = model.predict_proba(X_te_arm)[:, 1] if hasattr(model, "predict_proba") else None
+        return compute_classification_metrics(y_arr, yp, ypr).to_dict(), len(available)
+    else:
+        return compute_regression_metrics(y_arr, yp).to_dict(), len(available)
+
+
 def run_ablation_for_agent(df, intel_type, n_splits: int = 5) -> list[dict]:
     """
     Run walk-forward ablation for one agent.
@@ -49,16 +95,19 @@ def run_ablation_for_agent(df, intel_type, n_splits: int = 5) -> list[dict]:
     """
     import numpy as np
     from app.ml.utils import (
-        FEATURE_CONFIGS, GRAPH_CONTEXT_FEATURES, IntelligenceType,
-        ModelTask, chronological_split, prepare_features,
+        FEATURE_CONFIGS, GRAPH_CONTEXT_FEATURES, ModelTask,
+        chronological_split, prepare_features,
     )
-    from app.ml.metrics import compute_classification_metrics, compute_regression_metrics
     from app.ml.validation import WalkForwardValidator
     from app.ml.training import BaseTrainer
 
-    fc    = FEATURE_CONFIGS[intel_type]
-    mkey  = "r2" if fc.task == ModelTask.REGRESSION else "roc_auc"
+    fc      = FEATURE_CONFIGS[intel_type]
+    mkey    = "r2" if fc.task == ModelTask.REGRESSION else "roc_auc"
     trainer = BaseTrainer()
+    seed    = 42  # matches random_state in all hyperparameter dicts
+
+    full_feature_list    = fc.features
+    ablated_feature_list = [f for f in fc.features if f not in GRAPH_CONTEXT_FEATURES]
 
     # Use the 80% train split only (same as production training)
     train_df, _ = chronological_split(df, train_ratio=0.8)
@@ -71,59 +120,70 @@ def run_ablation_for_agent(df, intel_type, n_splits: int = 5) -> list[dict]:
     rows   = []
     now    = datetime.now(timezone.utc)
 
+    fold_deltas: list[float] = []
+
     for fold_idx, ((tr_s, tr_e), (te_s, te_e)) in enumerate(splits):
         X_tr = X_all.iloc[tr_s:tr_e]
         y_tr = y_all.iloc[tr_s:tr_e]
         X_te = X_all.iloc[te_s:te_e]
         y_te = y_all.iloc[te_s:te_e]
-        y_arr = y_te.values
 
-        model = trainer._create_model(intel_type)
-        model.fit(X_tr, y_tr)
+        # with_graph arm — trained on full feature list including graph columns
+        m_wg, n_feat_wg = _fit_and_score(
+            X_tr, y_tr, X_te, y_te, full_feature_list, intel_type, trainer, fc
+        )
 
-        def _score(X_eval):
-            yp = model.predict(X_eval)
-            if fc.task == ModelTask.CLASSIFICATION:
-                ypr = model.predict_proba(X_eval)[:, 1] if hasattr(model, "predict_proba") else None
-                m   = compute_classification_metrics(y_arr, yp, ypr).to_dict()
-            else:
-                m = compute_regression_metrics(y_arr, yp).to_dict()
-            return m
+        # graph_ablated arm — trained on feature list with graph columns REMOVED
+        m_abl, n_feat_abl = _fit_and_score(
+            X_tr, y_tr, X_te, y_te, ablated_feature_list, intel_type, trainer, fc
+        )
 
-        # with_graph arm
-        m_wg = _score(X_te)
+        wg_val  = m_wg.get(mkey, 0.0)
+        abl_val = m_abl.get(mkey, 0.0)
+        delta   = wg_val - abl_val
+        fold_deltas.append(delta)
 
-        # graph_ablated arm — zero all graph context columns
-        X_abl = X_te.copy()
-        for col in GRAPH_CONTEXT_FEATURES:
-            if col in X_abl.columns:
-                X_abl[col] = 0.0
-        m_abl = _score(X_abl)
-
-        for arm, m in [("with_graph", m_wg), ("graph_ablated", m_abl)]:
-            rows.append({
-                "id":             str(uuid.uuid4()),
-                "run_id":         run_id,
-                "arm":            arm,
-                "intelligence":   intel_type.value,
-                "window_index":   fold_idx,
-                "auc":            m.get(mkey, 0.0),
-                "f1":             m.get("f1", 0.0),
-                "precision_score": m.get("precision", 0.0),
-                "recall_score":   m.get("recall", 0.0),
-                "brier":          0.0,
-                "n_train":        len(X_tr),
-                "n_test":         len(X_te),
-                "created_at":     now,
-                "updated_at":     now,
-            })
-
-        wg_auc  = m_wg.get(mkey, 0.0)
-        abl_auc = m_abl.get(mkey, 0.0)
         logger.info(
             f"  {intel_type.value} fold {fold_idx}: "
-            f"with_graph={wg_auc:.4f}  ablated={abl_auc:.4f}  Δ={wg_auc - abl_auc:+.4f}"
+            f"with_graph={wg_val:.4f} (n={n_feat_wg})  "
+            f"ablated={abl_val:.4f} (n={n_feat_abl})  "
+            f"Δ={delta:+.4f}"
         )
+
+        for arm, m, n_feat in [
+            ("with_graph",    m_wg,  n_feat_wg),
+            ("graph_ablated", m_abl, n_feat_abl),
+        ]:
+            rows.append({
+                "id":              str(uuid.uuid4()),
+                "run_id":          run_id,
+                "arm":             arm,
+                "intelligence":    intel_type.value,
+                "window_index":    fold_idx,
+                "auc":             m.get(mkey, 0.0),
+                "f1":              m.get("f1", 0.0),
+                "precision_score": m.get("precision", 0.0),
+                "recall_score":    m.get("recall", 0.0),
+                "brier":           0.0,
+                "n_train":         len(X_tr),
+                "n_test":          len(X_te),
+                "n_features":      n_feat,
+                "seed":            seed,
+                "created_at":      now,
+                "updated_at":      now,
+            })
+
+    # Per-agent fold-level variance report
+    import numpy as np
+    mean_delta = float(np.mean(fold_deltas))
+    std_delta  = float(np.std(fold_deltas))
+    logger.info(
+        f"  {intel_type.value} fold deltas: {[f'{d:+.4f}' for d in fold_deltas]}"
+    )
+    logger.info(
+        f"  {intel_type.value} mean Δ={mean_delta:+.4f}  std={std_delta:.4f}  "
+        f"({'consistent' if std_delta < abs(mean_delta) else 'noisy — delta within fold variance'})"
+    )
 
     return rows
 
@@ -131,6 +191,7 @@ def run_ablation_for_agent(df, intel_type, n_splits: int = 5) -> list[dict]:
 def main():
     from app.core.config import get_settings
     import pandas as pd
+    import numpy as np
     from app.ml.utils import IntelligenceType
     from app.feature_engineering import engineer_features
 
@@ -140,14 +201,13 @@ def main():
         logger.error(f"processed_master.parquet not found at {parquet}. Run initialization first.")
         sys.exit(1)
 
-    logger.info(f"Loading {parquet} …")
+    logger.info(f"Loading {parquet} ...")
     df = pd.read_parquet(parquet)
-    logger.info(f"Loaded {len(df):,} rows × {len(df.columns)} cols")
+    logger.info(f"Loaded {len(df):,} rows x {len(df.columns)} cols")
 
-    # Engineer features once
-    logger.info("Engineering features …")
+    logger.info("Engineering features ...")
     df_eng = engineer_features(df)
-    logger.info(f"Engineered: {len(df_eng):,} rows × {len(df_eng.columns)} cols")
+    logger.info(f"Engineered: {len(df_eng):,} rows x {len(df_eng.columns)} cols")
 
     agents = [
         IntelligenceType.DEMAND,
@@ -169,10 +229,9 @@ def main():
         sys.exit(1)
 
     # Persist to ablation_runs table
-    logger.info(f"\nPersisting {len(all_rows)} rows to ablation_runs …")
+    logger.info(f"\nPersisting {len(all_rows)} rows to ablation_runs ...")
     conn = _pg()
     cur  = conn.cursor()
-    # Clear previous runs so the endpoint always shows the latest
     cur.execute("DELETE FROM ablation_runs")
     for r in all_rows:
         cur.execute("""
@@ -189,17 +248,31 @@ def main():
     conn.close()
     logger.info("Done. ablation_runs populated.")
 
-    # Summary
-    print("\n=== ABLATION SUMMARY ===")
+    # Summary — mean, delta, and fold-level variance side by side
+    print("\n=== ABLATION SUMMARY (two-model retrain per arm) ===")
     from collections import defaultdict
     by_agent: dict = defaultdict(lambda: {"with_graph": [], "graph_ablated": []})
     for r in all_rows:
         by_agent[r["intelligence"]][r["arm"]].append(r["auc"])
+
     for agent, arms in sorted(by_agent.items()):
-        import numpy as np
-        wg  = np.mean(arms["with_graph"])   if arms["with_graph"]   else float("nan")
-        abl = np.mean(arms["graph_ablated"]) if arms["graph_ablated"] else float("nan")
-        print(f"  {agent:10s}  with_graph={wg:.4f}  ablated={abl:.4f}  Δ={wg - abl:+.4f}")
+        wg_vals  = arms["with_graph"]
+        abl_vals = arms["graph_ablated"]
+        wg   = np.mean(wg_vals)  if wg_vals  else float("nan")
+        abl  = np.mean(abl_vals) if abl_vals else float("nan")
+        mean_d = wg - abl
+        # Paired fold deltas
+        fold_d = [w - a for w, a in zip(wg_vals, abl_vals)]
+        std_d  = float(np.std(fold_d)) if fold_d else float("nan")
+        folds_str = "  ".join(f"{d:+.4f}" for d in fold_d)
+        print(
+            f"  {agent:10s}  with_graph={wg:.4f}  ablated={abl:.4f}  "
+            f"mean_delta={mean_d:+.4f}  fold_std={std_d:.4f}"
+        )
+        print(f"             fold deltas: [{folds_str}]")
+        if std_d > abs(mean_d):
+            print(f"             NOTE: fold std ({std_d:.4f}) > |mean delta| ({abs(mean_d):.4f}) "
+                  f"— delta is within noise. Not evidence of graph contribution at this scale.")
 
 
 if __name__ == "__main__":

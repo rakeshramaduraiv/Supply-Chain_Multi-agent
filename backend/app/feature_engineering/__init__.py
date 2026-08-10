@@ -14,8 +14,10 @@ Post-shipment observables (delivery_gap, is_delayed, delivery_duration_days,
 shipping_delay_ratio) are computed for completeness but are BANNED from any
 model targeting Late_delivery_risk. The leakage guard in ml/utils enforces this.
 
-graph_avg_shipping_delay uses Days for shipment (scheduled) — the pre-shipment
-plan — NOT delivery_gap (which is post-hoc). This is the §4.1 requirement.
+graph_avg_shipping_delay uses an expanding-shifted late rate per (Shipping Mode,
+Order Region) as a pre-shipment delay proxy — NOT delivery_gap (post-hoc).
+The Tier-2 KG enrichment overwrites this with actual neighbour-route observed
+delay via :SHIPS_VIA / :CO_FAILS_WITH edges.
 """
 
 import logging
@@ -155,7 +157,7 @@ def _expanding_group_mean(
     expanding_target_rate but for continuous features.
     """
     if value_col not in df.columns:
-        return pd.Series(df[value_col].mean() if value_col in df.columns else 0.5, index=df.index)
+        return pd.Series(0.5, index=df.index)
 
     available = [c for c in group_cols if c in df.columns]
     global_prior = float(df[value_col].mean())
@@ -561,8 +563,9 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
     A3 fix: replaced full-df groupby().transform("mean") with expanding-shifted
     equivalents so test rows cannot see test-set target-derived values.
 
-    graph_avg_shipping_delay uses Days for shipment (scheduled) — the
-    pre-shipment plan known at order time — NOT delivery_gap (post-hoc).
+    graph_avg_shipping_delay uses Late_delivery_risk as a delay proxy via
+    expanding-shifted mean per (Shipping Mode, Region) — NOT delivery_gap
+    (post-hoc) and NOT Days for shipment (scheduled) (no temporal discipline).
     """
     dept_col   = "Department Name"
     mode_col   = "Shipping Mode"
@@ -586,20 +589,31 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
 
     # graph_avg_shipping_delay: expanding shifted mean of OBSERVED late rate per
     # (Shipping Mode, Region) neighbour routes — Tier-1 proxy for Neo4j traversal.
+    # Uses Late_delivery_risk as a delay proxy (expanding-shifted, leak-free).
     # Tier-2 overwrites with actual neighbour-route observed delay via
     # :SHIPS_VIA / :CO_FAILS_WITH edges, excluding the anchor row's own route.
     df["graph_avg_shipping_delay"] = _expanding_group_mean(
         df, [mode_col, region_col], target_col   # late rate as delay proxy
     )
 
-    # graph_tpke_edge_density: Tier-1 proxy = expanding shifted count of
-    # (Dept, Mode) co-occurrences normalised to [0,1].
-    # Tier-2 overwrites with actual TPKE edge count incident on the anchor
-    # entity within the trailing 30-day window, normalised to [0,1].
+    # graph_tpke_edge_density: expanding shifted count of (Dept, Mode)
+    # co-occurrences normalised to [0,1] — no full-df computation.
+    # Tier-2 overwrites with actual TPKE edge count from Neo4j.
     if dept_col in df.columns and mode_col in df.columns:
-        pair_count = df.groupby([dept_col, mode_col])[dept_col].transform("count")
-        _max_count = pair_count.max()
-        df["graph_tpke_edge_density"] = (pair_count / max(_max_count, 1)).clip(0, 1).fillna(0.0)
+        # Build expanding count per (dept, mode) group, shifted so row i
+        # sees only rows strictly before it.
+        pair_key = df[dept_col].astype(str) + "__" + df[mode_col].astype(str)
+        expanding_counts = pd.Series(np.nan, index=df.index)
+        for _, grp_idx in df.groupby([dept_col, mode_col]).groups.items():
+            s = pd.Series(1.0, index=grp_idx)
+            expanding_counts.loc[grp_idx] = (
+                s.expanding(min_periods=1).sum().shift(1).fillna(0).values
+            )
+        expanding_counts = expanding_counts.fillna(0.0)
+        _max_count = expanding_counts.max()
+        df["graph_tpke_edge_density"] = (
+            (expanding_counts / max(_max_count, 1)).clip(0, 1)
+        )
     else:
         df["graph_tpke_edge_density"] = 0.0
 

@@ -11,10 +11,11 @@ is a target-encoding leak. The feature lists use supplier_hist_late_rate and
 route_hist_late_rate — expanding shifted rates computed in feature_engineering.
 
 Agent differentiation (§3.7):
-  Supplier  — predicts P(supplier's monthly late rate > its trailing median)
-              Uses supplier history, category diversity, volume, lead-time.
-  Logistics — predicts Late_delivery_risk at individual order level.
-              Uses route, shipping mode, region, scheduled days, calendar.
+  Supplier  — predicts Late_delivery_risk using supplier-history features:
+              hist late rate, category diversity, order volume, lead-time.
+              Differentiated from Logistics by feature emphasis, not target.
+  Logistics — predicts Late_delivery_risk using route/mode/region features:
+              route hist late rate, shipping mode, region congestion, calendar.
 """
 
 import logging

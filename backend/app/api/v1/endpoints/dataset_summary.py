@@ -591,7 +591,11 @@ def get_error_diagnostics(period_start: str = None):
         dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
         period_mask = dates.dt.strftime("%Y-%m") == period_start
         df_period = df[period_mask].copy()
-        # Fall back to full dataset if period has no rows (e.g. pre-upload)
+        # If no rows match the period, use the most recent month available
+        # (covers the case where uploaded CSV has no date column or dates differ)
+        if len(df_period) < 10:
+            latest_period = dates.dt.strftime("%Y-%m").max()
+            df_period = df[dates.dt.strftime("%Y-%m") == latest_period].copy()
         if len(df_period) < 10:
             df_period = df.copy()
     else:
@@ -685,5 +689,5 @@ def get_error_diagnostics(period_start: str = None):
             "root_cause":        f"Demand model vs actual gap: {variance:+} units — {cat} · {region}",
         })
 
-    return {"diagnostics": diagnostics, "count": len(diagnostics)}
+    return {"diagnostics": diagnostics, "count": len(diagnostics), "period_used": period_start or "latest"}
 

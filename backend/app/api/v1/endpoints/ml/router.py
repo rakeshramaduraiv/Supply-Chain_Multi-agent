@@ -448,9 +448,12 @@ async def get_feature_importance(intelligence_type: str):
     try:
         from app.ml.feature_importance import compute_feature_importance
 
-        model = _registry.load_model(intel_type)
         version = _registry.get_latest_version(intel_type)
-        features = version.features_used if version else []
+        if not version:
+            raise HTTPException(status_code=404, detail=f"No model found for {intelligence_type}")
+        model = _registry.load_model(intel_type)
+        # Always use the features the model was actually trained with
+        features = version.features_used or []
 
         result = compute_feature_importance(model, features)
         return BaseResponse(
@@ -497,6 +500,53 @@ async def get_training_history(
         data=TrainingHistorySchema(entries=entries, total_entries=len(entries)),
         message=f"Training history: {len(entries)} entries",
     )
+
+
+@router.get("/evaluation-matrix", response_model=BaseResponse[dict])
+async def get_evaluation_matrix():
+    """Evaluate all 3 agents and return a unified metrics matrix."""
+    from app.ml.confidence import compute_classification_confidence, compute_regression_confidence
+    from app.ml.metrics import compute_classification_metrics, compute_regression_metrics
+    from app.ml.utils import ModelTask, chronological_split, prepare_features
+
+    try:
+        df = _load_processed_dataset()
+        _, test_df = chronological_split(df, train_ratio=0.8)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    agents = [
+        IntelligenceType.DEMAND,
+        IntelligenceType.SUPPLIER,
+        IntelligenceType.LOGISTICS,
+    ]
+    matrix = {}
+    for intel_type in agents:
+        version = _registry.get_latest_version(intel_type)
+        if not version:
+            matrix[intel_type.value] = {"status": "no_model"}
+            continue
+        try:
+            model = _registry.load_model(intel_type)
+            feature_config = FEATURE_CONFIGS[intel_type]
+            X_test, y_test = prepare_features(test_df, feature_config)
+            y_pred = model.predict(X_test)
+            y_test_arr = np.asarray(y_test)
+
+            if feature_config.task == ModelTask.CLASSIFICATION:
+                y_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, "predict_proba") else None
+                m = compute_classification_metrics(y_test_arr, y_pred, y_prob).to_dict()
+                conf = compute_classification_confidence(y_prob, y_test_arr).to_dict() if y_prob is not None else {}
+                matrix[intel_type.value] = {"task": "classification", "metrics": m, "confidence": conf, "n_samples": len(X_test), "status": "ok"}
+            else:
+                m = compute_regression_metrics(y_test_arr, y_pred).to_dict()
+                conf = compute_regression_confidence(y_pred, y_test_arr).to_dict()
+                matrix[intel_type.value] = {"task": "regression", "metrics": m, "confidence": conf, "n_samples": len(X_test), "status": "ok"}
+        except Exception as e:
+            logger.error(f"Evaluation matrix failed for {intel_type.value}: {e}")
+            matrix[intel_type.value] = {"status": "error", "detail": str(e)}
+
+    return BaseResponse(data=matrix, message="Evaluation matrix computed")
 
 
 router.include_router(coordinator.router)

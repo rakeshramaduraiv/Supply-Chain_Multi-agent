@@ -71,6 +71,7 @@ export const api = {
   getMetrics:         (type) => http.get(`/api/v1/ml/metrics/${type}`),
   getFeatureImportance: (type) => http.get(`/api/v1/ml/feature-importance/${type}`),
   evaluateModel:      (b) => http.post('/api/v1/ml/model/evaluate', b),
+  getEvaluationMatrix: () => http.get('/api/v1/ml/evaluation-matrix'),
 
   // Knowledge Graph
   buildGraph:         () => http.post('/api/v1/graph/build'),

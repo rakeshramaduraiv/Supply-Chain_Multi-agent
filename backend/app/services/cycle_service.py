@@ -286,29 +286,59 @@ def _stage2_match_forecast(
     except Exception as e:
         logger.warning(f"Stage 2: forecast fetch failed ({e}) — treating all rows as unmatched")
 
+    # No forecast in DB at all — honest SKIPPED, not fake COMPLETED
+    if total_forecast_entities == 0:
+        duration_ms = (time.perf_counter() - t0) * 1000
+        return StageResult(
+            stage=2,
+            name="Match Forecast vs Actual",
+            status="SKIPPED",
+            duration_ms=duration_ms,
+            detail={"reason": f"no standing forecast for this period", "match_rate": None},
+        ), pd.DataFrame(), df_actual.copy()
+
+    # Build actual_keys from uploaded rows — these are the keys we can match
+    actual_keys: set[str] = set()
+    if _PRODUCT_KEY in df_actual.columns:
+        actual_keys.update(df_actual[_PRODUCT_KEY].astype(str).unique())
+    if _SUPPLIER_KEY in df_actual.columns:
+        actual_keys.update(df_actual[_SUPPLIER_KEY].astype(str).unique())
+    if _ROUTE_KEY_A in df_actual.columns and _ROUTE_KEY_B in df_actual.columns:
+        route_keys = (df_actual[_ROUTE_KEY_A].astype(str) + "|" + df_actual[_ROUTE_KEY_B].astype(str)).unique()
+        actual_keys.update(route_keys)
+
+    # forecast_keys = keys present in the stored forecast
+    forecast_keys: set[str] = set(forecast_map.keys())
+
+    # matched = intersection — keys present in BOTH forecast and actuals
+    matched_keys = actual_keys & forecast_keys
+
+    # match_rate = what fraction of forecast entities we can score
+    # denominator is forecast_keys (not actual_keys, not matched_ids)
+    match_rate = len(matched_keys) / len(forecast_keys) if forecast_keys else None
+
+    # Split rows
     if matched_ids:
         idx_int = [int(i) for i in matched_ids if i.isdigit()]
-        df_matched   = df_actual.loc[df_actual.index.isin(idx_int)].copy() if idx_int else df_actual.copy()
-        df_unmatched = df_actual.loc[~df_actual.index.isin(idx_int)].copy() if idx_int else pd.DataFrame()
+        df_matched   = df_actual.loc[df_actual.index.isin(idx_int)].copy() if idx_int else pd.DataFrame()
+        df_unmatched = df_actual.loc[~df_actual.index.isin(idx_int)].copy()
     else:
-        # No forecast in DB — all rows proceed but are flagged as unmatched
-        df_matched   = df_actual.copy()
-        df_unmatched = pd.DataFrame()
+        df_matched   = pd.DataFrame()
+        df_unmatched = df_actual.copy()
 
     duration_ms = (time.perf_counter() - t0) * 1000
-    matched_forecast_entities = len(forecast_map)
-    match_rate = matched_forecast_entities / total_forecast_entities if total_forecast_entities > 0 else None
-
     return StageResult(
         stage=2,
         name="Match Forecast vs Actual",
         status="COMPLETED",
         duration_ms=duration_ms,
         detail={
-            "rows_matched":   len(df_matched),
-            "rows_excluded":  len(df_unmatched),
-            "forecast_anchors": len(forecast_map),
-            "match_rate": match_rate,
+            "rows_matched":            len(df_matched),
+            "rows_excluded":           len(df_unmatched),
+            "forecast_anchors":        len(forecast_keys),
+            "actual_anchors":          len(actual_keys),
+            "matched_anchors":         len(matched_keys),
+            "match_rate":              round(match_rate, 4) if match_rate is not None else None,
             "total_forecast_entities": total_forecast_entities,
         },
     ), df_matched, df_unmatched
@@ -643,10 +673,7 @@ async def run_upload_cycle(
 
     # Stage 3
     await _running(3, "Compute Metrics")
-    forecast_exists = False
-    if s2 and s2.status == "COMPLETED":
-        total_ents = s2.detail.get("total_forecast_entities", 0)
-        forecast_exists = (total_ents > 0)
+    forecast_exists = (s2.status == "COMPLETED" and s2.detail.get("match_rate") is not None)
     s3, metrics = _stage3_compute_metrics(df_matched, forecast_exists, period)
     stages.append(s3)
     await _emit(s3)

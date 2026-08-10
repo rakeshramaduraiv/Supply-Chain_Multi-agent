@@ -610,9 +610,11 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
                 s.expanding(min_periods=1).sum().shift(1).fillna(0).values
             )
         expanding_counts = expanding_counts.fillna(0.0)
-        _max_count = expanding_counts.max()
+        # Use expanding max so test rows are not scaled by a maximum that
+        # includes future rows (Issue 5a fix).
+        running_max = expanding_counts.expanding(min_periods=1).max()
         df["graph_tpke_edge_density"] = (
-            (expanding_counts / max(_max_count, 1)).clip(0, 1)
+            (expanding_counts / running_max.clip(lower=1)).clip(0, 1)
         )
     else:
         df["graph_tpke_edge_density"] = 0.0

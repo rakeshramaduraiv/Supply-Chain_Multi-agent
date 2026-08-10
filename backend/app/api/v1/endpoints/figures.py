@@ -10,7 +10,7 @@ import numpy as np
 from fastapi import APIRouter, Query
 from app.core.config import get_settings
 from app.ml.registry import ModelRegistry
-from app.ml.utils import IntelligenceType, FEATURE_CONFIGS, ModelTask
+from app.ml.utils import IntelligenceType, FEATURE_CONFIGS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Figures"])
@@ -111,54 +111,10 @@ def _ablation_sync():
     except Exception as e:
         logger.warning(f"ablation_runs DB read failed: {e}")
 
-    # Fallback: live evaluation on test split (zeroing graph context columns)
-    df = _parquet()
-    if df is None:
-        return []
-    from app.ml.utils import chronological_split, GRAPH_CONTEXT_FEATURES
-    from app.ml.metrics import compute_classification_metrics, compute_regression_metrics
-    _, test_df = chronological_split(df, train_ratio=0.8)
-    results = []
-
-    for intel_type in [IntelligenceType.DEMAND, IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS]:
-        version = _registry.get_latest_version(intel_type)
-        if not version:
-            continue
-        fc    = FEATURE_CONFIGS[intel_type]
-        mkey  = "r2" if fc.task == ModelTask.REGRESSION else "roc_auc"
-        mname = "R²" if fc.task == ModelTask.REGRESSION else "AUC"
-        try:
-            model = _registry.load_model(intel_type)
-            X, y  = _features_from_version(test_df, version, fc.target)
-            y_arr = np.asarray(y)
-            y_pred = model.predict(X)
-            if fc.task == ModelTask.CLASSIFICATION:
-                y_prob = model.predict_proba(X)[:, 1] if hasattr(model, "predict_proba") else None
-                val_a  = compute_classification_metrics(y_arr, y_pred, y_prob).to_dict().get(mkey, 0.0)
-            else:
-                val_a = compute_regression_metrics(y_arr, y_pred).to_dict().get(mkey, 0.0)
-            X_abl = X.copy()
-            for col in GRAPH_CONTEXT_FEATURES:
-                if col in X_abl.columns:
-                    X_abl[col] = 0.0
-            y_pred_b = model.predict(X_abl)
-            if fc.task == ModelTask.CLASSIFICATION:
-                y_prob_b = model.predict_proba(X_abl)[:, 1] if hasattr(model, "predict_proba") else None
-                val_b    = compute_classification_metrics(y_arr, y_pred_b, y_prob_b).to_dict().get(mkey, 0.0)
-            else:
-                val_b = compute_regression_metrics(y_arr, y_pred_b).to_dict().get(mkey, 0.0)
-            results.append({
-                "agent": intel_type.value.capitalize(),
-                "metric_name": mname,
-                "with_graph": round(float(val_a), 4),
-                "graph_ablated": round(float(val_b), 4),
-                "delta": round(float(val_a - val_b), 4),
-                "n_test_samples": len(X),
-                "suspicious_identical": abs(val_a - val_b) < 1e-6,
-            })
-        except Exception as e:
-            logger.warning(f"Ablation live eval failed for {intel_type.value}: {e}")
-    return results
+    # No fallback — the zeroing method is invalid (measures OOD sensitivity,
+    # not information contribution). Run scripts/ablation.py to populate
+    # ablation_runs, then this endpoint will return real results.
+    return []
 
 
 # ── Fig 2: TPKE timeline ──────────────────────────────────────────────────────
@@ -363,17 +319,8 @@ def _walk_forward_sync():
         if not raw:
             wfr = hp.get("walk_forward_result") or {}
             raw = wfr.get("folds") or []
-        # Fallback: single-point from stored metrics
-        if not raw:
-            m   = version.metrics or {}
-            val = m.get(mkey)
-            if val is not None:
-                raw = [{
-                    "fold_index": 1,
-                    "test_period": version.created_at[:7],
-                    "metric_value": val,
-                    "n_test": version.n_training_samples // 5,
-                }]
+        # No fallback — if no real folds exist, return empty so frontend shows
+        # EmptyState ("run scripts/ablation.py to generate walk-forward results")
         folds, vals = [], []
         for i, f in enumerate(raw):
             # Support both flat fold dicts and nested metrics dicts

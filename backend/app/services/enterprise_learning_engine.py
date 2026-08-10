@@ -217,22 +217,40 @@ class EnterpriseContinuousLearningEngine(BaseService):
             details={"new_rows": new_rows, "matched_records": matched_records}
         ).__dict__)
 
-        # ── Stage 3: Accuracy & Metric Comparison (MAPE, RMSE, MAE, F1, Accuracy) ────────────
+        # ── Stage 3: Accuracy & Metric Comparison — read from model registry ────────────────
         t0 = time.perf_counter()
-        late_rate = float(df_new["Late_delivery_risk"].mean()) if "Late_delivery_risk" in df_new.columns else 0.548
-        accuracy = round(min(99.0, max(60.0, (1.0 - late_rate) * 100.0 * 0.95 + 5.0)), 2)
-        mape = round(late_rate * 5.2, 2)
-        rmse = round(mape * 4.1, 2)
-        mae = round(mape * 3.2, 2)
-        precision = round(min(0.98, max(0.75, 1.0 - late_rate * 0.3)), 4)
-        recall = round(min(0.97, max(0.70, 1.0 - late_rate * 0.4)), 4)
-        f1_score = round(2 * (precision * recall) / (precision + recall), 4)
+        # Read real metrics from the model registry — never compute from late_rate
+        _registry = ModelRegistry()
+        _demand_m   = (_registry.get_latest_version("demand")   or type("V", (), {"metrics": {}})()).metrics or {}
+        _supplier_m = (_registry.get_latest_version("supplier") or type("V", (), {"metrics": {}})()).metrics or {}
+        _logistics_m= (_registry.get_latest_version("logistics")or type("V", (), {"metrics": {}})()).metrics or {}
+
+        # Use real sklearn metrics from registry; None when not yet computed
+        accuracy  = None  # demand R² is a regression metric, not accuracy
+        mape      = round(float(_demand_m.get("mape", 0.0)), 2) if _demand_m.get("mape") is not None else None
+        rmse      = round(float(_demand_m.get("rmse", 0.0)), 2) if _demand_m.get("rmse") is not None else None
+        mae       = round(float(_demand_m.get("mae",  0.0)), 2) if _demand_m.get("mae")  is not None else None
+        precision = round(float(_supplier_m.get("precision", 0.0)), 4) if _supplier_m.get("precision") is not None else None
+        recall    = round(float(_supplier_m.get("recall",    0.0)), 4) if _supplier_m.get("recall")    is not None else None
+        f1_score  = round(float(_supplier_m.get("f1",        0.0)), 4) if _supplier_m.get("f1")        is not None else None
+
+        metric_summary = {
+            k: v for k, v in {
+                "demand_r2":        _demand_m.get("r2_score"),
+                "demand_mape":      mape,
+                "supplier_auc":     _supplier_m.get("roc_auc"),
+                "supplier_precision": precision,
+                "supplier_recall":  recall,
+                "supplier_f1":      f1_score,
+                "logistics_auc":    _logistics_m.get("roc_auc"),
+            }.items() if v is not None
+        }
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=3, name="Prediction Comparison & Metrics", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="99.2%",
-            result_summary=f"Accuracy: {accuracy}%, MAPE: {mape}%, RMSE: {rmse}, F1 Score: {f1_score}",
-            details={"accuracy": accuracy, "mape": mape, "rmse": rmse, "mae": mae, "precision": precision, "recall": recall, "f1_score": f1_score}
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="—",
+            result_summary=f"Registry metrics: {metric_summary}",
+            details=metric_summary
         ).__dict__)
 
         # ── Stage 4: GraphRAG Root Cause Analysis (RCA Engine Execution) ────────────────────
@@ -249,7 +267,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
             rca_report_dict = rca_report.to_dict()
         except Exception as e_rca:
             logger.warning(f"[ECLE] RCA Execution warning: {e_rca}")
-            rca_report_dict = {"primary_driver": "Port Congestion & Carrier Capacity", "confidence": 0.942}
+            rca_report_dict = {}  # no fallback — hardcoded driver string is not a measurement
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=4, name="GraphRAG Root Cause Analysis", status="Completed",
@@ -264,7 +282,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
             "alternative_decision": "Reallocate 35% order volume from Supplier A to regional backup Supplier B",
             "sla_recovery_days": 2.4,
             "cost_saving_est": "$45,200",
-            "confidence": 0.938,
+            "confidence": None,  # not measured — requires counterfactual engine output
         }
         stages_output.append(EnterpriseLearningStageResult(
             stage=5, name="GCRCE Counterfactual Analysis", status="Completed",
@@ -353,12 +371,24 @@ class EnterpriseContinuousLearningEngine(BaseService):
 
         # ── Stage 10: Multi-Agent & RWDAA Refresh ───────────────────────────────────────────
         t0 = time.perf_counter()
-        rwdaa_weights = {
-            "Demand Planning Agent": round(min(0.98, max(0.85, (accuracy / 100.0) * 0.98 + 0.02)), 4),
-            "Supplier Intelligence Agent": round(min(0.96, max(0.80, (accuracy / 100.0) * 0.92 + 0.03)), 4),
-            "Inventory & Warehouse Agent": round(min(0.97, max(0.84, (accuracy / 100.0) * 0.95 + 0.02)), 4),
-            "Logistics & Transportation Agent": round(min(0.95, max(0.82, (accuracy / 100.0) * 0.91 + 0.04)), 4),
-        }
+        # RWDAA weights: read from registry metrics, not derived from fabricated accuracy
+        _sup_auc  = _supplier_m.get("roc_auc")  or 0.0
+        _log_auc  = _logistics_m.get("roc_auc") or 0.0
+        _dem_r2   = max(0.0, _demand_m.get("r2_score") or 0.0)
+        # Normalise real metrics to weights; fall back to equal weights if no metrics
+        _total = _dem_r2 + _sup_auc + _log_auc
+        if _total > 0:
+            rwdaa_weights = {
+                "Demand Planning Agent":           round(_dem_r2  / _total, 4),
+                "Supplier Intelligence Agent":     round(_sup_auc / _total, 4),
+                "Logistics & Transportation Agent":round(_log_auc / _total, 4),
+            }
+        else:
+            rwdaa_weights = {
+                "Demand Planning Agent":           None,
+                "Supplier Intelligence Agent":     None,
+                "Logistics & Transportation Agent":None,
+            }
         coord_summary = None
         try:
             from app.ml.prediction.collaborative_pipeline import get_agent_coordinator
@@ -369,9 +399,9 @@ class EnterpriseContinuousLearningEngine(BaseService):
                 action_type="continuous_learning_cycle",
                 context={
                     "period": period,
-                    "accuracy": accuracy,
+                    "registry_metrics": metric_summary,
                     "weights": rwdaa_weights,
-                    "overall_confidence": coord_summary.overall_confidence if coord_summary else 0.94,
+                    "overall_confidence": coord_summary.overall_confidence if coord_summary else None,
                     "resolved_conflicts": coord_summary.resolved_conflicts if coord_summary else [],
                 },
             )
@@ -413,7 +443,6 @@ class EnterpriseContinuousLearningEngine(BaseService):
             "cycle_id": cycle_id,
             "period": period,
             "cumulative_rows": cumulative_rows,
-            "accuracy": accuracy,
             "next_period": next_period_str,
             "workspace_status": workspace_status,
         })
@@ -428,7 +457,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
             old_row_count=old_rows,
             new_rows_ingested=new_rows,
             cumulative_row_count=cumulative_rows,
-            overall_accuracy=accuracy,
+            overall_accuracy=None,
             mape=mape,
             rmse=rmse,
             mae=mae,

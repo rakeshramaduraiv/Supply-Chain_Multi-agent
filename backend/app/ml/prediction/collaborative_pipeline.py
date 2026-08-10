@@ -180,12 +180,12 @@ class AgentCoordinator:
         demand_res = self.pipeline.demand_agent.predict(df)
         d_dict = demand_res.to_dict()
         d_pred = d_dict["predictions_summary"]["mean"]
-        d_conf = d_dict.get("mean_confidence", 0.94)
+        d_conf = d_dict.get("mean_confidence")  # None if model did not produce confidence
         d_payload = AgentPredictionPayload(
             agent_id="Demand Planning Agent",
             prediction=d_pred,
             confidence=d_conf,
-            reasoning=f"Demand Planning Agent projected baseline master order volume at {d_pred:.2f} units using temporal & lag features derived from Knowledge Graph context.",
+            reasoning=f"Demand Planning Agent projected baseline master order volume at {d_pred:.2f} units using temporal and lag features plus three KG-derived context features (graph_supplier_reliability, graph_inventory_stress, graph_avg_shipping_delay).",
             business_impact="Establishes enterprise master procurement & production allocation volume for upcoming window.",
             execution_timestamp=now,
             model_version=d_dict.get("model_version", "v2.1.0-demand-lightgbm"),
@@ -202,12 +202,12 @@ class AgentCoordinator:
         sup_res = self.pipeline.supplier_agent.predict(df)
         s_dict = sup_res.to_dict()
         s_pred = s_dict["predictions_summary"]["mean"]
-        s_conf = s_dict.get("mean_confidence", 0.91)
+        s_conf = s_dict.get("mean_confidence")  # None if model did not produce confidence
         s_payload = AgentPredictionPayload(
             agent_id="Supplier Intelligence Agent",
             prediction=s_pred,
             confidence=s_conf,
-            reasoning=f"Supplier Intelligence Agent evaluated supplier lead-time variance and delay risk at {s_pred:.4f} enriched by GraphRAG centrality & demand signals.",
+            reasoning=f"Supplier Intelligence Agent evaluated supplier lead-time variance and late-delivery risk at {s_pred:.4f} using supplier-history features plus three KG-derived context features (graph_supplier_reliability, graph_inventory_stress, graph_avg_shipping_delay).",
             business_impact="Identifies tier-1 supplier lead-time variance and potential port congestion risks.",
             execution_timestamp=now,
             model_version=s_dict.get("model_version", "v2.1.0-supplier-randomforest"),
@@ -224,7 +224,7 @@ class AgentCoordinator:
         log_res = self.pipeline.logistics_agent.predict(df)
         l_dict = log_res.to_dict()
         l_pred = l_dict["predictions_summary"]["mean"]
-        l_conf = l_dict.get("mean_confidence", 0.89)
+        l_conf = l_dict.get("mean_confidence")  # None if model did not produce confidence
         l_payload = AgentPredictionPayload(
             agent_id="Logistics & Transportation Agent",
             prediction=l_pred,
@@ -242,14 +242,15 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Conflict resolution & overall confidence (3-agent RWDAA weights)
+        # Weighted confidence — only include agents that produced a real confidence
         rwdaa_w = {"Demand": 0.35, "Supplier": 0.30, "Logistics": 0.35}
-        overall_conf = round(
-            (d_conf * rwdaa_w["Demand"]) +
-            (s_conf * rwdaa_w["Supplier"]) +
-            (l_conf * rwdaa_w["Logistics"]),
-            4
-        )
+        _conf_pairs = [(d_conf, rwdaa_w["Demand"]), (s_conf, rwdaa_w["Supplier"]), (l_conf, rwdaa_w["Logistics"])]
+        _valid = [(c, w) for c, w in _conf_pairs if c is not None]
+        if _valid:
+            _total_w = sum(w for _, w in _valid)
+            overall_conf = round(sum(c * w for c, w in _valid) / _total_w, 4) if _total_w > 0 else None
+        else:
+            overall_conf = None
 
         # Decision Engine
         from app.engine.decision_engine import DecisionEngine

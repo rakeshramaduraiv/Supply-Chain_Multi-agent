@@ -138,6 +138,16 @@ def run_ablation_for_agent(df, intel_type, n_splits: int = 5) -> list[dict]:
             X_tr, y_tr, X_te, y_te, ablated_feature_list, intel_type, trainer, fc
         )
 
+        # Assert the feature count difference equals the number of graph columns removed
+        expected_diff = len([f for f in GRAPH_CONTEXT_FEATURES if f in X_tr.columns])
+        actual_diff   = n_feat_wg - n_feat_abl
+        assert actual_diff == expected_diff, (
+            f"Feature count mismatch for {intel_type.value} fold {fold_idx}: "
+            f"with_graph has {n_feat_wg} features, ablated has {n_feat_abl} "
+            f"(diff={actual_diff}, expected={expected_diff}). "
+            f"The ablated feature list was not correctly reduced."
+        )
+
         wg_val  = m_wg.get(mkey, 0.0)
         abl_val = m_abl.get(mkey, 0.0)
         delta   = wg_val - abl_val
@@ -238,11 +248,12 @@ def main():
             INSERT INTO ablation_runs
               (id, run_id, arm, intelligence, window_index,
                auc, f1, precision_score, recall_score, brier,
-               n_train, n_test, created_at, updated_at)
+               n_train, n_test, n_features, seed, created_at, updated_at)
             VALUES
               (%(id)s, %(run_id)s, %(arm)s, %(intelligence)s, %(window_index)s,
                %(auc)s, %(f1)s, %(precision_score)s, %(recall_score)s, %(brier)s,
-               %(n_train)s, %(n_test)s, %(created_at)s, %(updated_at)s)
+               %(n_train)s, %(n_test)s, %(n_features)s, %(seed)s,
+               %(created_at)s, %(updated_at)s)
         """, r)
     conn.commit()
     conn.close()

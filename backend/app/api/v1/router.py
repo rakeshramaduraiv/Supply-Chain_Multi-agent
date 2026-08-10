@@ -28,6 +28,8 @@ from app.graphrag.copilot_routes import router as copilot_router
 from app.api.v1.endpoints.decision_routes import router as decision_router
 from app.ml.agent_memory.routes import router as agent_memory_router
 
+from app.api.v1.endpoints.cycle_routes import router as cycle_router
+
 api_router = APIRouter()
 
 # --- Health & System ---
@@ -69,6 +71,9 @@ api_router.include_router(live_ops.router, prefix="")
 
 # --- TPKE Evolution ---
 api_router.include_router(tpke_router, prefix="")
+
+# --- Cycle resync ---
+api_router.include_router(cycle_router, prefix="")
 
 # --- Administration / Initialization ---
 api_router.include_router(initialization_router, prefix="")

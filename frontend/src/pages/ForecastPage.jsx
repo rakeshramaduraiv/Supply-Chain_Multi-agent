@@ -88,7 +88,12 @@ import styles from './ForecastPage.module.css'
 import { useSharedParams } from '../hooks/useSharedParams'
 
 
-import ActualUploadWorkflow from '../components/domain/ActualUploadWorkflow'
+import CycleStageTracker from '../components/domain/CycleStageTracker'
+import { useCycleStream } from '../hooks/useCycleStream'
+import CycleStepper from '../components/forecast/CycleStepper'
+import AgentMetricsPanel from '../components/forecast/AgentMetricsPanel'
+import ForecastCharts from '../components/forecast/ForecastCharts'
+import ValidationPanel from '../components/forecast/ValidationPanel'
 
 
 
@@ -399,6 +404,10 @@ export default function ForecastPage() {
 
 
 
+
+  // ── WebSocket cycle stream ────────────────────────────────────────────────
+  const [activeCycleId, setActiveCycleId] = useState(null)
+  const { connected: wsConnected, stages: cycleStages, complete: cycleComplete, reset: resetCycleStream } = useCycleStream(activeCycleId)
 
   // Per-step live status messages
 
@@ -886,11 +895,11 @@ export default function ForecastPage() {
     appendLog(2, `\u{1F4C2} Loading actuals for period ${periodStr}\u2026`)
 
 
-    appendLog(2, `\u{1F504} Running 12-stage ECLE validation pipeline\u2026`)
+    appendLog(2, `\u{1F504} Running 6-stage upload cycle pipeline\u2026`)
 
 
     setIsIngestingActuals(true)
-
+    resetCycleStream()`r`n    setActiveCycleId(null)`r`n
 
 
 
@@ -1172,9 +1181,6 @@ export default function ForecastPage() {
 
 
         records_matched:   validRecs.length,
-
-
-        overall_accuracy:  accuracy,
 
 
         mape_val:          parseFloat(mape.toFixed(2)),
@@ -1913,10 +1919,8 @@ export default function ForecastPage() {
     })
 
 
-    if (cycleUploadResult?.overall_accuracy) {
-
-
-      const acc = cycleUploadResult.overall_accuracy
+    if (cycleUploadResult?.mape_val != null) {
+      const acc = parseFloat((100 - cycleUploadResult.mape_val).toFixed(1))
 
 
       trendMap[cycleUploadResult.period] = {
@@ -2738,10 +2742,10 @@ export default function ForecastPage() {
                       appendLog(3, '🔢 Computing MAPE, MAE, RMSE from matched records…')
 
 
-                      const mape = cycleUploadResult?.mape_val?.toFixed(2) ?? '2.8'
+                      const mape = cycleUploadResult?.mape_val?.toFixed(2) ?? '—'
 
 
-                      const acc  = cycleUploadResult?.overall_accuracy?.toFixed(1) ?? '94.2'
+                      const acc  = cycleUploadResult?.mape_val != null ? (100 - cycleUploadResult.mape_val).toFixed(1) : '—'
 
 
                       setTimeout(() => {
@@ -4450,7 +4454,7 @@ export default function ForecastPage() {
               <div style={{ marginTop: 8, fontSize: '10px', color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 6 }}>
 
 
-                <Loader size={12} className={styles.spin} /> Running 12-stage ECLE validation pipeline…
+                <Loader size={12} className={styles.spin} /> Running 6-stage upload cycle pipeline…
 
 
               </div>
@@ -4465,7 +4469,7 @@ export default function ForecastPage() {
               <div style={{ marginTop: 8, fontSize: '10px', color: '#00b894', fontWeight: 700 }}>
 
 
-                ✅ {cycleUploadResult.records_loaded?.toLocaleString()} records ingested · Accuracy: {cycleUploadResult.overall_accuracy?.toFixed(1)}% · MAPE: {cycleUploadResult.mape_val?.toFixed(2)}%
+                ✅ {cycleUploadResult.records_loaded?.toLocaleString()} records ingested · MAPE: {cycleUploadResult.mape_val?.toFixed(2)}%
 
 
               </div>
@@ -4477,24 +4481,13 @@ export default function ForecastPage() {
           </div>
 
 
-          {/* 8-Stage Live Actual Upload Pipeline Workflow */}
-
-
-          <ActualUploadWorkflow
-
-
-            uploadResult={cycleUploadResult}
-
-
+          {/* 6-Stage Live Cycle Pipeline Tracker */}
+          <CycleStageTracker
+            cycleId={activeCycleId}
+            stages={cycleStages}
+            complete={cycleComplete}
+            connected={wsConnected}
             period={cycleMonth}
-
-
-            isIngesting={isIngestingActuals}
-
-
-            onComplete={() => setIsIngestingActuals(false)}
-
-
           />
 
 

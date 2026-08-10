@@ -12,7 +12,8 @@
 import { useEffect, useRef, useCallback, useReducer } from 'react'
 
 const BASE_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-const WS_URL = BASE_API_URL.replace(/^http/, 'ws') + '/api/v1/ws'
+// ws.router is mounted with prefix="" under /api/v1, so the full path is /ws
+const WS_URL = BASE_API_URL.replace(/^http/, 'ws').replace(/\/api\/v1$/, '') + '/ws'
 
 // stages: { [stageNum]: eventObject }
 // complete: cycle.complete payload or null

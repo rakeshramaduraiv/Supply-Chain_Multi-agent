@@ -52,13 +52,11 @@ export const api = {
   exportDashboard:    () => http.get('/api/v1/dashboard/export'),
 
   // Data / Upload
-  uploadTrain:        (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/train', fd) },
-  uploadForecast:     (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/forecast', fd) },
-  uploadActual:       (f, desc='') => { const fd = new FormData(); fd.append('file', f); fd.append('description', desc); return multipart('/api/v1/data/upload/actual', fd) },
+  // uploadTrain / uploadForecast / processDataset removed — training is init-only
+  uploadActual:       (f, period) => { const fd = new FormData(); fd.append('file', f); fd.append('period', period || new Date().toISOString().slice(0,7)); return multipart('/api/v1/business/upload/actual', fd) },
   getDatasetHistory:  () => http.get('/api/v1/data/dataset/history'),
   getDataset:         (id) => http.get(`/api/v1/data/dataset/${id}`),
   getDatasetProfile:  (id) => http.get(`/api/v1/data/dataset/${id}/profile`),
-  processDataset:     (id) => http.post(`/api/v1/data/process/${id}`),
 
   // ML
   train:              (b) => http.post('/api/v1/ml/train', b),
@@ -113,7 +111,6 @@ export const api = {
   getRCAStats:        () => http.get('/api/v1/rca/statistics'),
   getRCASubgraph:     (b) => http.post('/api/v1/rca/subgraph', b),
   getRCAReport:       (id) => http.get(`/api/v1/rca/report/${id}`),
-
   // TPKE
   getTpkeStatus:      () => http.get('/api/v1/tpke/status'),
   getTpkeEdges:       () => http.get('/api/v1/tpke/edges'),
@@ -155,11 +152,10 @@ export const api = {
   queryCopilot:           (b) => http.post('/api/v1/graphrag/copilot/query', b),
 }
 
-// WebSocket connection — backend mounts at /api/v1/ws (ws.router with prefix="")
-// Previous attempts used /api/v1/ws which is correct; this helper makes it explicit.
-const WS_BASE = BASE.replace(/^http/, 'ws')
+// WebSocket: ws.router mounted with prefix="" under /api/v1, so full path is /ws
+const WS_BASE = BASE.replace(/^http/, 'ws').replace(/\/api\/v1$/, '')
 export function createWebSocket(onMessage, onClose) {
-  const ws = new WebSocket(`${WS_BASE}/api/v1/ws`)
+  const ws = new WebSocket(`${WS_BASE}/ws`)
   ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)) } catch {} }
   ws.onclose   = onClose || (() => {})
   ws.onerror   = () => ws.close()

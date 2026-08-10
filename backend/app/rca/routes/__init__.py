@@ -158,6 +158,17 @@ async def get_latest() -> RCALatestResponse:
     return RCALatestResponse(report=result.get("report"))
 
 
+@router.get("/report/{report_id}", response_model=RCAReportResponse)
+async def get_report(report_id: str) -> RCAReportResponse:
+    """Get a specific RCA report by ID."""
+    service = _get_service()
+    history = service.get_history(limit=200)
+    for item in history:
+        if str(item.get("id", "")) == report_id:
+            return RCAReportResponse(report=item.get("report", {}))
+    raise HTTPException(status_code=404, detail=f"RCA report {report_id!r} not found")
+
+
 @router.post("/counterfactual/evaluate")
 async def evaluate_counterfactual(
     target_id: str = Query(default="SUP_001"),

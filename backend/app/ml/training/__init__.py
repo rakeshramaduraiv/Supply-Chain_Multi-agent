@@ -193,6 +193,21 @@ class BaseTrainer:
                 model_factory=lambda: self._create_model(intelligence_type),
             )
             wf_result = wf_result_obj.to_dict()
+            # Annotate each fold with a test_period derived from the date column
+            date_col = "order date (DateOrders)"
+            if date_col in train_df.columns:
+                import pandas as _pd
+                dates = _pd.to_datetime(train_df[date_col], errors="coerce")
+                for fold_dict, fold_obj in zip(wf_result["folds"], wf_result_obj.folds):
+                    te_dates = dates.iloc[fold_obj.test_start_idx:fold_obj.test_end_idx]
+                    if len(te_dates) > 0:
+                        fold_dict["test_period"] = str(te_dates.min())[:7]
+                    fold_dict["metric_value"] = (
+                        fold_dict["metrics"].get("r2")
+                        or fold_dict["metrics"].get("roc_auc")
+                        or 0.0
+                    )
+                    fold_dict["n_test"] = fold_dict.get("test_size", 0)
 
         # Step 5: Train final model on full training set
         model = self._create_model(intelligence_type)
@@ -238,6 +253,9 @@ class BaseTrainer:
             "tpke_window_size_days":     _s.tpke_window_size_days,
         }
         hyperparams["tpke_params_at_training"] = tpke_params_at_training
+        # Persist walk-forward folds so /figures/models/walk-forward-history can read them
+        if wf_result:
+            hyperparams["walk_forward_folds"] = wf_result.get("folds", [])
 
         # Save to registry
         version = self.registry.save_model(

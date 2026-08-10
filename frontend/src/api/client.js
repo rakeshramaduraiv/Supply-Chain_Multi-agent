@@ -73,6 +73,22 @@ export const api = {
   evaluateModel:      (b) => http.post('/api/v1/ml/model/evaluate', b),
   getEvaluationMatrix: () => http.get('/api/v1/ml/evaluation-matrix'),
 
+  // Publication Figures
+  getAblationResults:       () => http.get('/api/v1/figures/ablation/results'),
+  getTpkeEvolutionTimeline: () => http.get('/api/v1/figures/tpke/evolution-timeline'),
+  getGraphStructure:        (limit = 600) => http.get('/api/v1/figures/graph/structure', { params: { limit } }),
+  getRocCurves:             () => http.get('/api/v1/figures/models/roc-curves'),
+  getWalkForwardHistory:    () => http.get('/api/v1/figures/models/walk-forward-history'),
+  getMetricsHistory:        () => http.get('/api/v1/figures/models/metrics-history'),
+  getDatasetOverview:       () => http.get('/api/v1/figures/dataset/overview'),
+
+  // Neo4j Explorer
+  getNeo4jOverview:         () => http.get('/api/v1/neo4j/overview'),
+  getNeo4jNodes:            (label, params) => http.get(`/api/v1/neo4j/nodes/${label}`, { params }),
+  getNeo4jRelationships:    (nodeId) => http.get(`/api/v1/neo4j/node/${nodeId}/relationships`),
+  searchNeo4j:              (q, label) => http.get('/api/v1/neo4j/search', { params: { q, label } }),
+  getNeo4jSubgraph:         (label, limit) => http.get('/api/v1/neo4j/subgraph', { params: { label, limit } }),
+
   // Knowledge Graph
   buildGraph:         () => http.post('/api/v1/graph/build'),
   rebuildGraph:       () => http.post('/api/v1/graph/rebuild'),

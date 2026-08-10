@@ -56,8 +56,6 @@ import styles from './ForecastPage.module.css'
 
 import { useSharedParams } from '../hooks/useSharedParams'
 
-import CycleStageTracker from '../components/domain/CycleStageTracker'
-import { useCycleStream } from '../hooks/useCycleStream'
 import CycleStepper from '../components/forecast/CycleStepper'
 import AgentMetricsPanel from '../components/forecast/AgentMetricsPanel'
 import ForecastCharts from '../components/forecast/ForecastCharts'
@@ -171,229 +169,6 @@ function StepLogPanel({ log }) {
 
 }
 
-function EvaluationMatrixSlide({ data, loading }) {
-  const safe = (v, d = 0) => (v == null || isNaN(v)) ? d : v
-
-  const agents = [
-    { key: 'demand',    label: 'Demand Agent',    color: 'var(--blue)', task: 'regression' },
-    { key: 'supplier',  label: 'Supplier Agent',  color: '#e67e22',     task: 'classification' },
-    { key: 'logistics', label: 'Logistics Agent', color: '#d63031',     task: 'classification' },
-  ]
-
-  // Build bar chart data for regression (demand)
-  const demandMetrics = data?.demand?.metrics || {}
-  const regressionData = [
-    { name: 'MAE',  value: safe(demandMetrics.mae,  1.15) },
-    { name: 'RMSE', value: safe(demandMetrics.rmse, 2.10) },
-    { name: 'MAPE', value: safe(demandMetrics.mape, 2.80) },
-    { name: 'R²',   value: safe(demandMetrics.r2,   0.91) },
-  ]
-
-  // Build bar chart data for classification agents
-  const classAgents = ['supplier', 'logistics']
-  const classMetricKeys = ['accuracy', 'precision', 'recall', 'f1', 'roc_auc']
-  const classChartData = classMetricKeys.map(k => {
-    const row = { name: k.toUpperCase().replace('_', ' ') }
-    classAgents.forEach(a => {
-      row[a] = safe(data?.[a]?.metrics?.[k], 0) * 100
-    })
-    return row
-  })
-
-  // Confusion matrices
-  const confMatrices = classAgents.map(a => ({
-    key: a,
-    label: agents.find(ag => ag.key === a)?.label,
-    color: agents.find(ag => ag.key === a)?.color,
-    cm: data?.[a]?.metrics?.confusion_matrix || [[0, 0], [0, 0]],
-    n: data?.[a]?.n_samples || 0,
-  }))
-
-  // Score cards
-  const scoreCards = agents.map(ag => {
-    const d = data?.[ag.key]
-    if (!d || d.status !== 'ok') return { ...ag, score: null, n: 0, status: d?.status || 'no_model' }
-    const m = d.metrics
-    const score = ag.task === 'regression'
-      ? safe(m.r2, 0) * 100
-      : safe(m.roc_auc, 0) * 100
-    const label = ag.task === 'regression' ? 'R² Score' : 'ROC-AUC'
-    return { ...ag, score: score.toFixed(1), label, n: d.n_samples, status: 'ok' }
-  })
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--tm)', fontSize: 13 }}>
-      Loading evaluation matrix…
-    </div>
-  )
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-      {/* Score Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        {scoreCards.map(ag => (
-          <div key={ag.key} className="card" style={{ padding: '16px 20px', borderTop: `3px solid ${ag.color}` }}>
-            <div style={{ fontSize: 11, color: 'var(--tm)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 4 }}>{ag.label}</div>
-            {ag.status === 'ok' ? (
-              <>
-                <div style={{ fontSize: 28, fontWeight: 800, color: ag.color }}>{ag.score}%</div>
-                <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 2 }}>{ag.task === 'regression' ? 'R² Score' : 'ROC-AUC'} · {ag.n?.toLocaleString()} test samples</div>
-                <div style={{ fontSize: 10, color: 'var(--tm)', marginTop: 4 }}>
-                  {ag.task === 'regression'
-                    ? `MAE: ${safe(data?.[ag.key]?.metrics?.mae).toFixed(3)} · RMSE: ${safe(data?.[ag.key]?.metrics?.rmse).toFixed(3)}`
-                    : `F1: ${(safe(data?.[ag.key]?.metrics?.f1) * 100).toFixed(1)}% · Acc: ${(safe(data?.[ag.key]?.metrics?.accuracy) * 100).toFixed(1)}%`}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 8 }}>
-                {ag.status === 'no_model' ? '⚠ No model trained yet' : `⚠ ${ag.status}`}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Charts row 1: Regression metrics + Classification metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-
-        {/* Demand Agent — Regression Metrics */}
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
-            Demand Agent — Regression Metrics
-          </div>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={regressionData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--b)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--tm)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: 'var(--tm)' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v) => v.toFixed(4)} />
-                <Bar dataKey="value" name="Score" barSize={36} radius={[4, 4, 0, 0]}>
-                  {regressionData.map((_, i) => (
-                    <Cell key={i} fill={['#3b82f6','#6366f1','#f59e0b','#00b894'][i]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--tm)', marginTop: 6 }}>
-            Lower MAE/RMSE/MAPE = better · Higher R² = better (max 1.0)
-          </div>
-        </div>
-
-        {/* Supplier + Logistics — Classification Metrics */}
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e67e22', display: 'inline-block' }} />
-            Supplier & Logistics — Classification Metrics (%)
-          </div>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={classChartData} margin={{ left: -10, right: 10, top: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--b)" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--tm)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: 'var(--tm)' }} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
-                <Tooltip formatter={(v) => `${v.toFixed(1)}%`} />
-                <Legend wrapperStyle={{ fontSize: 9 }} />
-                <Bar dataKey="supplier"  name="Supplier Agent"  fill="#e67e22" barSize={18} radius={[3,3,0,0]} />
-                <Bar dataKey="logistics" name="Logistics Agent" fill="#d63031" barSize={18} radius={[3,3,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Charts row 2: Confusion Matrices */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {confMatrices.map(({ key, label, color, cm, n }) => {
-          const tn = cm[0]?.[0] ?? 0
-          const fp = cm[0]?.[1] ?? 0
-          const fn = cm[1]?.[0] ?? 0
-          const tp = cm[1]?.[1] ?? 0
-          const total = tn + fp + fn + tp || 1
-          const cells = [
-            { label: 'TN', value: tn, pct: (tn/total*100).toFixed(1), bg: '#00b89422' },
-            { label: 'FP', value: fp, pct: (fp/total*100).toFixed(1), bg: '#d6303122' },
-            { label: 'FN', value: fn, pct: (fn/total*100).toFixed(1), bg: '#f59e0b22' },
-            { label: 'TP', value: tp, pct: (tp/total*100).toFixed(1), bg: '#00b89422' },
-          ]
-          return (
-            <div key={key} className="card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
-                {label} — Confusion Matrix
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--tm)' }}>{n.toLocaleString()} samples</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 320, margin: '0 auto' }}>
-                {cells.map((c, i) => (
-                  <div key={i} style={{ background: c.bg, border: '1px solid var(--b)', borderRadius: 8, padding: '14px 10px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: 'var(--tm)', fontWeight: 700 }}>{c.label}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp)' }}>{c.value.toLocaleString()}</div>
-                    <div style={{ fontSize: 10, color: 'var(--ts)' }}>{c.pct}%</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 10, color: 'var(--tm)' }}>
-                <span>Predicted: Negative | Positive</span>
-                <span style={{ color: '#00b894', fontWeight: 700 }}>
-                  Precision: {total > 0 ? ((tp/(tp+fp||1))*100).toFixed(1) : '—'}%
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ROC-AUC Timeline — per-agent confidence over test set */}
-      <div className="card" style={{ padding: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Activity size={15} style={{ color: 'var(--blue)' }} />
-          All-Agent Metric Summary Table
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--b)', color: 'var(--tm)', textAlign: 'left' }}>
-              <th style={{ padding: '6px 10px' }}>Agent</th>
-              <th style={{ padding: '6px 10px' }}>Task</th>
-              <th style={{ padding: '6px 10px' }}>Samples</th>
-              <th style={{ padding: '6px 10px' }}>MAE / Accuracy</th>
-              <th style={{ padding: '6px 10px' }}>RMSE / F1</th>
-              <th style={{ padding: '6px 10px' }}>MAPE / Precision</th>
-              <th style={{ padding: '6px 10px' }}>R² / ROC-AUC</th>
-              <th style={{ padding: '6px 10px' }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {agents.map(ag => {
-              const d = data?.[ag.key]
-              const m = d?.metrics || {}
-              const ok = d?.status === 'ok'
-              const fmt = (v) => ok ? safe(v).toFixed(4) : '—'
-              const fmtPct = (v) => ok ? `${(safe(v)*100).toFixed(1)}%` : '—'
-              return (
-                <tr key={ag.key} style={{ borderBottom: '1px solid var(--b)', color: 'var(--tp)' }}>
-                  <td style={{ padding: '7px 10px', fontWeight: 700, color: ag.color }}>{ag.label}</td>
-                  <td style={{ padding: '7px 10px' }}><span className="badge bdg-blue">{ag.task}</span></td>
-                  <td style={{ padding: '7px 10px' }}>{ok ? d.n_samples?.toLocaleString() : '—'}</td>
-                  <td style={{ padding: '7px 10px' }}>{ag.task === 'regression' ? fmt(m.mae) : fmtPct(m.accuracy)}</td>
-                  <td style={{ padding: '7px 10px' }}>{ag.task === 'regression' ? fmt(m.rmse) : fmtPct(m.f1)}</td>
-                  <td style={{ padding: '7px 10px' }}>{ag.task === 'regression' ? `${fmt(m.mape)}%` : fmtPct(m.precision)}</td>
-                  <td style={{ padding: '7px 10px', fontWeight: 700, color: '#00b894' }}>{ag.task === 'regression' ? fmt(m.r2) : fmtPct(m.roc_auc)}</td>
-                  <td style={{ padding: '7px 10px' }}>
-                    <span className={`badge ${ok ? 'bdg-low' : 'bdg-med'}`}>{ok ? 'OK' : d?.status || 'no model'}</span>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-    </div>
-  )
-}
 
 export default function ForecastPage() {
 
@@ -469,7 +244,6 @@ export default function ForecastPage() {
 
   // ── WebSocket cycle stream ────────────────────────────────────────────────
   const [activeCycleId, setActiveCycleId] = useState(null)
-  const { connected: wsConnected, stages: cycleStages, complete: cycleComplete, reset: resetCycleStream } = useCycleStream(activeCycleId)
 
   // Per-step live status messages
 
@@ -635,12 +409,6 @@ export default function ForecastPage() {
 
   })
 
-  const evalMatrix = useQuery({
-    queryKey: ['supplyChain', 'evaluationMatrix'],
-    queryFn: () => api.getEvaluationMatrix().then(r => r.data),
-    staleTime: 120_000,
-  })
-
   // ── Mutations ─────────────────────────────────────────────────────────────
 
   const cycleRcaMut = useMutation({
@@ -780,7 +548,6 @@ export default function ForecastPage() {
     appendLog(2, `\u{1F504} Running 6-stage upload cycle pipeline\u2026`)
 
     setIsIngestingActuals(true)
-    resetCycleStream()
     setActiveCycleId(null)
 
     const agentMap = ['Logistics Agent', 'Demand Agent', 'Supplier Agent', 'Logistics Agent', 'Demand Agent', 'Supplier Agent']
@@ -1626,12 +1393,6 @@ export default function ForecastPage() {
 
               <ShieldCheck size={14} /> Validation & Error Diagnostics
 
-            </button>
-            <button
-              className={`btn ${activeTab === 'evalmatrix' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-              onClick={() => setActiveTab('evalmatrix')}
-            >
-              <BarChart2 size={14} /> Evaluation Matrix
             </button>
 
           </div>
@@ -3031,15 +2792,6 @@ export default function ForecastPage() {
             )}
 
           </div>
-
-          {/* 6-Stage Live Cycle Pipeline Tracker */}
-          <CycleStageTracker
-            cycleId={activeCycleId}
-            stages={cycleStages}
-            complete={cycleComplete}
-            connected={wsConnected}
-            period={cycleMonth}
-          />
 
           {/* Detailed Error Diagnostics Cards */}
 

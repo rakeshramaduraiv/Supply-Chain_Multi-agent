@@ -222,7 +222,7 @@ def _stage2_match_forecast(
             detail={"reason": "No database session — forecast matching skipped"},
         ), df_actual.copy(), pd.DataFrame()
 
-    matched_ids: set[str] = set()
+    matched_ids: set[str] = set()  # kept for legacy compat — no longer used for row split
     forecast_map: dict[str, float] = {}
     total_forecast_entities = 0
 
@@ -317,14 +317,34 @@ def _stage2_match_forecast(
     # denominator is forecast_keys (not actual_keys, not matched_ids)
     match_rate = len(matched_keys) / len(forecast_keys) if forecast_keys else None
 
-    # Split rows
-    if matched_ids:
-        idx_int = [int(i) for i in matched_ids if i.isdigit()]
-        df_matched   = df_actual.loc[df_actual.index.isin(idx_int)].copy() if idx_int else pd.DataFrame()
-        df_unmatched = df_actual.loc[~df_actual.index.isin(idx_int)].copy()
-    else:
-        df_matched   = pd.DataFrame()
-        df_unmatched = df_actual.copy()
+    # --- FIX 1: derive row split FROM matched_keys (single source of truth) ---
+    # Build a per-row key series aligned to df_actual.index
+    def _row_key_series(df: pd.DataFrame) -> pd.Series:
+        parts = []
+        if _PRODUCT_KEY in df.columns:
+            parts.append(df[_PRODUCT_KEY].astype(str))
+        if _SUPPLIER_KEY in df.columns:
+            parts.append(df[_SUPPLIER_KEY].astype(str))
+        if _ROUTE_KEY_A in df.columns and _ROUTE_KEY_B in df.columns:
+            parts.append(df[_ROUTE_KEY_A].astype(str) + "|" + df[_ROUTE_KEY_B].astype(str))
+        if not parts:
+            return pd.Series(["__no_key__"] * len(df), index=df.index)
+        # A row matches if ANY of its key columns appears in matched_keys
+        match_mask = pd.Series(False, index=df.index)
+        for s in parts:
+            match_mask |= s.isin(matched_keys)
+        return match_mask
+
+    match_mask   = _row_key_series(df_actual)
+    df_matched   = df_actual[match_mask].copy()
+    df_unmatched = df_actual[~match_mask].copy()
+
+    # Invariant: if match_rate > 0 then df_matched must be non-empty
+    if match_rate is not None and match_rate > 0:
+        assert len(df_matched) > 0, (
+            f"match_rate={match_rate:.4f} but zero rows matched — key mismatch between "
+            f"forecast_keys={len(forecast_keys)} and df_actual columns"
+        )
 
     duration_ms = (time.perf_counter() - t0) * 1000
     return StageResult(

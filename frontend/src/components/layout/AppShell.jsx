@@ -9,6 +9,7 @@ import IntelligencePage from '../../pages/IntelligencePage'
 import RiskPage from '../../pages/RiskPage'
 import EntityPage from '../../pages/EntityPage'
 import ReportsPage from '../../pages/ReportsPage'
+import FiguresPage from '../../pages/FiguresPage'
 import { useSharedParams } from '../../hooks/useSharedParams'
 import { useRealtimeSync } from '../../hooks/useRealtimeSync'
 import { ChevronRight, Home, Bell, X, Trash2, AlertTriangle, AlertCircle, CheckCircle, Info, Brain } from 'lucide-react'
@@ -23,6 +24,7 @@ const PAGES = [
   { id: 'risk',         path: '/risk',         label: 'Root Cause Center' },
   { id: 'graph',        path: '/graph',        label: 'Knowledge Intelligence' },
   { id: 'reports',      path: '/reports',      label: 'System & Reports' },
+  { id: 'figures',      path: '/figures',      label: 'Figures' },
 ]
 
 export default function AppShell() {
@@ -263,7 +265,7 @@ export default function AppShell() {
             <Route path="/risk"         element={<RiskPage />} />
             <Route path="/entities"     element={<EntityPage />} />
             <Route path="/reports"      element={<ReportsPage />} />
-            {/* Fallback */}
+            <Route path="/figures"      element={<FiguresPage />} />
             <Route path="*"             element={<Navigate to="/" replace />} />
           </Routes>
         </div>

@@ -107,11 +107,18 @@ def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
     # (They may exist as raw columns in the parquet for RCA/display — that is fine.
     # The ban is on using them as ML inputs, which is enforced at training time.)
     from app.ml.utils import _LEAKY as _LEAKY_SETS, FEATURE_CONFIGS
-    all_feature_cols: set[str] = set()
-    for fc in FEATURE_CONFIGS.values():
-        all_feature_cols.update(fc.features)
-    all_leaky = set().union(*_LEAKY_SETS.values())
-    leaky_in_features = sorted(all_leaky & all_feature_cols & set(df.columns))
+    from app.ml.utils import IntelligenceType
+    leaky_in_features: list[str] = []
+    for agent, leaky_set in _LEAKY_SETS.items():
+        try:
+            intel = IntelligenceType(agent)
+            fc = FEATURE_CONFIGS.get(intel)
+        except ValueError:
+            fc = None
+        if fc is None:
+            continue
+        overlap = sorted(leaky_set & set(fc.features) & set(df.columns))
+        leaky_in_features.extend(f"{agent}:{c}" for c in overlap)
     if leaky_in_features:
         raise RuntimeError(
             f"processed_master.parquet{label} has leaky columns present in "

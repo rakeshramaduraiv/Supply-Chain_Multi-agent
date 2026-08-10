@@ -29,6 +29,8 @@ from app.api.v1.endpoints.decision_routes import router as decision_router
 from app.ml.agent_memory.routes import router as agent_memory_router
 
 from app.api.v1.endpoints.cycle_routes import router as cycle_router
+from app.api.v1.endpoints.figures import router as figures_router
+from app.api.v1.endpoints.neo4j_explorer import router as neo4j_explorer_router
 
 api_router = APIRouter()
 
@@ -77,3 +79,9 @@ api_router.include_router(cycle_router, prefix="")
 
 # --- Administration / Initialization ---
 api_router.include_router(initialization_router, prefix="")
+
+# --- Publication Figures ---
+api_router.include_router(figures_router, prefix="")
+
+# --- Neo4j Explorer ---
+api_router.include_router(neo4j_explorer_router, prefix="")

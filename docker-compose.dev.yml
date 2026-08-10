@@ -34,7 +34,7 @@ services:
         condition: service_healthy
       neo4j:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level info
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 15s
@@ -79,11 +79,11 @@ services:
     volumes:
       - neo4j_dev_data:/data
     healthcheck:
-      test: ["CMD", "neo4j", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
     restart: unless-stopped
     networks:
       - amasci-net

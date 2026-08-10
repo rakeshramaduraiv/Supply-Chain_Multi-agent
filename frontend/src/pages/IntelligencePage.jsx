@@ -32,6 +32,7 @@ import {
   ChevronDown, X, DollarSign, Gauge, Building2, Globe, ArrowRight, Store,
 } from 'lucide-react'
 import s from './IntelligencePage.module.css'
+import Neo4jPage from './Neo4jPage'
 
 /* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
 
@@ -1259,6 +1260,8 @@ export default function IntelligencePage() {
   const mK = graphStats?.metrics || graphStats || {}
   const lastSyncTime = new Date().toLocaleTimeString()
 
+  const [mainTab, setMainTab] = useState('workspace')
+
   return (
     <div className={s.page}>
 
@@ -1295,6 +1298,16 @@ export default function IntelligencePage() {
         </div>
 
         <div className={s.headerRight}>
+          <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
+            <button
+              onClick={() => setMainTab('workspace')}
+              style={{ padding: '4px 12px', fontSize: 11, fontWeight: mainTab === 'workspace' ? 700 : 400, background: mainTab === 'workspace' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', borderBottom: mainTab === 'workspace' ? '2px solid #60a5fa' : '2px solid transparent', color: mainTab === 'workspace' ? '#000' : 'rgba(0,0,0,0.5)', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
+            >Graph Workspace</button>
+            <button
+              onClick={() => setMainTab('neo4j')}
+              style={{ padding: '4px 12px', fontSize: 11, fontWeight: mainTab === 'neo4j' ? 700 : 400, background: mainTab === 'neo4j' ? 'rgba(255,255,255,0.15)' : 'transparent', border: 'none', borderBottom: mainTab === 'neo4j' ? '2px solid #4ade80' : '2px solid transparent', color: mainTab === 'neo4j' ? '#000' : 'rgba(0,0,0,0.5)', cursor: 'pointer', borderRadius: '4px 4px 0 0' }}
+            >Neo4j Explorer</button>
+          </div>
           <div className={s.liveBadge}><div className={s.liveDot} /> Live Sync</div>
           <button className={s.hdrBtn} title="Sync Workspace" onClick={() => queryClient.invalidateQueries({ predicate: q => q.queryKey[0]?.startsWith?.('kg') })}>
             <RefreshCw size={14} />
@@ -1302,8 +1315,14 @@ export default function IntelligencePage() {
         </div>
       </header>
 
+      {mainTab === 'neo4j' && (
+        <div style={{ flex: 1, overflow: 'auto', background: '#f1f5f9' }}>
+          <Neo4jPage embedded />
+        </div>
+      )}
+
       {/* ══════════════ BODY ══════════════ */}
-      <div className={s.shell}>
+      <div className={s.shell} style={{ display: mainTab === 'neo4j' ? 'none' : undefined }}>
 
         {/* ── left: Searchable Entity Explorer with Filters ── */}
         <aside className={s.leftBar}>

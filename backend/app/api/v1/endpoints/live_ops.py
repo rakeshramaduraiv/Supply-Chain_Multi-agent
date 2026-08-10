@@ -69,6 +69,13 @@ def _load_parquet() -> pd.DataFrame | None:
         return _parquet_cache
 
     df = pd.read_parquet(parquet_path)
+    if "shipping_delay_days" not in df.columns:
+        if "shipping_delay" in df.columns:
+            df["shipping_delay_days"] = df["shipping_delay"]
+        elif "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
+            df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+        else:
+            df["shipping_delay_days"] = 0.0
     _parquet_cache = df
     _parquet_mtime = mtime
     return df

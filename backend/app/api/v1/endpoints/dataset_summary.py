@@ -50,6 +50,13 @@ def get_temp_df() -> pd.DataFrame | None:
         if base_path.exists():
             try:
                 _temp_df = pd.read_parquet(base_path)
+                if "shipping_delay_days" not in _temp_df.columns:
+                    if "shipping_delay" in _temp_df.columns:
+                        _temp_df["shipping_delay_days"] = _temp_df["shipping_delay"]
+                    elif "Days for shipping (real)" in _temp_df.columns and "Days for shipment (scheduled)" in _temp_df.columns:
+                        _temp_df["shipping_delay_days"] = _temp_df["Days for shipping (real)"] - _temp_df["Days for shipment (scheduled)"]
+                    else:
+                        _temp_df["shipping_delay_days"] = 0.0
                 logger.info(f"[TempList] Loaded base DataCo parquet: {len(_temp_df)} rows")
             except Exception as e:
                 logger.warning(f"[TempList] Base parquet load failed: {e}")

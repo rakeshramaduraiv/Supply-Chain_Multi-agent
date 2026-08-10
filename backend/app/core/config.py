@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     openai_api_base: str = "https://api.openai.com/v1"
     openai_model_name: str = "gpt-4o"
 
+    # --- Graph Enrichment ---
+    allow_enrichment_fallback: bool = True
+
     # --- TPKE Configuration ---
     # θ: minimum P(B|A) for an edge to be created
     tpke_confidence_threshold: float = 0.6
@@ -81,6 +84,10 @@ class Settings(BaseSettings):
     tpke_window_size_days: int = 90
     # lag_days: max days between event A and event B to count as a sequence
     tpke_lag_days: int = 7
+    # top-K edges to retain per node after each evolution pass
+    tpke_top_k: int = 10
+    # edge weight below which an edge is pruned
+    tpke_removal_threshold: float = 0.1
 
     # --- Logging ---
     log_level: str = "INFO"

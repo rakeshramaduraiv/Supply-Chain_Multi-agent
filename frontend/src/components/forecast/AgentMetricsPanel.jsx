@@ -101,8 +101,8 @@ export default function AgentMetricsPanel({
         </div>
       </div>
 
-      {/* Inventory Agent — excluded */}
-      <div style={{
+      {/* Inventory Agent — commented out, no UI display for now */}
+      {/* <div style={{
         border: '1.5px dashed var(--b)', borderRadius: '8px', padding: '14px 12px',
         background: 'var(--s0)', opacity: 0.65,
       }}>
@@ -114,7 +114,7 @@ export default function AgentMetricsPanel({
           DataCo contains no independent inventory signal (CV AUC 0.479).
           Excluding this agent rather than reporting a degenerate model.
         </div>
-      </div>
+      </div> */}
 
       {/* Logistics Agent */}
       <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #d63031', boxShadow: '0 0 0 2px rgba(214,48,49,0.12)' } : {}}>

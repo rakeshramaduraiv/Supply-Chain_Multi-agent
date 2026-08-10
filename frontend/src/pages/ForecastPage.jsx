@@ -899,7 +899,9 @@ export default function ForecastPage() {
 
 
     setIsIngestingActuals(true)
-    resetCycleStream()`r`n    setActiveCycleId(null)`r`n
+    resetCycleStream()
+    setActiveCycleId(null)
+
 
 
 
@@ -3583,18 +3585,7 @@ export default function ForecastPage() {
 
 
 
-                  {/* Inventory Agent — excluded */}
-                  <div style={{
-                    border: '1.5px dashed var(--b)', borderRadius: '8px', padding: '14px 12px',
-                    background: 'var(--s0)', opacity: 0.65,
-                  }}>
-                    <div style={{ fontSize: '11.5px', fontWeight: 800, color: 'var(--ts)', marginBottom: '4px' }}>Inventory</div>
-                    <div style={{ fontSize: '9.5px', fontWeight: 700, color: 'var(--tm)', marginBottom: '8px' }}>— excluded</div>
-                    <div style={{ fontSize: '9.5px', color: 'var(--tm)', lineHeight: '1.5' }}>
-                      DataCo contains no independent inventory signal (CV AUC 0.479).
-                      Excluding this agent rather than reporting a degenerate model.
-                    </div>
-                  </div>
+                  {/* Inventory Agent — commented out, no UI display for now */}
 
 {/* Logistics Agent */}
 
@@ -3776,7 +3767,7 @@ export default function ForecastPage() {
                     <Warehouse size={16} style={{ color: '#d4a017' }} />
 
 
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded</span>
+                    {/* Inventory — excluded — commented out */}
 
 
                     <span style={{ fontSize: '9px', color: 'var(--tm)' }}>Stock Buffer: OK</span>

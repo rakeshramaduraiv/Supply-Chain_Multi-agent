@@ -37,7 +37,7 @@ function KGBadge({ graphEnriched, coverage }) {
 export function AgentMetricsPanel({ agents = {} }) {
   // agents: { demand: { score, metrics, graphEnriched, coverage }, supplier: {...}, logistics: {...} }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) 1fr', gap: '12px', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', alignItems: 'start' }}>
       {['demand', 'supplier', 'logistics'].map(type => {
         const cfg = AGENTS[type]
         const data = agents[type] || {}
@@ -88,8 +88,8 @@ export function AgentMetricsPanel({ agents = {} }) {
         )
       })}
 
-      {/* Excluded inventory tile — dashed border, muted, methodological note */}
-      <div style={{
+      {/* Inventory agent tile — commented out, no UI display for now */}
+      {/* <div style={{
         border: '1.5px dashed var(--b)', borderRadius: '8px', padding: '14px 12px',
         background: 'var(--s0)', opacity: 0.7,
       }}>
@@ -103,7 +103,7 @@ export function AgentMetricsPanel({ agents = {} }) {
           DataCo contains no independent inventory signal (CV AUC 0.479).
           Excluding this agent rather than reporting a degenerate model.
         </div>
-      </div>
+      </div> */}
     </div>
   )
 }

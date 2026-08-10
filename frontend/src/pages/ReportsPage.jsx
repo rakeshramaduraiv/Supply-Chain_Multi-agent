@@ -338,9 +338,7 @@ export default function ReportsPage({ defaultTab }) {
                     <span>Logistics Agent (LGBM Classifier)</span>
                     <span style={{ color: '#10b981', fontWeight: 700 }}>weight: 0.25</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--b)', paddingTop: '4px', marginTop: '2px' }}>
-                    <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
-                  </div>
+                  {/* Inventory — excluded (CV AUC 0.479) — commented out */}
                 </div>
               </div>
 
@@ -485,7 +483,7 @@ export default function ReportsPage({ defaultTab }) {
                   Demand Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.30</span><br />
                   Supplier Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.45</span><br />
                   Logistics Agent: <span style={{ color: '#10b981', fontWeight: 700 }}>weight 0.25</span><br />
-                  <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
+                  {/* Inventory — excluded (CV AUC 0.479) — commented out */}
                 </div>
               </div>
 

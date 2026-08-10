@@ -232,7 +232,7 @@ export default function DecisionJournal() {
                 Demand Agent: <span style={{ color: '#10b981' }}>weight 0.30</span><br />
                 Supplier Agent: <span style={{ color: '#10b981' }}>weight 0.45</span><br />
                 Logistics Agent: <span style={{ color: '#10b981' }}>weight 0.25</span><br />
-                <span style={{ color: 'var(--tm)', fontStyle: 'italic' }}>Inventory — excluded (CV AUC 0.479)</span>
+                {/* Inventory — excluded (CV AUC 0.479) — commented out */}
               </div>
             </div>
 

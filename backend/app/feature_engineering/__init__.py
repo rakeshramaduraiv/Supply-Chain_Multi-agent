@@ -321,19 +321,24 @@ def _demand_rolling(df: pd.DataFrame) -> pd.DataFrame:
         # A6 fix: shift(1) before rolling so row i never sees its own value
         df["qty_roll_7"]  = g.transform(lambda x: x.shift(1).rolling(7,  min_periods=1).mean())
         df["qty_roll_30"] = g.transform(lambda x: x.shift(1).rolling(30, min_periods=1).mean())
-        df["qty_lag_1"]   = g.transform(lambda x: x.shift(1).fillna(x.mean()))
-        df["qty_lag_7"]   = g.transform(lambda x: x.shift(7).fillna(x.mean()))
-        df["qty_lag_30"]  = g.transform(lambda x: x.shift(30).fillna(x.mean()))
+        # LEAK 1 FIX: fill nulls with expanding-shifted mean, not full-group mean
+        _prior = df[qty_col].expanding(min_periods=1).mean().shift(1)
+        for _n, _col in [(1, "qty_lag_1"), (7, "qty_lag_7"), (30, "qty_lag_30")]:
+            _shifted   = g.transform(lambda x, n=_n: x.shift(n))
+            _exp_mean  = g.transform(lambda x: x.shift(1).expanding(min_periods=1).mean())
+            df[_col]   = _shifted.fillna(_exp_mean).fillna(_prior).fillna(0.0)
     else:
         df["qty_roll_7"]  = qty.shift(1).rolling(7,  min_periods=1).mean()
         df["qty_roll_30"] = qty.shift(1).rolling(30, min_periods=1).mean()
-        df["qty_lag_1"]   = qty.shift(1).fillna(qty.mean())
-        df["qty_lag_7"]   = qty.shift(7).fillna(qty.mean())
-        df["qty_lag_30"]  = qty.shift(30).fillna(qty.mean())
+        _prior = qty.expanding(min_periods=1).mean().shift(1)
+        for _n, _col in [(1, "qty_lag_1"), (7, "qty_lag_7"), (30, "qty_lag_30")]:
+            df[_col] = qty.shift(_n).fillna(_prior).fillna(0.0)
 
     price = df[price_col].fillna(0) if price_col in df.columns else pd.Series(0.0, index=df.index)
-    price_mean = price.mean() if price.mean() > 0 else 1.0
-    df["price_ratio"] = (price / price_mean).fillna(1.0)
+    # fix (d): expanding shifted mean instead of full-df mean
+    _price_exp = price.expanding(min_periods=1).mean().shift(1).bfill().fillna(1.0)
+    _price_exp = _price_exp.where(_price_exp > 0, 1.0)
+    df["price_ratio"] = (price / _price_exp).fillna(1.0)
 
     sales = df["Sales"].fillna(0) if "Sales" in df.columns else pd.Series(0.0, index=df.index)
     disc  = df[disc_col].fillna(0) if disc_col in df.columns else pd.Series(0.0, index=df.index)
@@ -371,16 +376,14 @@ def _demand_rolling(df: pd.DataFrame) -> pd.DataFrame:
     df["order_value_log"]  = np.log1p(np.maximum(sales, 0))
     df["revenue_per_unit"] = np.where(qty > 0, sales / qty, 0.0)
 
-    # A7 fix: category_demand_rank — use expanding shifted mean per category
-    # so row i sees only historical qty, not the full-df sum (which leaks target).
     cat_col = "Category Name"
     if cat_col in df.columns and qty_col in df.columns:
         df["category_demand_rank"] = _expanding_group_mean(
             df, [cat_col], qty_col, min_periods=1
         )
-        # Normalise to [0, 1] using the global max of the expanding means
-        _max = df["category_demand_rank"].max()
-        df["category_demand_rank"] = (df["category_demand_rank"] / max(_max, 1)).clip(0, 1)
+        # fix (b): expanding running max, not full-df max
+        _run_max = df["category_demand_rank"].expanding(min_periods=1).max().clip(lower=1.0)
+        df["category_demand_rank"] = (df["category_demand_rank"] / _run_max).clip(0, 1)
     else:
         df["category_demand_rank"] = 0.5
 
@@ -407,11 +410,12 @@ def _inventory(df: pd.DataFrame) -> pd.DataFrame:
 
     grp_cols = [c for c in ("Category Name", "Order Region") if c in df.columns]
     if grp_cols and qty_col in df.columns:
+        # LEAK 5 FIX: shift(1) before rolling so row i never sees its own qty
         roll_14 = df.groupby(grp_cols)[qty_col].transform(
-            lambda x: x.rolling(14, min_periods=1).mean()
+            lambda x: x.shift(1).rolling(14, min_periods=1).mean()
         )
     else:
-        roll_14 = qty.rolling(14, min_periods=1).mean()
+        roll_14 = qty.shift(1).rolling(14, min_periods=1).mean()
 
     roll_14_safe = roll_14.replace(0, np.nan).fillna(1.0)
     roll_30_safe = df["qty_roll_30"].replace(0, np.nan).fillna(1.0)
@@ -458,15 +462,27 @@ def _supplier(df: pd.DataFrame) -> pd.DataFrame:
     # supplier_delay_rate = expanding late rate per department only
     df["supplier_delay_rate"] = expanding_target_rate(df, dept_col, target_col)
 
-    # supplier_order_volume: normalised order count per department
-    vol = df.groupby(dept_col)[dept_col].transform("count")
-    df["supplier_order_volume"] = (vol / max(vol.max(), 1)).fillna(0.0)
+    # LEAK 2 FIX: expanding shifted count per department, normalised by running max
+    _ones   = pd.Series(1.0, index=df.index)
+    _exp_cnt = _ones.groupby(df[dept_col]).transform(
+        lambda x: x.expanding(min_periods=1).sum().shift(1)
+    ).fillna(0.0)
+    _run_max_vol = _exp_cnt.expanding(min_periods=1).max().clip(lower=1.0)
+    df["supplier_order_volume"] = (_exp_cnt / _run_max_vol).clip(0, 1).fillna(0.0)
     df["supplier_volume"]       = df["supplier_order_volume"]
 
-    # supplier_category_diversity: distinct categories per department
+    # LEAK 3 FIX: expanding distinct-category count per department
     if "Category Name" in df.columns:
-        div = df.groupby(dept_col)["Category Name"].transform("nunique")
-        df["supplier_category_diversity"] = (div / max(div.max(), 1)).fillna(0.0)
+        _div = pd.Series(0.0, index=df.index)
+        for _dept, _idx in df.groupby(dept_col).groups.items():
+            _seen: set = set()
+            _out: list = []
+            for _i in _idx:
+                _out.append(float(len(_seen)))
+                _seen.add(df.at[_i, "Category Name"])
+            _div.loc[_idx] = _out
+        _run_max_div = _div.expanding(min_periods=1).max().clip(lower=1.0)
+        df["supplier_category_diversity"] = (_div / _run_max_div).clip(0, 1).fillna(0.0)
     else:
         df["supplier_category_diversity"] = 0.0
 
@@ -505,16 +521,20 @@ def _logistics(df: pd.DataFrame) -> pd.DataFrame:
     # region_congestion_index: expanding rate per region
     df["region_congestion_index"] = df["region_hist_late_rate"]
 
-    # route_frequency: how often this (mode, region) pair appears, normalised
+    # LEAK 4 FIX: expanding shifted count per (mode, region), normalised by running max
     if mode_col in df.columns and region_col in df.columns:
-        freq = df.groupby([mode_col, region_col])[mode_col].transform("count")
-        df["route_frequency"] = (freq / max(freq.max(), 1)).fillna(0.0)
+        _ones_r   = pd.Series(1.0, index=df.index)
+        _exp_freq = _ones_r.groupby([df[mode_col], df[region_col]]).transform(
+            lambda x: x.expanding(min_periods=1).sum().shift(1)
+        ).fillna(0.0)
+        _run_max_freq = _exp_freq.expanding(min_periods=1).max().clip(lower=1.0)
+        df["route_frequency"] = (_exp_freq / _run_max_freq).clip(0, 1).fillna(0.0)
     else:
         df["route_frequency"] = 0.0
 
-    # days_scheduled: scheduled shipping days — known at order time
+    # days_scheduled: fix (a) — constant default 3.0 instead of full-df median
     if sched_col in df.columns:
-        df["days_scheduled"] = df[sched_col].fillna(df[sched_col].median())
+        df["days_scheduled"] = df[sched_col].fillna(3.0)
     else:
         df["days_scheduled"] = 3.0
 
@@ -602,7 +622,7 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
     if dept_col in df.columns and mode_col in df.columns:
         # Build expanding count per (dept, mode) group, shifted so row i
         # sees only rows strictly before it.
-        pair_key = df[dept_col].astype(str) + "__" + df[mode_col].astype(str)
+        # pair_key removed — was unused
         expanding_counts = pd.Series(np.nan, index=df.index)
         for _, grp_idx in df.groupby([dept_col, mode_col]).groups.items():
             s = pd.Series(1.0, index=grp_idx)
@@ -610,11 +630,10 @@ def _graph_context_tier1(df: pd.DataFrame) -> pd.DataFrame:
                 s.expanding(min_periods=1).sum().shift(1).fillna(0).values
             )
         expanding_counts = expanding_counts.fillna(0.0)
-        # Use expanding max so test rows are not scaled by a maximum that
-        # includes future rows (Issue 5a fix).
-        running_max = expanding_counts.expanding(min_periods=1).max()
+        # fix (c): expanding running max, not full-df max
+        _running_max_tpke = expanding_counts.expanding(min_periods=1).max().clip(lower=1.0)
         df["graph_tpke_edge_density"] = (
-            (expanding_counts / running_max.clip(lower=1)).clip(0, 1)
+            (expanding_counts / _running_max_tpke).clip(0, 1)
         )
     else:
         df["graph_tpke_edge_density"] = 0.0
@@ -640,6 +659,4 @@ def _aliases(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _zscore(s: pd.Series) -> pd.Series:
-    mu, sigma = s.mean(), s.std()
-    return np.where(sigma > 0, (s - mu) / sigma, 0.0)
+# _zscore deleted — used full-df mu/sigma (leaky) and was called from nowhere.

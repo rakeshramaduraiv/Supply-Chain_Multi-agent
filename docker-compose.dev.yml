@@ -82,8 +82,8 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
       interval: 15s
       timeout: 10s
-      retries: 10
-      start_period: 120s
+      retries: 20
+      start_period: 180s
     restart: unless-stopped
     networks:
       - amasci-net

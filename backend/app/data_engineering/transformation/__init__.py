@@ -153,15 +153,27 @@ class TransformationService:
     def _drop_unnecessary_columns(self, df: pd.DataFrame, report: TransformationReport) -> pd.DataFrame:
         """Remove columns that provide no analytical value."""
         drop_candidates = [
+            # PII
             "Customer Email",
             "Customer Password",
             "Customer Street",
-            "Product Image",
-            "Product Description",
             "Customer Fname",
             "Customer Lname",
-            "Order Zipcode",
             "Customer Zipcode",
+            "Order Zipcode",
+            # No analytical value
+            "Product Image",
+            "Product Description",
+            # Identifier columns — unique keys, not features
+            "Order Id",
+            "Order Item Id",
+            "Customer Id",
+            "Order Customer Id",
+            "Category Id",
+            "Product Category Id",
+            "Department Id",
+            "Order Item Cardprod Id",
+            "Product Card Id",
         ]
 
         dropped = []

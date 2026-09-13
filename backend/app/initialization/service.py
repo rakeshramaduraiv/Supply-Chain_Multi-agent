@@ -28,6 +28,7 @@ import pandas as pd
 
 from app.core.config import get_settings
 from app.data_engineering.pipeline import DataEngineeringPipeline
+from app.initialization.stage_exporter import StageExporter
 from app.ml.training import TrainingOrchestrator, TrainingResult
 from app.ml.registry import ModelRegistry
 from app.ml.utils import GRAPH_CONTEXT_FEATURES
@@ -207,6 +208,12 @@ class InitializationService:
         result["dataset_filename"] = dataset_path.name
         result["dataset_size_mb"] = round(dataset_path.stat().st_size / 1024 / 1024, 2)
 
+        exporter = StageExporter(
+            out_dir="data/stages",
+            sample_rows=2000,
+            disabled=False,
+        )
+
         try:
             # Step 1: Load dataset
             step_start = time.perf_counter()
@@ -221,6 +228,7 @@ class InitializationService:
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
             logger.info(f"[1/7] Loaded: {len(df)} rows, {len(df.columns)} columns")
+            exporter.export(1, "raw", df, notes=f"{len(df)} rows x {len(df.columns)} cols")
 
             # Step 2: Data Engineering Pipeline (Validate + Clean + Transform)
             step_start = time.perf_counter()
@@ -243,6 +251,10 @@ class InitializationService:
                 f"[2/7] Data engineering complete: "
                 f"{pipeline_result.row_count_raw} → {pipeline_result.row_count_final} rows"
             )
+            exporter.export(2, "cleaned", df_processed,
+                            notes=f"quality_score={pipeline_result.validation_report.get('quality_score', 0):.3f}")
+            exporter.write_preprocessing_csv(df_processed)
+            exporter.write_fe_inputs_csv(df_processed)
 
             # Step 3: Feature Engineering (Tier-1, no graph)
             step_start = time.perf_counter()
@@ -256,6 +268,9 @@ class InitializationService:
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
             logger.info(f"[3/7] Feature engineering complete: {len(df_features.columns)} total columns")
+            exporter.export(3, "tier1_features", df_features,
+                            notes=f"{len(df_features.columns)} cols after Tier-1 FE")
+            exporter.write_feature_groups(df_features)
 
             # Steps 4 + 4b: graph constraints + enrichment in ONE event loop
             # The Neo4j async driver's transport is bound to the loop it is
@@ -339,6 +354,9 @@ class InitializationService:
             graph_enriched_flag = False
             build_nodes = 0
             build_rels = 0
+            _tier1_graph = df_features[GRAPH_CONTEXT_FEATURES].copy() if all(
+                c in df_features.columns for c in GRAPH_CONTEXT_FEATURES
+            ) else None
             try:
                 df_features, graph_enriched_flag = await _graph_steps(df_features)
                 result["steps"]["knowledge_graph"] = {
@@ -352,6 +370,10 @@ class InitializationService:
                     "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
                 logger.info("[4/7] Graph constraints + enrichment complete")
+                exporter.export(4, "graph_enriched", df_features,
+                                notes=f"graph_enriched={graph_enriched_flag}")
+                if _tier1_graph is not None:
+                    exporter.write_graph_delta(df_features, _tier1_graph)
             except Exception as enrich_err:
                 allow_fallback = settings.allow_enrichment_fallback
                 if not allow_fallback:
@@ -372,6 +394,10 @@ class InitializationService:
                     "status": "skipped", "reason": str(enrich_err), "degraded": True,
                     "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
+                exporter.export(4, "graph_enriched", df_features,
+                                notes="graph_enriched=False enrichment_error")
+                if _tier1_graph is not None:
+                    exporter.write_graph_delta(df_features, _tier1_graph)
 
             # Step 5: Train ML Models (now sees real graph features from Step 4)
             step_start = time.perf_counter()
@@ -396,6 +422,9 @@ class InitializationService:
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
             logger.info(f"[5/7] Training complete: {len(training_results)} models")
+            exporter.export(5, "training_input", df_features,
+                            notes="final frame passed to train_all")
+            exporter.write_model_results(training_results)
 
             # Step 6: Register models (already done in training step via registry)
             step_start = time.perf_counter()
@@ -408,6 +437,7 @@ class InitializationService:
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
             logger.info(f"[6/7] Registry verified: {sum(len(v) for v in registry_info.values())} models")
+            exporter.write_registry_summary()
 
             # Step 7: Save processed dataset for future use
             step_start = time.perf_counter()
@@ -427,6 +457,7 @@ class InitializationService:
                 "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
             }
             logger.info(f"[7/7] Processed dataset saved")
+            exporter.finalize()
 
             # Finalize
             total_duration = (time.perf_counter() - start_time) * 1000

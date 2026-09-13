@@ -29,6 +29,9 @@ services:
       - ./backend/tests:/app/tests
       - upload_data:/app/data/uploads
       - model_data:/app/data/models
+      - ./backend/data/raw:/app/data/raw
+      - ./backend/data/stages:/app/data/stages
+      - ./backend/data/processed:/app/data/processed
     depends_on:
       postgres:
         condition: service_healthy

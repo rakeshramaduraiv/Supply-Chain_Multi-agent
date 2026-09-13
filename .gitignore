@@ -47,41 +47,6 @@ desktop.ini
 backend/data/logs/*
 !backend/data/logs/.gitkeep
 
-# Large generated data files — never commit to GitHub
-backend/data/raw/*.csv
-backend/data/uploads/*.parquet
-backend/data/uploads/*.csv
-backend/data/uploads/graph_entities.json
-backend/data/stages/*.csv
-backend/data/stages/*.parquet
-backend/data/stages/*.json
-backend/data/stages/feature_groups/
-backend/data/models/demand/
-backend/data/models/supplier/
-backend/data/models/logistics/
-backend/data/models/inventory/
-backend/data/models/registry.json
-backend/data/models/.initialized
-backend/data/models/dismissed_alerts.json
-backend/data/metrics_history.json
-backend/data/forecasts/
-backend/data/processed/
-backend/data/agent_memory/
-
-# Root-level data mirror
-data/raw/*.csv
-data/stages/
-
-# Debug/check scripts
-check_diff.py
-check_fe_inputs.py
-check_files.py
-check_ids.py
-regen_preprocessed.py
-run_init.py
-_debug*.py
-_compute_leaky_demand.py
-
 # Docker volumes
 postgres_data/
 neo4j_data/

@@ -1,26 +1,3 @@
-[
-  {
-    "agent": "Demand",
-    "metric_name": "R\u00b2",
-    "before": 0.9954,
-    "after": 0.4587,
-    "removed_features": ["discount_rate", "price_ratio"],
-    "note": "before=0.9954 computed by re-training with banned algebraic features (discount_rate, price_ratio). after=0.4587 from registry demand_v_20260810_042439_621f7f."
-  },
-  {
-    "agent": "Supplier",
-    "metric_name": "AUC",
-    "before": 0.971,
-    "after": 0.7215,
-    "removed_features": ["is_delayed", "shipping_delay_ratio", "supplier_delay_rate"],
-    "note": "before=0.971 from registry entry supplier_v_20260809_195014 which used leaky post-shipment features."
-  },
-  {
-    "agent": "Logistics",
-    "metric_name": "AUC",
-    "before": 0.970,
-    "after": 0.7202,
-    "removed_features": ["is_delayed", "shipping_delay_ratio", "supplier_delay_rate"],
-    "note": "before=0.970 from registry entry logistics_v_20260809_195109 which used leaky post-shipment features."
-  }
-]
+version https://git-lfs.github.com/spec/v1
+oid sha256:08ad94998760553e21aa7c0c16228ba3b5cca2fa4409b10d45bc645a148a2f59
+size 949

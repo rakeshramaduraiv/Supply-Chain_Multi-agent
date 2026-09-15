@@ -63,8 +63,32 @@ backend/uploads/*.parquet
 *_FULL_BACKUP.csv
 *_train.csv
 
+# Stage pipeline outputs (regenerable via make bootstrap + initialization)
+# All stage CSVs and JSONs are excluded EXCEPT the 6 compact summary files listed below.
+backend/data/stages/*.csv
+backend/data/stages/**/*.csv
+backend/data/stages/*.json
+data/stages/*.csv
+data/stages/**/*.csv
+data/stages/*.json
+_lfs_list.txt
+# Keep the 6 compact review-evidence summaries as ordinary git objects:
+!backend/data/stages/00_pipeline_summary.csv
+!backend/data/stages/00_data_quality_report.csv
+!backend/data/stages/00_dataset_provenance.csv
+!backend/data/stages/4_graph_feature_delta.csv
+!backend/data/stages/5_model_metrics.csv
+!backend/data/stages/ablation_results.csv
+!data/stages/00_pipeline_summary.csv
+!data/stages/00_data_quality_report.csv
+!data/stages/00_dataset_provenance.csv
+!data/stages/4_graph_feature_delta.csv
+!data/stages/5_model_metrics.csv
+
+# user_uploads CSVs are duplicates of actuals_real — excluded
+backend/data/user_uploads/*.csv
+
 # Runtime output files (regenerated on each run)
-*.txt
 af_test.json
 diag_test.json
 retrain_result.txt
@@ -83,6 +107,8 @@ find_area*.py
 inspect_*.py
 regen_*.py
 run_init.py
+_insert_tests.py
+_tmp_lines.txt
 
 # Docker volumes
 postgres_data/

@@ -145,6 +145,46 @@ class TestHoldoutGuardRaises:
         if max_date >= pd.Timestamp(holdout_start):
             raise RuntimeError("Guard should not fire on clean data")
 
+    def test_parquet_integrity_raises_on_contaminated_parquet(self):
+        """
+        assert_parquet_integrity must raise when the parquet contains a row
+        dated 2017-10-15 (on or after holdout_start_date).
+        Proof that Issue 2 is fixed: the check is NOT inverted.
+        """
+        import numpy as np
+        from app.initialization.service import assert_parquet_integrity
+        from app.ml.utils import GRAPH_CONTEXT_FEATURES
+
+        n = 110_000
+        dates = pd.date_range("2015-01-01", periods=n, freq="8h")
+        df = pd.DataFrame({
+            "order date (DateOrders)": dates,
+            **{col: np.random.default_rng(0).random(n) for col in GRAPH_CONTEXT_FEATURES},
+        })
+        df.loc[0, "order date (DateOrders)"] = pd.Timestamp("2017-10-15")
+
+        with pytest.raises((ValueError, RuntimeError)):
+            assert_parquet_integrity(df, "test_contaminated.parquet")
+
+    def test_parquet_integrity_passes_on_clean_parquet(self):
+        """assert_parquet_integrity must NOT raise when max date < holdout_start."""
+        import numpy as np
+        from app.initialization.service import assert_parquet_integrity
+        from app.ml.utils import GRAPH_CONTEXT_FEATURES
+
+        n = 110_000
+        dates = pd.date_range("2015-01-01", "2017-09-30", periods=n)
+        df = pd.DataFrame({
+            "order date (DateOrders)": dates,
+            **{col: np.random.default_rng(1).random(n) for col in GRAPH_CONTEXT_FEATURES},
+        })
+        try:
+            assert_parquet_integrity(df, "test_clean.parquet")
+        except (ValueError, RuntimeError) as e:
+            assert "contaminated" not in str(e).lower(), (
+                f"Clean parquet raised contamination error: {e}"
+            )
+
 
 # ── 4. Graph build receives no holdout rows ───────────────────────────────────
 

@@ -74,10 +74,10 @@ class Settings(BaseSettings):
     allow_enrichment_fallback: bool = True
 
     # --- Holdout / Evaluation ---
-    # Set to "2017-10-01" to train only on rows before that date.
-    # Set to None (or empty string) to use the full dataset (legacy behaviour).
-    holdout_start_date: str | None = None
-    use_real_holdout_actuals: bool = False
+    # Training is restricted to rows strictly before holdout_start_date.
+    # Both settings must be set together — they are meaningless apart.
+    holdout_start_date: str | None = "2017-10-01"
+    use_real_holdout_actuals: bool = True
     actuals_dir: str = "data/actuals_real"
 
     # --- TPKE Configuration ---

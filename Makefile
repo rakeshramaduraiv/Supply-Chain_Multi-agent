@@ -12,6 +12,9 @@ help: ## Show this help
 
 # --- Development ---
 
+bootstrap: ## Verify raw CSV and regenerate training split + holdout actuals
+	cd backend && python -m scripts.bootstrap_data
+
 dev: ## Start development environment
 	docker compose -f docker-compose.dev.yml up -d
 	@echo ""

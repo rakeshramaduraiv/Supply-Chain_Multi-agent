@@ -1,3 +1,4 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:58a908cc37c86b6fbc4e92273732bd479bfc91218b399a6892ca43265b1b5699
-size 335
+column,tier1_mean,tier2_mean,mean_absolute_change,max_absolute_change,pct_rows_changed,pearson_tier1_vs_tier2
+graph_supplier_reliability,0.451091,0.449943,0.209585,0.59989,99.26,0.092887
+graph_inventory_stress,1.031395,1.009165,0.024713,2.37952,59.28,0.091381
+graph_avg_shipping_delay,0.550072,0.522791,0.319666,2.42,99.98,0.80843

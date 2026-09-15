@@ -44,10 +44,9 @@ MASTER_DATASET_PATTERNS = [
     "dataco*.csv",
 ]
 
-_PARQUET_MIN_ROWS   = 100_000
-_PARQUET_DATE_MIN   = pd.Timestamp("2015-01-01")
-_PARQUET_DATE_MAX   = pd.Timestamp("2017-09-30")  # training ends before holdout (2017-10-01)
-_PARQUET_DATE_COL   = "order date (DateOrders)"
+_PARQUET_MIN_ROWS        = 100_000
+_PARQUET_COVERAGE_MIN_DATE = pd.Timestamp("2015-01-01")  # dataset must reach back to here
+_PARQUET_DATE_COL        = "order date (DateOrders)"
 
 
 def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
@@ -56,8 +55,10 @@ def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
 
     Raises RuntimeError (not a warning) on any violation:
       1. Row count must be >= 100,000
-      2. Date range must cover 2015-01-01 .. 2018-01-31
-      3. All four GRAPH_CONTEXT_FEATURES must be present as columns
+      2. Earliest date must reach back to 2015-01-01 (coverage check)
+      3. Latest date must be BEFORE holdout_start_date (contamination check)
+      4. All four GRAPH_CONTEXT_FEATURES must be present as columns
+      5. No leaky column may appear in any agent feature list
     """
     label = f" ({path})" if path else ""
 
@@ -69,7 +70,7 @@ def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
             f"This is a stub or truncated file. Re-run initialization."
         )
 
-    # 2. Date range
+    # 2. Coverage check — dataset must reach back to 2015-01-01
     if _PARQUET_DATE_COL not in df.columns:
         raise RuntimeError(
             f"processed_master.parquet{label} is missing date column "
@@ -83,16 +84,22 @@ def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
         )
     actual_min = dates.min()
     actual_max = dates.max()
-    if actual_min > _PARQUET_DATE_MIN:
+    if actual_min > _PARQUET_COVERAGE_MIN_DATE:
         raise RuntimeError(
             f"processed_master.parquet{label}: earliest date is {actual_min.date()} — "
-            f"expected <= {_PARQUET_DATE_MIN.date()}. Dataset does not cover full range."
+            f"expected <= {_PARQUET_COVERAGE_MIN_DATE.date()}. Dataset does not cover full range."
         )
-    if actual_max < _PARQUET_DATE_MAX:
-        raise RuntimeError(
-            f"processed_master.parquet{label}: latest date is {actual_max.date()} — "
-            f"expected >= {_PARQUET_DATE_MAX.date()}. Dataset does not cover full range."
-        )
+
+    # 3. Holdout contamination check — only when holdout_start_date is configured
+    holdout_start = settings.holdout_start_date
+    if holdout_start:
+        holdout_ts = pd.Timestamp(holdout_start)
+        if actual_max >= holdout_ts:
+            raise ValueError(
+                f"Parquet integrity: contains data at {actual_max.date()}, "
+                f"on or after holdout start {holdout_start}. "
+                f"Training data is contaminated with holdout months."
+            )
 
     # 3. Graph context features — must all be present (Tier-1 or Tier-2)
     missing_graph = [c for c in GRAPH_CONTEXT_FEATURES if c not in df.columns]
@@ -191,6 +198,23 @@ class InitializationService:
             "steps": {},
             "errors": [],
         }
+
+        # ── Startup assertion: the two holdout settings must be consistent ──
+        if settings.use_real_holdout_actuals and not settings.holdout_start_date:
+            raise RuntimeError(
+                "Configuration error: USE_REAL_HOLDOUT_ACTUALS=True but "
+                "HOLDOUT_START_DATE is not set. Both settings must be configured "
+                "together — they are meaningless apart."
+            )
+
+        # ── Log holdout configuration at INFO so every run is auditable ─────
+        logger.info(
+            f"Holdout configuration: "
+            f"holdout_start_date={settings.holdout_start_date!r}  "
+            f"use_real_holdout_actuals={settings.use_real_holdout_actuals}"
+        )
+        result["holdout_start_date"] = settings.holdout_start_date
+        result["use_real_holdout_actuals"] = settings.use_real_holdout_actuals
 
         # Step 0: Locate dataset
         if dataset_path is None:

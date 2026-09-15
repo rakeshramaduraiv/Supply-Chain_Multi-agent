@@ -1067,17 +1067,14 @@ async def dismiss_alert(alert_id: str):
 async def get_holdout_file(filename: str):
     """
     Serve a holdout CSV file so the frontend can POST it back as an upload.
-    Serves from user_uploads/ (named UPLOAD_N_Month_YYYY.csv) or actuals_real/.
+    Canonical source: backend/data/actuals_real/ (named YYYY_MM_actual.csv).
     """
     from fastapi.responses import FileResponse
     import re
-    # Allow both naming conventions
     if not re.fullmatch(r"[\w\-]+\.csv", filename):
         raise HTTPException(400, "Invalid filename")
     candidates = [
-        Path("/app/data/user_uploads") / filename,
         Path("/app/data/actuals_real") / filename,
-        Path(settings.raw_data_dir).parent / "user_uploads" / filename,
         Path(settings.raw_data_dir).parent / "actuals_real" / filename,
     ]
     path = next((p for p in candidates if p.exists()), None)

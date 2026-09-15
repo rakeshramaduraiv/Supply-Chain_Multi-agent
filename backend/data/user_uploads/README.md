@@ -1,42 +1,28 @@
-# User Upload Files — DataCo Holdout Months
+# user_uploads/
 
-These 4 CSV files are the **last 4 months** cut from the original DataCo Supply Chain dataset.
-The models were trained on everything BEFORE October 2017.
-These files are the real unseen data — upload them one by one to evaluate model performance.
+This directory is the destination for CSV files uploaded at runtime via the
+`POST /api/v1/business/upload/actual` endpoint.
 
-## Files
+## Holdout evaluation files
 
-| File | Period | Rows | Upload Order |
-|------|--------|------|--------------|
-| UPLOAD_1_October_2017.csv  | 2017-10 | 2,255 | Upload first  |
-| UPLOAD_2_November_2017.csv | 2017-11 | 2,055 | Upload second |
-| UPLOAD_3_December_2017.csv | 2017-12 | 2,124 | Upload third  |
-| UPLOAD_4_January_2018.csv  | 2018-01 | 2,123 | Upload fourth |
+The four real held-out months (Oct 2017 – Jan 2018) are **not** stored here.
+They live in their canonical location:
 
-## How to Upload
+    backend/data/actuals_real/
+        2017_10_actual.csv   (2,255 rows)
+        2017_11_actual.csv   (2,055 rows)
+        2017_12_actual.csv   (2,124 rows)
+        2018_01_actual.csv   (2,123 rows)
 
-1. Start the app: `docker compose -f docker-compose.dev.yml up -d` then `cd frontend && npm run dev`
-2. Open http://localhost:5173
-3. Click **"Upload Actuals"** in the top navigation
-4. Upload files **in order** (1 → 2 → 3 → 4)
-5. Watch the dashboard update in real time after each upload
+The `GET /api/v1/business/holdout-file/{filename}` endpoint serves files
+directly from `actuals_real/`. There is no duplication.
 
-## What Happens After Upload
+## Regenerating the holdout files
 
-- The backend runs the ML models on the uploaded data
-- Supplier AUC, Logistics AUC, Demand MAE, R² are computed against real outcomes
-- The Knowledge Graph (TPKE) evolves based on the new data
-- All dashboard KPIs update immediately to reflect the uploaded actuals
+If `actuals_real/` is empty, run:
 
-## Note on Cycle 1
+    cd backend
+    python -m scripts.create_holdout_actuals
 
-October 2017 (Cycle 1) has no prior forecast to compare against — stages 2 and 3
-are skipped for that month. Real metrics begin from November 2017 (Cycle 2).
-
-## Source
-
-These files were split from:
-  `backend/data/raw/DataCoSupplyChainDataset.csv`
-
-The training set (171,962 rows, Jan 2015 – Sep 2017) is at:
-  `backend/data/raw/DataCoSupplyChainDataset_train.csv`
+This requires `backend/data/raw/DataCoSupplyChainDataset.csv` to be present.
+See the "Reproducing from a clean clone" section in the root README.

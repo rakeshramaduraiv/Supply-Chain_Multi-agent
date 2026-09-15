@@ -1,3 +1,2 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:ac754e6c625fac7d4b3c07550b53e632fd2f5aa93aa28f10e830784a3107865c
-size 437
+dataset_name,company,domain,authors,institutions,published,doi,rows,columns,date_min,date_max,target,target_positive_pct
+DataCo Smart Supply Chain,DataCo Global (fictitious e-commerce company),"clothing, sporting goods, electronics",Constante F.; Silva F.; Pereira A.,Universidad Central del Ecuador; Instituto Politecnico de Leiria,"2019, Mendeley Data V5",10.17632/8gx2fvg2k6.5,180519,53,2015-01-01,2018-01-31,Late_delivery_risk,54.83

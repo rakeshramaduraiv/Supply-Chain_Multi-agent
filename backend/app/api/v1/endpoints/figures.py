@@ -21,11 +21,18 @@ _executor = ThreadPoolExecutor(max_workers=2)
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _parquet():
-    for p in [Path(get_settings().upload_dir) / "processed_master.parquet",
-              Path("/app/data/uploads/processed_master.parquet")]:
-        if p.exists():
-            import pandas as pd
-            return pd.read_parquet(p)
+    """Load cumulative dataset via CumulativeStore; fall back to processed_master.parquet."""
+    import pandas as pd
+    from app.store.cumulative import CumulativeStore
+    try:
+        return CumulativeStore().load_full()
+    except FileNotFoundError:
+        for p in [Path(get_settings().upload_dir) / "processed_master.parquet",
+                  Path("/app/data/uploads/processed_master.parquet")]:
+            if p.exists():
+                return pd.read_parquet(p)
+    except Exception as e:
+        logger.warning(f"[Figures] CumulativeStore load failed: {e}")
     return None
 
 def _pg():

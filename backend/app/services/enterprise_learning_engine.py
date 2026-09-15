@@ -127,6 +127,7 @@ class ContinuousLearningResult:
             "next_forecast_summary": self.next_forecast_summary,
             "workspace_status": self.workspace_status,
             "duration_ms": round(self.duration_ms, 2),
+            "any_stage_failed": any(s.get("status") == "Failed" for s in self.stages),
         }
 
 
@@ -193,8 +194,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
         schema_valid = "Late_delivery_risk" in df_new.columns or "Order Item Quantity" in df_new.columns or len(df_new.columns) > 5
         stages_output.append(EnterpriseLearningStageResult(
             stage=1, name="Schema & Integrity Validation", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="99.9%",
-            result_summary=f"Verified CSV schema & {len(df_new.columns)} column structures with 0 duplicate integrity errors.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"Validated {len(df_new.columns)} columns, {new_rows:,} rows, schema_valid={schema_valid}.",
             details={"column_count": len(df_new.columns), "schema_valid": schema_valid}
         ).__dict__)
 
@@ -205,8 +206,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
         matched_records = min(new_rows, 2018)
         stages_output.append(EnterpriseLearningStageResult(
             stage=2, name="Record Matching", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="98.5%",
-            result_summary=f"Matched {matched_records:,} actual order lines against prior period prediction benchmarks.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"Loaded {old_rows:,} existing rows; new upload has {new_rows:,} rows.",
             details={"new_rows": new_rows, "matched_records": matched_records}
         ).__dict__)
 
@@ -264,8 +265,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=4, name="GraphRAG Root Cause Analysis", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="94.2%",
-            result_summary="Identified primary disruption driver: Lead-time congestion cascading to Warehouse stockouts.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"RCA completed: {len(rca_report_dict)} findings." if rca_report_dict else "RCA produced no findings (Neo4j unavailable or no causal paths found).",
             details=rca_report_dict
         ).__dict__)
 
@@ -279,7 +280,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
         }
         stages_output.append(EnterpriseLearningStageResult(
             stage=5, name="GCRCE Counterfactual Analysis", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="93.8%",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
             result_summary="Computed optimal counterfactual: 35% re-allocation recovers 2.4 days SLA margin.",
             details=counterfactual_report
         ).__dict__)
@@ -304,8 +305,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=6, name="Knowledge Graph Mutation", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="95.5%",
-            result_summary=f"Mutated {kg_sync_info.get('updated', 128)} Neo4j nodes & evolved {tpke_mutations_count} TPKE inferred edges without graph rebuild.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"KG mutation: {kg_sync_info.get('updated', 0)} nodes updated, {tpke_mutations_count} TPKE edges evolved.",
             details={"nodes_mutated": kg_sync_info.get("updated", 128), "tpke_edges": tpke_mutations_count}
         ).__dict__)
 
@@ -319,8 +320,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=7, name="Incremental GraphRAG Re-indexing", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="97.8%",
-            result_summary="Re-indexed GraphRAG vector embeddings & refreshed context retrieval cache.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary="GraphRAG re-indexing attempted." if True else "",
             details={"indexed": True}
         ).__dict__)
 
@@ -342,31 +343,54 @@ class EnterpriseContinuousLearningEngine(BaseService):
             df_features[col] = df_features[col].astype(str)
         cumulative_rows = append_to_temp_df(df_features, period)
 
-        new_version_tag = f"2015-{period}_v2"
+        new_version_tag = f"{period}_cum{len(df_old) + new_rows}"
         stages_output.append(EnterpriseLearningStageResult(
             stage=8, name="Historical Dataset Expansion", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="100%",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
             result_summary=f"Expanded Ground Truth Dataset from {old_rows:,} to {cumulative_rows:,} records ({new_version_tag}).",
             details={"old_rows": old_rows, "new_rows": new_rows, "cumulative_rows": cumulative_rows, "version": new_version_tag}
         ).__dict__)
 
-        # ── Stage 9: Model Retraining (Cumulative Dataset) ──────────────────────────────────
+                # ── Stage 9: Model Retraining (Cumulative Dataset) ──────────────────────────────────────────────
         t0 = time.perf_counter()
         retrained_models = []
-        try:
-            training_results = self._training_orchestrator.train_all(
-                df_features, dataset_version=new_version_tag
-            )
-            retrained_models = list(training_results.keys())
-        except Exception as e_train:
-            logger.warning(f"[ECLE] Model retraining warning: {e_train}")
-            retrained_models = ["DemandTrainer", "SupplierTrainer", "InventoryTrainer", "LogisticsTrainer"]
+        stage9_status = "Skipped"
+        stage9_summary = "Retraining deferred (retrain_on_upload=False)."
+        stage9_details: dict = {}
+        if settings.retrain_on_upload:
+            try:
+                df_cumulative = CumulativeStore().load_full()
+                if len(df_cumulative) < len(df_features) * 2:
+                    raise RuntimeError(
+                        f"Retraining frame has only {len(df_cumulative):,} rows; "
+                        f"expected the full cumulative dataset. Refusing to train."
+                    )
+                training_results = self._training_orchestrator.train_all(
+                    df_cumulative, dataset_version=new_version_tag,
+                    already_engineered=True,
+                )
+                retrained_models = list(training_results.keys())
+                stage9_status = "Completed"
+                stage9_summary = (
+                    f"Retrained {len(retrained_models)} models on cumulative "
+                    f"{len(df_cumulative):,}-row dataset (period={period})."
+                )
+                stage9_details = {
+                    "retrained_models": retrained_models,
+                    "cumulative_rows_used": len(df_cumulative),
+                }
+            except Exception as e_train:
+                logger.error(f"[ECLE] Model retraining failed: {e_train}", exc_info=True)
+                retrained_models = []
+                stage9_status = "Failed"
+                stage9_summary = f"Retraining failed: {e_train}"
+                stage9_details = {"error": str(e_train)}
 
         stages_output.append(EnterpriseLearningStageResult(
-            stage=9, name="Model Retraining", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="96.8%",
-            result_summary=f"Retrained LightGBM & RandomForest models on expanded {cumulative_rows:,}-row dataset.",
-            details={"retrained_models": retrained_models}
+            stage=9, name="Model Retraining", status=stage9_status,
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=stage9_summary,
+            details=stage9_details,
         ).__dict__)
 
         # ── Stage 10: Multi-Agent & RWDAA Refresh ───────────────────────────────────────────
@@ -393,7 +417,10 @@ class EnterpriseContinuousLearningEngine(BaseService):
         try:
             from app.ml.prediction.collaborative_pipeline import get_agent_coordinator
             coord = get_agent_coordinator()
-            coord_summary = coord.execute_coordinated_pipeline(df_features.head(500))
+            _cap = settings.coordinator_row_cap
+        _coord_df = df_features.tail(_cap) if _cap and _cap > 0 else df_features
+        _coord_rows = len(_coord_df)
+        coord_summary = coord.execute_coordinated_pipeline(_coord_df)
             self._memory.store_agent_action(
                 agent_id="Enterprise Agent Orchestrator",
                 action_type="continuous_learning_cycle",
@@ -410,8 +437,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
 
         stages_output.append(EnterpriseLearningStageResult(
             stage=10, name="Multi-Agent & RWDAA Refresh", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="98.2%",
-            result_summary="Updated 4 BI Decision Agent memories and re-weighted RWDAA adaptive agent confidence metrics.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"Refreshed agent memory and RWDAA weights for period={period}. Coordinator ran on {_coord_rows:,} rows.",
             details={"rwdaa_weights": rwdaa_weights, "coordinator_summary": coord_summary.to_dict() if coord_summary else {}}
         ).__dict__)
 
@@ -421,8 +448,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
         next_period_str = "February 2019"
         stages_output.append(EnterpriseLearningStageResult(
             stage=11, name="Next Planning Period Prediction", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="95.8%",
-            result_summary=f"Generated multi-agent predictions for {next_period_str} based on expanded historical ground truth.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"Auto-forecast generated for next period after {period}. ready={next_forecast_data.get('ready', False)}.",
             details={"next_period": next_period_str}
         ).__dict__)
 
@@ -431,8 +458,8 @@ class EnterpriseContinuousLearningEngine(BaseService):
         workspace_status = f"Waiting for {next_period_str} Actual Dataset"
         stages_output.append(EnterpriseLearningStageResult(
             stage=12, name="Workspace Status Transition", status="Completed",
-            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence="100%",
-            result_summary=f"Workspace status updated to: '{workspace_status}'. Cycle reset for continuous planning.",
+            execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
+            result_summary=f"Workspace status: '{workspace_status}'.",
             details={"workspace_status": workspace_status}
         ).__dict__)
 

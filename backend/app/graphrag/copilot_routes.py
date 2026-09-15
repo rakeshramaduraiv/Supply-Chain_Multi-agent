@@ -39,11 +39,10 @@ router = APIRouter(prefix="/graphrag/copilot", tags=["Enterprise AI Copilot"])
 def _build_grounded_evidence(entity_id: str, entity_label: str, query: str) -> list[dict]:
     """Build evidence ranked from real DataCo parquet — Jan 2015 to Sep 2017."""
     try:
-        settings = get_settings()
-        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
-        if not parquet_path.exists():
-            raise FileNotFoundError("parquet not found")
-        df = pd.read_parquet(parquet_path)
+        from app.store.cumulative import CumulativeStore
+        df = CumulativeStore().load_full()
+        if df is None or len(df) == 0:
+            raise FileNotFoundError("no data")
         total = len(df)
         late_rate = round(float(df["Late_delivery_risk"].mean()) * 100, 1) if "Late_delivery_risk" in df.columns else 54.8
         avg_delay = round(float(df["shipping_delay_days"].mean()), 2) if "shipping_delay_days" in df.columns else 1.25
@@ -126,9 +125,8 @@ async def copilot_query(req: CopilotQueryRequest):
 
     # 4. Synthesize Reasoning & Recommendations — grounded in real DataCo metrics
     try:
-        settings = get_settings()
-        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
-        df_s = pd.read_parquet(parquet_path) if parquet_path.exists() else None
+        from app.store.cumulative import CumulativeStore
+        df_s = CumulativeStore().load_full()
         total_orders = len(df_s) if df_s is not None else 171962
         late_rate_pct = round(float(df_s["Late_delivery_risk"].mean()) * 100, 1) if df_s is not None and "Late_delivery_risk" in df_s.columns else 54.8
         avg_delay = round(float(df_s["shipping_delay_days"].mean()), 2) if df_s is not None and "shipping_delay_days" in df_s.columns else 1.25

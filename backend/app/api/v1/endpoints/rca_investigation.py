@@ -35,22 +35,22 @@ settings = get_settings()
 
 router = APIRouter(prefix="/rca/investigation", tags=["Root Cause Enterprise Investigator"])
 
-# ── Cache for dataset ────────────────────────────────────────────────────────
-_parquet_cache: pd.DataFrame | None = None
-
 def _load_parquet() -> pd.DataFrame | None:
-    global _parquet_cache
-    parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
-    if not parquet_path.exists():
+    """Load cumulative dataset via CumulativeStore."""
+    from app.store.cumulative import CumulativeStore
+    try:
+        return CumulativeStore().load_full()
+    except FileNotFoundError:
+        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
+        if parquet_path.exists():
+            return pd.read_parquet(parquet_path)
         csv_path = Path(settings.upload_dir) / "DataCoSupplyChainDataset.csv"
-        if not csv_path.exists():
-            return None
-        return pd.read_csv(csv_path, encoding="latin1")
-    if _parquet_cache is not None:
-        return _parquet_cache
-    df = pd.read_parquet(parquet_path)
-    _parquet_cache = df
-    return df
+        if csv_path.exists():
+            return pd.read_csv(csv_path, encoding="latin1")
+        return None
+    except Exception as e:
+        logger.warning(f"[RCAInvestigation] Dataset load failed: {e}")
+        return None
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
@@ -201,7 +201,8 @@ async def analyze_incident(req: IncidentAnalysisRequest):
         "evidence_ranking": evidence_ranking,
         "propagation_flow": propagation_flow,
         "reasoning_chain": reasoning_chain,
-    }
+    }
+
     result_store.save_rca_investigation(response)
     return response
 
@@ -259,7 +260,8 @@ async def simulate_counterfactual(req: CounterfactualSimulationRequest):
         "allocation_shift_pct": shift,
         "optimal_scenario": scenarios[0],
         "all_scenarios": scenarios,
-    }
+    }
+
     result_store.save_counterfactual(cf_result)
     return cf_result
 

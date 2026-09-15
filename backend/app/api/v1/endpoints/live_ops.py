@@ -33,42 +33,33 @@ settings = get_settings()
 
 router = APIRouter(prefix="/business/live-ops", tags=["Live Operations Enterprise Analytics"])
 
-_parquet_cache: pd.DataFrame | None = None
-_parquet_mtime: float = 0.0
-
-
 def clear_live_ops_cache():
-    """Invalidate live ops parquet cache."""
-    global _parquet_cache, _parquet_mtime
-    _parquet_cache = None
-    _parquet_mtime = 0.0
+    """Invalidate live ops dataset cache (delegates to CumulativeStore)."""
+    try:
+        from app.store.cumulative import CumulativeStore
+        CumulativeStore()._invalidate_cache()
+    except Exception:
+        pass
 
 
 def _load_parquet() -> pd.DataFrame | None:
-    """Load or retrieve cached processed master parquet dataset."""
-    global _parquet_cache, _parquet_mtime
-    parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
-    if not parquet_path.exists():
-        # Fallback to csv if parquet not generated yet
-        csv_path = Path(settings.upload_dir) / "DataCoSupplyChainDataset.csv"
-        if not csv_path.exists():
-            return None
-        mtime = csv_path.stat().st_mtime
-        if _parquet_cache is not None and mtime == _parquet_mtime:
-            return _parquet_cache
-        df = pd.read_csv(csv_path, encoding="latin1")
-        if "shipping_delay_days" not in df.columns:
-            sched = df.get("Days for shipping (real)", 0) - df.get("Days for shipment (scheduled)", 0)
-            df["shipping_delay_days"] = sched
-        _parquet_cache = df
-        _parquet_mtime = mtime
-        return df
-
-    mtime = parquet_path.stat().st_mtime
-    if _parquet_cache is not None and mtime == _parquet_mtime:
-        return _parquet_cache
-
-    df = pd.read_parquet(parquet_path)
+    """Load cumulative dataset (base + all uploaded increments) via CumulativeStore."""
+    from app.store.cumulative import CumulativeStore
+    try:
+        df = CumulativeStore().load_full()
+    except FileNotFoundError:
+        # First-run fallback before initialization completes
+        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
+        if parquet_path.exists():
+            df = pd.read_parquet(parquet_path)
+        else:
+            csv_path = Path(settings.upload_dir) / "DataCoSupplyChainDataset.csv"
+            if not csv_path.exists():
+                return None
+            df = pd.read_csv(csv_path, encoding="latin1")
+    except Exception as e:
+        logger.warning(f"[LiveOps] Dataset load failed: {e}")
+        return None
     if "shipping_delay_days" not in df.columns:
         if "shipping_delay" in df.columns:
             df["shipping_delay_days"] = df["shipping_delay"]
@@ -76,8 +67,6 @@ def _load_parquet() -> pd.DataFrame | None:
             df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
         else:
             df["shipping_delay_days"] = 0.0
-    _parquet_cache = df
-    _parquet_mtime = mtime
     return df
 
 

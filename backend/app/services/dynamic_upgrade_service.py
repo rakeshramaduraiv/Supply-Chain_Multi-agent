@@ -118,17 +118,29 @@ class DynamicDatasetUpgradeService(BaseService):
         added_rows = combined_rows - old_rows
         logger.info(f"[Step 1/5] Merged datasets: {old_rows} old rows + {len(df_new)} uploaded -> {combined_rows} cumulative rows (+{added_rows} net)")
 
-        # ── Step 2: Feature Engineering & Parquet Update ─────────────────────
+        # ── Step 2: Feature Engineering & CumulativeStore append ─────────────
+        # NOTE: DynamicDatasetUpgradeService is a secondary upload path used by
+        # ml/router.py train_with_upload. EnterpriseContinuousLearningEngine is
+        # the primary path (business/upload/actual). Both must write through
+        # CumulativeStore so load_full() sees the data everywhere.
+        # processed_master.parquet is NOT written here — init Step 7 is the
+        # only writer of that file.
         try:
             df_features = self._feature_pipeline.transform(df_combined)
         except Exception as e_feat:
             logger.warning(f"[DynamicUpgrade] Feature pipeline warning: {e_feat}. Proceeding with combined data.")
             df_features = df_combined.copy()
 
-        # Save cumulative dataset atomically
-        self.master_parquet_path.parent.mkdir(parents=True, exist_ok=True)
-        df_features.to_parquet(self.master_parquet_path, index=False)
-        logger.info(f"[Step 2/5] Saved updated cumulative dataset to {self.master_parquet_path}")
+        # Persist via CumulativeStore (idempotent — skips if period already exists)
+        try:
+            from app.store.cumulative import CumulativeStore
+            _store = CumulativeStore()
+            _store.append(df_features, period)
+            logger.info(f"[Step 2/5] Appended {len(df_features)} rows to CumulativeStore period={period}")
+        except ValueError as _dup:
+            logger.info(f"[Step 2/5] CumulativeStore period already exists, skipping append: {_dup}")
+        except Exception as _cs_err:
+            logger.warning(f"[Step 2/5] CumulativeStore append warning: {_cs_err}")
 
         # Clear dataset summary & analytics caches
         clear_dataset_cache()

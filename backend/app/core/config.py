@@ -80,6 +80,10 @@ class Settings(BaseSettings):
     use_real_holdout_actuals: bool = True
     actuals_dir: str = "data/actuals_real"
 
+    # --- Continuous Learning ---
+    retrain_on_upload: bool = True          # False = skip Stage 9, defer retraining
+    coordinator_row_cap: int = 0            # 0 = no cap; >0 = use most-recent N rows
+
     # --- TPKE Configuration ---
     # θ: minimum P(B|A) for an edge to be created
     tpke_confidence_threshold: float = 0.6

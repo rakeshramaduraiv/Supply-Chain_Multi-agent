@@ -41,6 +41,8 @@ from app.ml.agent_memory import get_agent_memory
 from app.ml.prediction.collaborative_pipeline import CollaborativeAgentPipeline
 from app.rca.engine import RCAEngine
 from app.tpke.engine import TPKEEngine
+from app.store import result_store
+from app.store import result_store
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +169,7 @@ class ClosedLoopOrchestrator:
 
         duration_ms = (time.perf_counter() - start) * 1000
 
-        return ClosedLoopCycleResult(
+        _result = ClosedLoopCycleResult(
             cycle_id=cycle_id,
             timestamp=now,
             dataset_processed=dataset_name,
@@ -179,6 +181,8 @@ class ClosedLoopOrchestrator:
             business_recommendation=rag_res.business_recommendation,
             duration_ms=duration_ms,
         )
+        result_store.save_closed_loop_cycle(_result.to_dict())
+        return _result
 
 
 # Singleton instance

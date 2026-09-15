@@ -160,6 +160,10 @@ export const api = {
   getLiveOpsEntityAnalytics: (params) => http.get('/api/v1/business/live-ops/entity-analytics', { params }),
   getLiveOpsRelationships:   (entity_id) => http.get('/api/v1/business/live-ops/relationships', { params: { entity_id } }),
 
+  // Holdout / Evaluation
+  getCycleHistory:      () => http.get('/api/v1/business/cycle-history'),
+  getDataSourceMode:    () => http.get('/api/v1/business/data-source-mode'),
+
   // Enterprise AI Supply Chain Investigator
   investigateIncident:    (b) => http.post('/api/v1/rca/investigation/analyze-incident', b),
   simulateCounterfactual: (b) => http.post('/api/v1/rca/investigation/simulate-counterfactual', b),

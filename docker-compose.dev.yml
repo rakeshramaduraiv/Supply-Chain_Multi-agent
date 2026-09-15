@@ -24,14 +24,19 @@ services:
       - SECRET_KEY=dev-secret-key-not-for-production
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
       - LOG_LEVEL=DEBUG
+      - HOLDOUT_START_DATE=2017-10-01
+      - USE_REAL_HOLDOUT_ACTUALS=true
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
       - upload_data:/app/data/uploads
       - model_data:/app/data/models
+      - ./backend/scripts:/app/scripts
       - ./backend/data/raw:/app/data/raw
       - ./backend/data/stages:/app/data/stages
       - ./backend/data/processed:/app/data/processed
+      - ./backend/data/actuals_real:/app/data/actuals_real
+      - ./backend/data/user_uploads:/app/data/user_uploads
     depends_on:
       postgres:
         condition: service_healthy

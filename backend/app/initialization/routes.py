@@ -137,6 +137,25 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
         import pandas as pd
         df = pd.read_parquet(processed_path)
 
+        # Apply holdout filter so parquet and models only cover training window
+        holdout_start = settings.holdout_start_date or ""
+        if holdout_start:
+            date_col = next(
+                (c for c in ("order date (DateOrders)", "order_date") if c in df.columns),
+                None,
+            )
+            if date_col:
+                dates = pd.to_datetime(df[date_col], errors="coerce")
+                cutoff = pd.Timestamp(holdout_start)
+                before = len(df)
+                df = df[dates < cutoff].copy()
+                logger.info(
+                    f"[retrain] Holdout filter: {before:,} -> {len(df):,} rows (cutoff {holdout_start})"
+                )
+                # Overwrite parquet so dashboard analytics also reflect training-only data
+                df.to_parquet(processed_path, index=False)
+                logger.info(f"[retrain] Saved training-only parquet: {len(df):,} rows")
+
         from app.ml.training import TrainingOrchestrator
         orchestrator = TrainingOrchestrator()
         results = orchestrator.train_all(df, dataset_version="retrain")
@@ -161,6 +180,8 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
             "status": "completed",
             "models_retrained": len(results),
             "duration_ms": round(duration_ms, 1),
+            "holdout_start_date": holdout_start or None,
+            "training_rows": len(df),
             "models": {
                 k: {"version": v.version_id, "accuracy": v.metrics.get("accuracy", 0)}
                 for k, v in results.items()

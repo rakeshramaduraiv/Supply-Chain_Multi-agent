@@ -18,6 +18,7 @@ import pandas as pd
 from fastapi import APIRouter
 
 from app.core.config import get_settings
+from app.store import result_store
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -26,13 +27,14 @@ router = APIRouter(prefix="/dataset", tags=["Dataset Analytics"])
 
 _cache: dict | None = None
 _analytics_cache: dict | None = None
+_cache_mtime: float = 0.0          # parquet mtime when _cache was built
+_analytics_mtime: float = 0.0      # parquet mtime when _analytics_cache was built
 
 # ── Session-scoped temperature list ─────────────────────────────────────────
-# Loaded once from the base DataCo parquet on first access.
-# Uploaded CSVs are appended here in memory only — the base parquet is NEVER
-# modified. Every backend restart rebuilds this from the base file alone.
+# Reloaded from disk whenever the parquet file changes.
 _BASE_PARQUET_PATH: Path | None = None
 _temp_df: pd.DataFrame | None = None   # base DataCo + any session uploads
+_temp_df_mtime: float = 0.0            # mtime when _temp_df was last loaded
 
 
 def _get_base_parquet_path() -> Path:
@@ -43,25 +45,35 @@ def _get_base_parquet_path() -> Path:
 
 
 def get_temp_df() -> pd.DataFrame | None:
-    """Return the session temperature DataFrame (base + session uploads)."""
-    global _temp_df
-    if _temp_df is None:
-        base_path = _get_base_parquet_path()
-        if base_path.exists():
-            try:
-                _temp_df = pd.read_parquet(base_path)
-                if "shipping_delay_days" not in _temp_df.columns:
-                    if "shipping_delay" in _temp_df.columns:
-                        _temp_df["shipping_delay_days"] = _temp_df["shipping_delay"]
-                    elif "Days for shipping (real)" in _temp_df.columns and "Days for shipment (scheduled)" in _temp_df.columns:
-                        _temp_df["shipping_delay_days"] = _temp_df["Days for shipping (real)"] - _temp_df["Days for shipment (scheduled)"]
-                    else:
-                        _temp_df["shipping_delay_days"] = 0.0
-                logger.info(f"[TempList] Loaded base DataCo parquet: {len(_temp_df)} rows")
-            except Exception as e:
-                logger.warning(f"[TempList] Base parquet load failed: {e}")
-                return None
-        else:
+    """Return the session temperature DataFrame — reloads if parquet changed."""
+    global _temp_df, _temp_df_mtime, _cache, _analytics_cache, _cache_mtime, _analytics_mtime
+    base_path = _get_base_parquet_path()
+    if not base_path.exists():
+        return None
+    try:
+        current_mtime = base_path.stat().st_mtime
+    except OSError:
+        return _temp_df
+    if _temp_df is None or current_mtime != _temp_df_mtime:
+        try:
+            df = pd.read_parquet(base_path)
+            if "shipping_delay_days" not in df.columns:
+                if "shipping_delay" in df.columns:
+                    df["shipping_delay_days"] = df["shipping_delay"]
+                elif "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
+                    df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+                else:
+                    df["shipping_delay_days"] = 0.0
+            _temp_df = df
+            _temp_df_mtime = current_mtime
+            # Invalidate derived caches when base data changes
+            _cache = None
+            _analytics_cache = None
+            _cache_mtime = 0.0
+            _analytics_mtime = 0.0
+            logger.info(f"[TempList] Reloaded base DataCo parquet: {len(_temp_df)} rows (mtime changed)")
+        except Exception as e:
+            logger.warning(f"[TempList] Base parquet load failed: {e}")
             return None
     return _temp_df
 
@@ -104,8 +116,13 @@ def _load_parquet() -> pd.DataFrame | None:
 
 
 def _compute_summary() -> dict:
-    global _cache
-    if _cache is not None:
+    global _cache, _cache_mtime
+    base_path = _get_base_parquet_path()
+    try:
+        current_mtime = base_path.stat().st_mtime if base_path.exists() else 0.0
+    except OSError:
+        current_mtime = 0.0
+    if _cache is not None and current_mtime == _cache_mtime:
         return _cache
 
     df = _load_parquet()
@@ -184,14 +201,23 @@ def _compute_summary() -> dict:
         d["avg_delay"] = round(d["avg_delay"], 2)
         d["order_count"] = int(d["total"])
 
+    # Derive next forecast period from actual training data end
+    try:
+        _end_ts = pd.Timestamp(date_max)
+        _next_start = (_end_ts + pd.offsets.MonthBegin(1)).strftime("%Y-%m-%d")
+        _next_end = (_end_ts + pd.offsets.MonthEnd(1)).strftime("%Y-%m-%d")
+    except Exception:
+        _next_start = "2017-11-01"
+        _next_end   = "2017-11-30"
+
     _cache = {
         "ready": True,
         "total_orders": total_orders,
         "date_range_start": date_min,
         "date_range_end": date_max,
         "training_data_end_date": date_max,
-        "next_forecast_start": "2018-02-01",
-        "next_forecast_end": "2018-02-28",
+        "next_forecast_start": _next_start,
+        "next_forecast_end": _next_end,
 
         # Core metrics
         "late_delivery_pct": late_pct,
@@ -213,13 +239,19 @@ def _compute_summary() -> dict:
         "total_categories": len(categories),
         "total_regions": len(regions),
     }
+    _cache_mtime = current_mtime
     return _cache
 
 
 def _compute_analytics() -> dict:
     """Compute detailed analytics for all frontend pages — all from real data."""
-    global _analytics_cache
-    if _analytics_cache is not None:
+    global _analytics_cache, _analytics_mtime
+    base_path = _get_base_parquet_path()
+    try:
+        current_mtime = base_path.stat().st_mtime if base_path.exists() else 0.0
+    except OSError:
+        current_mtime = 0.0
+    if _analytics_cache is not None and current_mtime == _analytics_mtime:
         return _analytics_cache
 
     df = _load_parquet()
@@ -333,6 +365,7 @@ def _compute_analytics() -> dict:
     # === Training metrics from registry ===
     training_metrics = _load_training_metrics()
 
+    _analytics_mtime = current_mtime
     _analytics_cache = {
         "ready": True,
         "shipping_risk": shipping_risk,
@@ -506,12 +539,19 @@ def _compute_auto_forecast() -> dict:
         numeric_confs = [float(v.get("confidence", 0)) for v in forecast_results.values() if isinstance(v, dict) and "confidence" in v]
         overall_confidence = round(sum(numeric_confs) / len(numeric_confs) if numeric_confs else 0.0, 4)
 
+        # Derive forecast period dynamically from training data end
+        summary = _compute_summary()
+        forecast_period_start = summary.get("next_forecast_start", "")
+        forecast_period_end   = summary.get("next_forecast_end", "")
+        training_data_end     = summary.get("training_data_end_date", "")
+        forecast_period_label = forecast_period_start[:7] if forecast_period_start else ""
+
         return {
             "ready": True,
-            "forecast_period": "2018-02",
-            "forecast_period_start": "2018-02-01",
-            "forecast_period_end": "2018-02-28",
-            "training_data_end": "2018-01-31",
+            "forecast_period": forecast_period_label,
+            "forecast_period_start": forecast_period_start,
+            "forecast_period_end": forecast_period_end,
+            "training_data_end": training_data_end,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": "completed",
             "overall_confidence": overall_confidence,
@@ -558,10 +598,10 @@ def get_next_forecast_period():
     """Auto-detect the next forecast period based on training data end date."""
     summary = _compute_summary()
     return {
-        "period_start": "2018-02-01",
-        "period_end": "2018-02-28",
-        "training_data_end": "2018-01-31",
-        "recommendation": "Forecasting February 2018 (next period after DataCo training data ends 2018-01-31)",
+        "period_start": summary.get("next_forecast_start", ""),
+        "period_end": summary.get("next_forecast_end", ""),
+        "training_data_end": summary.get("training_data_end_date", ""),
+        "recommendation": f"Forecasting next period after training data ends {summary.get('training_data_end_date', '')}",
     }
 
 
@@ -576,6 +616,7 @@ def get_auto_forecast():
     if _forecast_cache is not None:
         return _forecast_cache
     _forecast_cache = _compute_auto_forecast()
+    result_store.save_auto_forecast(_forecast_cache)
     return _forecast_cache
 
 
@@ -685,7 +726,7 @@ def get_error_diagnostics(period_start: str = None):
         diagnostics.append({
             "category":          cat,
             "region":            region,
-            "period":            period_start or "2018-02",
+            "period":            period_start or "latest",
             "predicted_demand":  pred_demand,
             "actual_demand":     actual_demand,
             "variance":          f"{variance:+} ({pct_var}%)",
@@ -696,5 +737,7 @@ def get_error_diagnostics(period_start: str = None):
             "root_cause":        f"Demand model vs actual gap: {variance:+} units — {cat} · {region}",
         })
 
-    return {"diagnostics": diagnostics, "count": len(diagnostics), "period_used": period_start or "latest"}
+    out = {"diagnostics": diagnostics, "count": len(diagnostics), "period_used": period_start or "latest"}
+    result_store.save_error_diagnostics(out, period_start)
+    return out
 

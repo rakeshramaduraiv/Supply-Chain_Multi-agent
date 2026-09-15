@@ -501,7 +501,7 @@ export default function Overview() {
               </div>
               <div style={{ height: '200px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={charts.operational_risk_trend || []} margin={{ left: -15, right: 10, top: 10, bottom: 0 }}>
+                  <AreaChart data={charts.operational_risk_trend?.length > 0 ? charts.operational_risk_trend : null} margin={{ left: -15, right: 10, top: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--b)" vertical={false} />
                     <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} domain={[0, 100]} unit="%" />
@@ -551,7 +551,7 @@ export default function Overview() {
               </div>
               <div style={{ height: '200px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={charts.historical_operations_volume || []} margin={{ left: -15, right: 10, top: 10, bottom: 0 }}>
+                  <AreaChart data={charts.historical_operations_volume?.length > 0 ? charts.historical_operations_volume : null} margin={{ left: -15, right: 10, top: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--b)" vertical={false} />
                     <XAxis dataKey="month" tick={axisStyle} axisLine={false} tickLine={false} />
                     <YAxis tick={axisStyle} axisLine={false} tickLine={false} />

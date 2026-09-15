@@ -16,6 +16,8 @@ from app.repositories.domain import ForecastRunRepository, ForecastResultReposit
 from app.services.domain.tpke_service import TPKELogService
 from app.tpke.engine import TPKEEngine
 from app.api.v1.endpoints.ws import broadcast_event
+from app.store import result_store
+from app.store import result_store
 from app.tpke.schemas import (
     DecayResponse,
     EdgeMutationResponse,
@@ -106,6 +108,7 @@ async def run_evolution(
     )
 
     await broadcast_event("TPKE Completed", {"forecast_run_id": run.id})
+    result_store.save_tpke_evolution(report.to_dict(), triggered_by=request.triggered_by or "")
 
     return report.to_dict()
 
@@ -122,7 +125,7 @@ async def run_decay(
 
     await broadcast_event("TPKE Completed", {"action": "decay"})
 
-    return {
+    decay_result = {
         "edges_decayed": result.edges_decayed,
         "edges_removed": result.edges_removed,
         "mutations": [
@@ -137,7 +140,9 @@ async def run_decay(
             }
             for m in result.mutations
         ],
-    }
+    }
+    result_store.save_tpke_decay(decay_result)
+    return decay_result
 
 
 @router.get("/status")

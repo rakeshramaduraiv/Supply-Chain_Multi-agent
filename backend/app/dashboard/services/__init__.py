@@ -193,18 +193,14 @@ class DashboardService:
 
     def _hydrate_analytics(self) -> None:
         """
-        Populate AnalyticsEngine from live sources if not already populated.
-        Reads the processed parquet and model registry so KPIs reflect real data.
+        Populate AnalyticsEngine from live sources on every call.
+        Reads the processed parquet and model registry so KPIs always
+        reflect the current state of uploaded data.
         """
-        # Only hydrate once per service instance (avoid repeated I/O)
-        if self._analytics.get_ml_metrics():
-            return
-
         try:
             from pathlib import Path
             import pandas as pd
             from app.core.config import get_settings
-            from app.ml.registry import ModelRegistry
 
             settings = get_settings()
             parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
@@ -223,6 +219,35 @@ class DashboardService:
                 })
         except Exception as e:
             logger.debug(f"Dashboard parquet hydration skipped: {e}")
+
+        # Also ingest any uploaded actuals from actuals_real/ to reflect
+        # the most recently uploaded data in KPIs
+        try:
+            from pathlib import Path
+            import pandas as pd
+            from app.core.config import get_settings
+
+            settings = get_settings()
+            actuals_dir = Path("/app/data/actuals_real")
+            actual_csvs = sorted(actuals_dir.glob("*_actual.csv"))
+            if actual_csvs:
+                frames = []
+                for p in actual_csvs:
+                    try:
+                        frames.append(pd.read_csv(p, encoding="latin-1"))
+                    except Exception:
+                        pass
+                if frames:
+                    df_actual = pd.concat(frames, ignore_index=True)
+                    if "Late_delivery_risk" in df_actual.columns:
+                        actual_late = float(df_actual["Late_delivery_risk"].mean())
+                        self._analytics.update_ml_metrics({
+                            "avg_late_delivery_rate": actual_late,
+                            "avg_supplier_risk": actual_late,
+                            "avg_shipment_risk": actual_late,
+                        })
+        except Exception as e:
+            logger.debug(f"Dashboard actuals hydration skipped: {e}")
 
         try:
             from app.ml.registry import ModelRegistry

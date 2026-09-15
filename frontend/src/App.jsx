@@ -9,7 +9,7 @@ const qc = new QueryClient({
     queries: {
       retry: 3,
       staleTime: 5_000,
-      refetchInterval: 15_000, // Background poll fallback
+      refetchInterval: 10_000,   // poll every 10s as WebSocket fallback
       refetchOnWindowFocus: true,
     }
   }

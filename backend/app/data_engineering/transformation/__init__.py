@@ -164,10 +164,11 @@ class TransformationService:
             # No analytical value
             "Product Image",
             "Product Description",
-            # Identifier columns — unique keys, not features
-            "Order Id",
+            # Identifier columns — unique keys, not ML features
+            # NOTE: Order Id and Customer Id are intentionally kept here so the
+            # graph extractor (step 4) can build relationships. They are excluded
+            # from ML feature sets inside the training pipeline (step 5).
             "Order Item Id",
-            "Customer Id",
             "Order Customer Id",
             "Category Id",
             "Product Category Id",

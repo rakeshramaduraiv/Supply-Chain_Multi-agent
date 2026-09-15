@@ -141,6 +141,10 @@ export function useNetworkPageData() {
   const totalNodes = Object.values(nodeCounts).reduce((a, b) => a + b, 0)
   const totalRels  = graphStats.data?.total_relationships || graphStats.data?.metrics?.total_relationships || 0
 
+  // ── Derived: graph version and TPKE edge count ─────────────────────────
+  const graphVersion   = graphStats.data?.graph_version || 'v1.4.2'
+  const tpkeEdgeCount  = tpkeEdges.data?.count || (tpkeEdges.data?.edges?.length ?? 0)
+
   // ── Derived: relationship distribution from graph dash + TPKE ──────────
   const relDistribution = graphDash.data?.relationship_distribution || []
 
@@ -170,7 +174,7 @@ export function useNetworkPageData() {
     graphStats, graphDash, graphSchema, riskDash, tpkeDash, tpkeEdges,
     trends, forecastDash, analytics,
     isLoading, isRefetching,
-    nodeCounts, totalNodes, totalRels,
+    nodeCounts, totalNodes, totalRels, graphVersion, tpkeEdgeCount,
     relDistribution, riskByEntity, monthlyLabels, monthlyValues,
     forecastMetrics, forecastCards, tpkeEdgeList,
   }

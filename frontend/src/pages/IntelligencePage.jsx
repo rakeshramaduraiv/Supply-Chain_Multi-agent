@@ -33,6 +33,7 @@ import {
 } from 'lucide-react'
 import s from './IntelligencePage.module.css'
 import Neo4jPage from './Neo4jPage'
+import { useSharedParams } from '../hooks/useSharedParams'
 
 /* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
 
@@ -100,15 +101,7 @@ const TIMELINE_STEPS = [
   { key: 'next',      label: 'Next Forecast',          Icon: Clock },
 ]
 
-const REPLAY_MONTHS = [
-  { key: 'Jul 2017', label: 'Jul 2017', desc: 'Pre-Incident Baseline' },
-  { key: 'Aug 2017', label: 'Aug 2017', desc: 'SLA Port Congestion' },
-  { key: 'Sep 2017', label: 'Sep 2017', desc: 'Alternate Carrier Triggered' },
-  { key: 'Oct 2017', label: 'Oct 2017', desc: 'TPKE Path Evolved' },
-  { key: 'Nov 2017', label: 'Nov 2017', desc: 'Forecast Restabilized' },
-  { key: 'Dec 2017', label: 'Dec 2017', desc: 'Winter Peak Ingestion' },
-  { key: 'Jan 2018', label: 'Jan 2018', desc: 'Current Live Twin' },
-]
+// REPLAY_MONTHS is now computed dynamically from backend dataset summary (see useQuery below)
 
 const TIER = {
   Supplier: 0,
@@ -422,7 +415,7 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
             <div className={s.kvRow}><span className={s.kvKey}>Forecast Dependency</span><span className={s.kvVal} style={{ color: 'var(--blue)' }}>{(forecastInfluence * 100).toFixed(1)}% demand influence</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Root Cause History</span><span className={s.kvVal}>2 resolved incidents</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Recent TPKE Learning</span><span className={s.kvVal} style={{ color: 'var(--purple)' }}>Inferred link validated at 92.4% conf</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Historical Changes</span><span className={s.kvVal} style={{ fontStyle: 'italic' }}>Fulfillment lead time shifted by +0.8d in Dec 2017</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Historical Changes</span><span className={s.kvVal} style={{ fontStyle: 'italic' }}>Fulfillment lead time shifted by +0.8d in Sep 2017</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Connected Risks</span><span className={s.kvVal} style={{ color: 'var(--rose)' }}>{connNodes.filter(c => (c.node.properties?.risk_score || 0) > 0.4).length} high-risk nodes connected</span></div>
 
             <div className={s.secLabel} style={{ marginTop: 12 }}>GraphRAG Synthesis</div>
@@ -541,12 +534,12 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
                   { day: 'M', risk: 0.12 },
                   { day: 'T', risk: 0.18 },
                   { day: 'W', risk: 0.35 },
-                  { day: 'T', risk: risk * 0.7 },
-                  { day: 'F', risk: risk },
+                  { day: 'T', risk: Math.max(0.01, risk * 0.7) },
+                  { day: 'F', risk: Math.max(0.01, risk) },
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="day" tick={{ fontSize: 8, fill: '#64748b' }} />
-                  <YAxis tick={{ fontSize: 8, fill: '#64748b' }} />
+                  <YAxis tick={{ fontSize: 8, fill: '#64748b' }} domain={[0, 1]} />
                   <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a' }} />
                   <Area type="monotone" dataKey="risk" stroke="var(--rose)" fill="rgba(244,63,94,0.08)" strokeWidth={1.5} />
                 </AreaChart>
@@ -773,21 +766,25 @@ function KnowledgeAnalytics({ nodes, edges, simVals }) {
       <div className={s.analyticsCard}>
         <div className={s.analyticsCardTitle}>Edge Confidence Distribution</div>
         <div style={{ height: 130 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={[
-              { confidence: '50-60%', count: Math.round(totalEdges * 0.1) },
-              { confidence: '60-70%', count: Math.round(totalEdges * 0.15) },
-              { confidence: '70-80%', count: Math.round(totalEdges * 0.25) },
-              { confidence: '80-90%', count: Math.round(totalEdges * 0.35) },
-              { confidence: '90-100%', count: Math.round(totalEdges * 0.15) },
-            ]}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="confidence" tick={{ fontSize: 7.5, fill: '#64748b' }} />
-              <YAxis tick={{ fontSize: 7.5, fill: '#64748b' }} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a' }} />
-              <Area type="monotone" dataKey="count" stroke="#6366f1" fill="rgba(99,102,241,0.08)" strokeWidth={1.5} />
-            </AreaChart>
-          </ResponsiveContainer>
+          {totalEdges > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={[
+                { confidence: '50-60%', count: Math.max(1, Math.round(totalEdges * 0.1)) },
+                { confidence: '60-70%', count: Math.max(1, Math.round(totalEdges * 0.15)) },
+                { confidence: '70-80%', count: Math.max(1, Math.round(totalEdges * 0.25)) },
+                { confidence: '80-90%', count: Math.max(1, Math.round(totalEdges * 0.35)) },
+                { confidence: '90-100%', count: Math.max(1, Math.round(totalEdges * 0.15)) },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="confidence" tick={{ fontSize: 7.5, fill: '#64748b' }} />
+                <YAxis tick={{ fontSize: 7.5, fill: '#64748b' }} />
+                <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a' }} />
+                <Area type="monotone" dataKey="count" stroke="#6366f1" fill="rgba(99,102,241,0.08)" strokeWidth={1.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#94a3b8' }}>Loading graph data…</div>
+          )}
         </div>
       </div>
 
@@ -916,6 +913,18 @@ function KnowledgeAnalytics({ nodes, edges, simVals }) {
 
 export default function IntelligencePage() {
   const queryClient = useQueryClient()
+  const { navigateToPage } = useSharedParams()
+
+  // Read forecast lifecycle focus context (written by ForecastPage Step 5/6)
+  const [graphFocusBanner, setGraphFocusBanner] = useState(() => {
+    try {
+      const raw = localStorage.getItem('amasci_graph_focus')
+      if (!raw) return null
+      const ctx = JSON.parse(raw)
+      localStorage.removeItem('amasci_graph_focus')
+      return ctx
+    } catch { return null }
+  })
 
   // Workspace Pan/Zoom/Drag State
   const [layer, setLayer] = useState('Combined')
@@ -959,7 +968,7 @@ export default function IntelligencePage() {
   useEffect(() => {
     if (!isReplaying) return
     const timer = setInterval(() => {
-      setTimelineStep(prev => (prev + 1) % REPLAY_MONTHS.length)
+      setTimelineStep(prev => (prev + 1) % replayMonths.length)
     }, 1800)
     return () => clearInterval(timer)
   }, [isReplaying])
@@ -989,6 +998,31 @@ export default function IntelligencePage() {
     queryFn: () => api.getActiveVersion().then(r => r.data).catch(() => ({ version: '1.4.2' })),
     retry: false, staleTime: 120_000,
   })
+
+  const { data: datasetSummaryRaw } = useQuery({
+    queryKey: ['kg_dataset_summary'],
+    queryFn: () => api.getDatasetSummary().then(r => r.data).catch(() => ({})),
+    retry: false, staleTime: 30_000, refetchInterval: 30_000,
+  })
+
+  // Compute replay months dynamically from real backend date range (Jan 2015 – Sep 2017)
+  const replayMonths = useMemo(() => {
+    const startStr = datasetSummaryRaw?.date_range_start || '2015-01-01'
+    const endStr = datasetSummaryRaw?.date_range_end || datasetSummaryRaw?.date_max || '2017-09-30'
+    const [startY, startM] = startStr.slice(0, 7).split('-').map(Number)
+    const [endY, endM] = endStr.slice(0, 7).split('-').map(Number)
+    const months = []
+    let y = startY, m = startM
+    while (y < endY || (y === endY && m <= endM)) {
+      const label = new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+      const isLast = (y === endY && m === endM)
+      const isFirst = (y === startY && m === startM)
+      months.push({ key: label, label, desc: isLast ? 'Training Window End (Live Twin)' : isFirst ? 'DataCo Training Start' : '' })
+      m += 1
+      if (m > 12) { m = 1; y += 1 }
+    }
+    return months
+  }, [datasetSummaryRaw])
 
   // Nodes & Edges construction with stores, carriers, regions, and departments
   const rawNodes = useMemo(() => {
@@ -1277,7 +1311,7 @@ export default function IntelligencePage() {
 
         <div className={s.healthStrip}>
           {[
-            ['Neo4j Status', 'ONLINE', 'green'],
+            ['Neo4j Status', (graphStats?.node_count > 0 || graphStats?.total_nodes > 0 || (graphStats?.metrics?.node_count > 0)) ? 'ONLINE' : rawNodes.length > 0 && graphDataRaw?.nodes && Object.keys(graphDataRaw.nodes).length > 0 ? 'ONLINE' : 'FALLBACK', graphStats?.node_count > 0 || graphStats?.total_nodes > 0 ? 'green' : 'amber'],
             ['Graph Version', 'v' + (versionData?.version || mK.version || '1.4.2'), 'blue'],
             ['TPKE Version', 'v' + (tpkeData?.version || mK.tpke_version || '2.1'), 'purple'],
             ['Node Count', rawNodes.length.toString(), ''],
@@ -1298,6 +1332,15 @@ export default function IntelligencePage() {
         </div>
 
         <div className={s.headerRight}>
+          {graphFocusBanner && (
+            <button
+              className={s.hdrBtn}
+              style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800, marginRight: 8 }}
+              onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
+            >
+              ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5' : 'Step 6'})
+            </button>
+          )}
           <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
             <button
               onClick={() => setMainTab('workspace')}
@@ -1318,6 +1361,37 @@ export default function IntelligencePage() {
       {mainTab === 'neo4j' && (
         <div style={{ flex: 1, overflow: 'auto', background: '#f1f5f9' }}>
           <Neo4jPage embedded />
+        </div>
+      )}
+
+      {/* Forecast lifecycle focus banner */}
+      {graphFocusBanner && mainTab !== 'neo4j' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px',
+          background: graphFocusBanner.mode === 'kg_mutation'
+            ? 'linear-gradient(90deg, rgba(91,138,255,0.10) 0%, rgba(0,184,148,0.06) 100%)'
+            : 'linear-gradient(90deg, rgba(124,111,205,0.12) 0%, rgba(91,138,255,0.06) 100%)',
+          border: `1px solid ${graphFocusBanner.mode === 'kg_mutation' ? 'rgba(91,138,255,0.3)' : 'rgba(124,111,205,0.3)'}`,
+          borderRadius: 8, margin: '0 0 0 0', flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 13 }}>{graphFocusBanner.mode === 'kg_mutation' ? '🔗' : '⚡'}</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--tp)' }}>
+                {graphFocusBanner.mode === 'kg_mutation' ? 'Knowledge Graph Mutation Applied — Step 5' : 'TPKE Edge Evolution Complete — Step 6'}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 1 }}>
+                {graphFocusBanner.message || `Period: ${graphFocusBanner.period}`}
+              </div>
+            </div>
+          </div>
+          <button
+            style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+            onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
+          >
+            ← Return to Forecast Lifecycle
+          </button>
         </div>
       )}
 
@@ -1537,7 +1611,7 @@ export default function IntelligencePage() {
                       <div className={s.timelineSection} style={{ flex: 1 }}>
                         <div className={s.timelineScroll}>
                           <div className={s.timelineTrack}>
-                            {REPLAY_MONTHS.map((step, idx) => {
+                            {replayMonths.map((step, idx) => {
                               const done = idx < timelineStep
                               const active = idx === timelineStep
                               return (

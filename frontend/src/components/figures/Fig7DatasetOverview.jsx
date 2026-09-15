@@ -53,17 +53,17 @@ export default function Fig7DatasetOverview() {
     <FigureShell
       figureNumber={7}
       title="DataCo Smart Supply Chain — Dataset Overview"
-      caption="180,519 orders across 5 global markets (2015–2018). 54.8% late delivery rate. Source: DataCo Global Supply Chain dataset."
+      caption="DataCo Smart Supply Chain training window (Jan 2015 – Sep 2017). Source: DataCo Global Supply Chain dataset."
       loading={isLoading} error={isError ? 'Failed to load dataset overview' : false}
       empty={empty} dataPoints={data?.total_orders || null}
     >
       {/* KPI row */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-        <StatCard label="Total Orders"     value={data?.total_orders?.toLocaleString()}  sub="2015–2018"          color={COLORS.blue}   />
+        <StatCard label="Total Orders"     value={data?.total_orders?.toLocaleString()}  sub={`${data?.date_range?.start?.slice(0,7)} – ${data?.date_range?.end?.slice(0,7)}`} color={COLORS.blue}   />
         <StatCard label="Late Delivery"    value={`${(data?.overall_late_rate * 100).toFixed(1)}%`} sub="of all orders"  color={COLORS.orange} />
         <StatCard label="Markets"          value="5"                                      sub="LATAM · Europe · Asia · USCA · Africa" color={COLORS.green}  />
         <StatCard label="Shipping Modes"   value="4"                                      sub="Standard · Second · First · Same Day"  color={COLORS.pink}   />
-        <StatCard label="Date Range"       value={`${data?.date_range?.start?.slice(0,7)} → ${data?.date_range?.end?.slice(0,7)}`} sub="37 months" color="#64748b" />
+        <StatCard label="Date Range"       value={`${data?.date_range?.start?.slice(0,7)} → ${data?.date_range?.end?.slice(0,7)}`} sub="Training window" color="#64748b" />
       </div>
 
       {/* Monthly volume + late rate */}
@@ -136,11 +136,11 @@ export default function Fig7DatasetOverview() {
               <XAxis dataKey="Market" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis domain={[0, 1]} tickFormatter={v => `${(v*100).toFixed(0)}%`} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <Tooltip formatter={v => `${(v*100).toFixed(1)}%`} />
-              <ReferenceLine y={data?.overall_late_rate || 0.548} stroke="#94a3b8" strokeDasharray="4 2"
+              <ReferenceLine y={data?.overall_late_rate || 0} stroke="#94a3b8" strokeDasharray="4 2"
                 label={{ value: 'avg', position: 'right', fontSize: 10, fill: '#94a3b8' }} />
               <Bar dataKey="late_rate" name="Late Rate" radius={[4,4,0,0]} {...NO_ANIMATION}>
                 {(data?.market_breakdown || []).map((r, i) => (
-                  <Cell key={i} fill={(r.late_rate || 0) > (data?.overall_late_rate || 0.548) ? COLORS.orange : COLORS.blue} />
+                  <Cell key={i} fill={(r.late_rate || 0) > (data?.overall_late_rate || 0) ? COLORS.orange : COLORS.blue} />
                 ))}
               </Bar>
             </BarChart>

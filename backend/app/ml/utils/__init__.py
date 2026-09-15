@@ -142,6 +142,8 @@ _LEAKY: dict[str, set[str]] = {
         "supplier_delay_rate",
         # Full-df route/region encodings
         "region_congestion_index",  # full-df in old code; use region_hist_late_rate
+        # Categorical perfect-mapping of target
+        "Delivery Status",
     },
     "logistics": {
         # Post-shipment observables
@@ -151,6 +153,8 @@ _LEAKY: dict[str, set[str]] = {
         "shipping_efficiency_score",
         # Full-df target encoding
         "supplier_delay_rate",
+        # Categorical perfect-mapping of target
+        "Delivery Status",
     },
 }
 
@@ -159,6 +163,20 @@ _ALL_LISTS: dict[str, list[str]] = {
     "supplier":  SUPPLIER_FEATURES,
     "logistics": LOGISTICS_FEATURES,
 }
+
+# Assert no feature list intersects BANNED_FROM_MODELS
+try:
+    from app.core.constants import BANNED_FROM_MODELS as _BANNED
+    for _name, _feats in _ALL_LISTS.items():
+        _banned_overlap = set(_BANNED) & set(_feats)
+        if _banned_overlap:
+            raise ValueError(
+                f"BANNED_FROM_MODELS violation in {_name.upper()}_FEATURES: "
+                f"{sorted(_banned_overlap)}. "
+                f"Remove these columns from the feature list."
+            )
+except ImportError:
+    pass  # constants not yet available during bootstrap
 
 for _name, _feats in _ALL_LISTS.items():
     _overlap = _LEAKY[_name] & set(_feats)
@@ -250,32 +268,79 @@ class LeakageAuditRow:
     verdict: str   # PASS | SUSPECT | FAIL
 
 
+def _cramers_v(series: pd.Series, y: pd.Series) -> float:
+    """
+    Cramér's V between a categorical series and a binary target.
+    Returns a value in [0, 1]; 1.0 = perfect association.
+    """
+    try:
+        from scipy.stats import chi2_contingency
+        ct = pd.crosstab(series.astype(str), y)
+        chi2, _, _, _ = chi2_contingency(ct)
+        n = len(series)
+        k = min(ct.shape) - 1
+        if n == 0 or k == 0:
+            return 0.0
+        return float(np.sqrt(chi2 / (n * k)))
+    except Exception:
+        return 0.0
+
+
 def audit_feature_leakage(
     X: pd.DataFrame,
     y: pd.Series,
     corr_threshold: float = 0.85,
     mi_threshold: float = 0.55,
     suspect_threshold: float = 0.70,
+    cramers_v_threshold: float = 0.85,
 ) -> list[LeakageAuditRow]:
     """
-    For each feature: |Pearson(f, y)| and mutual_info_classif(f, y).
+    For each numeric feature: |Pearson(f, y)| and mutual_info_classif(f, y).
+    For each categorical (object/category) feature: Cramér's V against y.
+
     verdict: FAIL    if corr > corr_threshold OR mi > mi_threshold
+                     OR cramers_v > cramers_v_threshold
              SUSPECT if corr > suspect_threshold
              PASS    otherwise
 
-    Raises LeakageError on any FAIL.
+    Raises ValueError on any FAIL.
     Logs SUSPECT features as warnings.
 
     is_delayed would score correlation 1.0 and be caught instantly.
+    "Delivery Status" would score Cramér's V ≈ 1.0 and be caught here.
     """
     rows: list[LeakageAuditRow] = []
     fails: list[str] = []
 
+    y_arr = y.values.astype(float)
+
+    # ── Categorical path: Cramér's V ─────────────────────────────────────────
+    X_cat = X.select_dtypes(include=["object", "category"])
+    for col in X_cat.columns:
+        cv = _cramers_v(X_cat[col], y)
+        if cv > cramers_v_threshold:
+            verdict = "FAIL"
+            fails.append(f"{col} (cramers_v={cv:.3f})")
+        else:
+            verdict = "PASS"
+        rows.append(LeakageAuditRow(
+            feature_name=col,
+            target_corr=round(cv, 4),   # reuse field; semantics differ for categoricals
+            mutual_info=0.0,
+            verdict=verdict,
+        ))
+        if verdict == "FAIL":
+            logger.error(f"Leakage audit FAIL (categorical): {col} Cramér's V={cv:.3f}")
+
+    # ── Numeric path: Pearson + MI ────────────────────────────────────────────
     X_num = X.select_dtypes(include=[np.number]).fillna(0)
     if X_num.empty:
+        if fails:
+            raise ValueError(
+                f"Leakage audit FAIL — categorical features with Cramér's V > {cramers_v_threshold}:\n  "
+                + "\n  ".join(fails)
+            )
         return rows
-
-    y_arr = y.values.astype(float)
 
     # Pearson correlations
     corrs = {col: abs(float(np.corrcoef(X_num[col].values, y_arr)[0, 1]))
@@ -314,8 +379,8 @@ def audit_feature_leakage(
 
     if fails:
         raise ValueError(
-            f"Leakage audit FAIL — features with target correlation > {corr_threshold} "
-            f"or MI > {mi_threshold}:\n  " + "\n  ".join(fails)
+            f"Leakage audit FAIL — features exceeding thresholds:\n  "
+            + "\n  ".join(fails)
         )
 
     return rows

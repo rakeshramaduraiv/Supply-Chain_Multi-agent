@@ -28,7 +28,7 @@ import {
 import styles from './DecisionJournal.module.css'
 
 const MONTHS_REPLAY = [
-  '2015-01', '2015-06', '2016-01', '2016-06', '2017-01', '2017-06', '2017-12', '2018-01'
+  '2015-01', '2015-06', '2016-01', '2016-06', '2017-01', '2017-04', '2017-07', '2017-09'
 ]
 
 export default function DecisionJournal() {
@@ -59,7 +59,7 @@ export default function DecisionJournal() {
   const currentReplayMonth = MONTHS_REPLAY[replayIdx]
 
   // Dynamic ground truth calculations
-  const totalOrders            = s.total_orders || 180519
+  const totalOrders            = s.total_orders || 171962
   const replayScale            = (replayIdx + 1) / MONTHS_REPLAY.length
   const ordersIngested         = Math.round(totalOrders * replayScale)
   const lateDeliveryRate       = s.late_delivery_pct || 54.8
@@ -151,7 +151,7 @@ export default function DecisionJournal() {
               {isPlaying ? <Pause size={11} /> : <Play size={11} />}
               {isPlaying ? 'Pause' : 'Replay'}
             </button>
-            <button className="btn btn-secondary btn-xs" onClick={() => { setReplayIdx(7); setIsPlaying(false) }}>
+            <button className="btn btn-secondary btn-xs" onClick={() => { setReplayIdx(MONTHS_REPLAY.length - 1); setIsPlaying(false) }}>
               <RotateCcw size={11} /> Reset
             </button>
           </div>
@@ -199,7 +199,7 @@ export default function DecisionJournal() {
               <div className={styles.secBody}>
                 Forecast Cycle: <strong>{currentReplayMonth}</strong><br />
                 Accuracy Score: <strong>{forecastHealth}%</strong><br />
-                Graph Version: <strong>v1.4.2</strong><br />
+                Graph Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
                 TPKE Version: <strong>v2.1</strong><br />
                 Status: <strong style={{ color: '#10b981' }}>VERIFIED_CLOSED_LOOP</strong>
               </div>
@@ -221,7 +221,7 @@ export default function DecisionJournal() {
               <div className={styles.secBody}>
                 MAPE Error Rate: <strong>{(100 - forecastHealth).toFixed(1)}%</strong><br />
                 RMSE Metric: <strong>12.4 deviation</strong><br />
-                Prediction Confidence: <strong>94.2%</strong>
+                Prediction Confidence: <strong>{forecastHealth}%</strong>
               </div>
             </div>
 
@@ -240,9 +240,9 @@ export default function DecisionJournal() {
             <div className={styles.sectionCard}>
               <span className={styles.secTitle}><Activity size={13} /> Section 4: Knowledge Graph Traversal</span>
               <div className={styles.secBody}>
-                Neo4j Version: <strong>v1.4.2</strong><br />
-                Active Node count: <strong>2,890 nodes</strong><br />
-                Evolved edge count: <strong>5,640 relationships</strong>
+                Neo4j Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
+                Active Node count: <strong>{(network.totalNodes || 0).toLocaleString()} nodes</strong><br />
+                Evolved edge count: <strong>{(network.totalRels || 0).toLocaleString()} relationships</strong>
               </div>
             </div>
 
@@ -251,8 +251,8 @@ export default function DecisionJournal() {
               <span className={styles.secTitle}><NetIcon size={13} /> Section 5: TPKE Evolved Causal Edges</span>
               <div className={styles.secBody}>
                 Learned Edge: <strong>Late Delivery ➔ Stockout</strong><br />
-                Edge Confidence: <strong>94.2%</strong><br />
-                Occurrences logged: <strong>82 times</strong>
+                Edge Confidence: <strong>{forecastHealth}%</strong><br />
+                Occurrences logged: <strong>{network.tpkeEdgeCount || 0} times</strong>
               </div>
             </div>
 

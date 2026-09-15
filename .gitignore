@@ -47,6 +47,43 @@ desktop.ini
 backend/data/logs/*
 !backend/data/logs/.gitkeep
 
+# Large data files (exceed GitHub 100MB limit)
+backend/data/raw/*.csv
+data/raw/*.csv
+
+# Parquet files (binary, large, regenerable)
+backend/data/stages/*.parquet
+backend/data/stages/**/*.parquet
+data/stages/*.parquet
+data/stages/**/*.parquet
+backend/data/uploads/*.parquet
+backend/uploads/*.parquet
+
+# Backup data files
+*_FULL_BACKUP.csv
+*_train.csv
+
+# Runtime output files (regenerated on each run)
+*.txt
+af_test.json
+diag_test.json
+retrain_result.txt
+retrain2.txt
+*_out.txt
+
+# One-off debug/fix scripts (not part of the application)
+_debug*.py
+_compute*.py
+check_*.py
+fix_*.py
+verify_*.py
+wire_*.py
+rewire_*.py
+find_area*.py
+inspect_*.py
+regen_*.py
+run_init.py
+
 # Docker volumes
 postgres_data/
 neo4j_data/

@@ -17,7 +17,7 @@ export default function FiguresPage() {
       <div style={{ marginBottom: 32 }}>
         <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a' }}>Publication Figures</div>
         <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-          AMASCI — DataCo Smart Supply Chain · 180,519 orders · All values from live backend
+          AMASCI — DataCo Smart Supply Chain · Jan 2015 – Sep 2017 Training Window · All values from live backend
         </div>
       </div>
 

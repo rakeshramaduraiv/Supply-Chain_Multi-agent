@@ -73,6 +73,28 @@ RANDOM_STATE = 42
 TEST_SIZE = 0.2
 WALK_FORWARD_SPLITS = 5
 
+# --- Columns banned from ALL agent feature lists ---
+# These are post-shipment observables or algebraic restatements of the target.
+# "Delivery Status" is a categorical perfect-mapping of Late_delivery_risk
+# (Cramér's V ≈ 1.0) and MUST NOT appear in any model feature list.
+# It stays in REQUIRED_COLUMNS for ingest validation and dashboards.
+# Required-for-ingest and banned-from-models are orthogonal concerns.
+BANNED_FROM_MODELS: list[str] = [
+    "Delivery Status",
+    "is_delayed",
+    "delivery_gap",
+    "delivery_duration_days",
+    "shipping_delay_ratio",
+    "composite_risk_score",
+    "revenue_per_unit",
+    "supplier_delay_rate",
+    "Days for shipping (real)",
+    # Identifier columns — kept in pipeline for graph enrichment (step 4)
+    # but must never appear as ML features
+    "Order Id",
+    "Customer Id",
+]
+
 # --- Risk Score Thresholds ---
 RISK_LOW_THRESHOLD = 0.25
 RISK_MEDIUM_THRESHOLD = 0.50

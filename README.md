@@ -50,7 +50,7 @@ make prod
 - **Backend**: 234 tests passing
 - **Frontend**: 409 source files, 0 TypeScript errors
 - **Build**: ~9.4s production build
-- **Dataset**: DataCo Smart Supply Chain (180,519 rows, 53 columns)
+- **Dataset**: DataCo Smart Supply Chain (171,962 rows, Jan 2015 – Sep 2017 training window)
 
 ## License
 

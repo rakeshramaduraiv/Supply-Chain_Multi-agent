@@ -4,7 +4,7 @@
 
  *
 
- * Grounded in the 180,519-row DataCo Smart Supply Chain Dataset (2015-01-01 to 2018-01-31).
+ * Grounded in the DataCo Smart Supply Chain Dataset (Jan 2015 – Sep 2017 training window).
 
  * Tells one complete business story:
 
@@ -26,13 +26,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import {
 
-  RefreshCw, BarChart2, CheckCircle, Upload, Zap, Cpu, Rocket, AlertTriangle, Factory,
+  RefreshCw, BarChart2, CheckCircle, Zap, Cpu, Rocket, AlertTriangle, Factory,
 
-  Anchor, Warehouse, Truck, Users, Lightbulb, FileUp, ArrowRight, Download,
+  Anchor, Warehouse, Truck, Users, Lightbulb, ArrowRight, Download,
 
   ShieldCheck, Activity, Calendar, Play, Network, Layers, GitBranch, Search,
 
-  ArrowUpRight, ArrowDownRight, Minus, CheckSquare, Clock, ArrowRightCircle, Loader
+  ArrowUpRight, ArrowDownRight, Minus, CheckSquare, Clock, ArrowRightCircle, Loader, Upload, FileUp
 
 } from 'lucide-react'
 
@@ -48,8 +48,6 @@ import { api } from '../api/client'
 
 import Spinner from '../components/ui/Spinner'
 
-import UploadZone from '../components/ui/UploadZone'
-
 import { useToast } from '../components/ui/Toast'
 
 import styles from './ForecastPage.module.css'
@@ -61,13 +59,21 @@ import AgentMetricsPanel from '../components/forecast/AgentMetricsPanel'
 import ForecastCharts from '../components/forecast/ForecastCharts'
 import ValidationPanel from '../components/forecast/ValidationPanel'
 
-// The DataCo dataset ends 2018-01-31.
+// The DataCo dataset training window ends 2017-09-30.
 
-// The model is trained on 2015-01 through 2018-01.
+// The model is trained on Jan 2015 through Sep 2017.
 
-// The lifecycle starts by forecasting 2018-02, then ingesting 2018-02 actuals, then forecasting 2018-03, etc.
+// The lifecycle starts by forecasting Oct 2017, then ingesting Oct 2017 actuals, then forecasting Nov 2017, etc.
 
 const FORECAST_MONTHS = [
+
+  { period: '2017-10', label: 'Oct 2017' },
+
+  { period: '2017-11', label: 'Nov 2017' },
+
+  { period: '2017-12', label: 'Dec 2017' },
+
+  { period: '2018-01', label: 'Jan 2018' },
 
   { period: '2018-02', label: 'Feb 2018' },
 
@@ -178,8 +184,6 @@ export default function ForecastPage() {
 
   const { navigateToPage } = useSharedParams()
 
-  const [activeTab, setActiveTab] = useState('intelligence')
-
   // ── Persist lifecycle state across page navigation ──────────────────────
 
   const readLS = (key, fallback) => {
@@ -190,55 +194,40 @@ export default function ForecastPage() {
 
   const writeLS = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
 
+  const [activeTab, _setActiveTab] = useState(() => readLS('amasci_cycle_tab', 'intelligence'))
+  const setActiveTab = (v) => { _setActiveTab(v); writeLS('amasci_cycle_tab', v) }
+
   // 8-step Continuous Decision Support Loop state — persisted in localStorage
 
   const [cycleStep, _setCycleStep] = useState(() => readLS('amasci_cycle_step', 1))
 
-  const [cycleMonth, _setCycleMonth] = useState(() => readLS('amasci_cycle_month', '2018-02'))
+  const [cycleMonth, _setCycleMonth] = useState(() => readLS('amasci_cycle_month', '2017-10'))
 
-  const [cycleTrainedUntil, _setCycleTrainedUntil] = useState(() => readLS('amasci_cycle_trained_until', '2018-01'))
+  const [cycleTrainedUntil, _setCycleTrainedUntil] = useState(() => readLS('amasci_cycle_trained_until', '2017-09'))
 
   const [cycleActualsUploaded, _setCycleActualsUploaded] = useState(() => readLS('amasci_cycle_actuals_uploaded', false))
+  const [cycleModelRetrained, _setCycleModelRetrained] = useState(false)
 
-  const [cycleModelRetrained, _setCycleModelRetrained] = useState(() => readLS('amasci_cycle_model_retrained', false))
-
-  const setCycleStep = (v) => { _setCycleStep(v); writeLS('amasci_cycle_step', v) }
-
-  const setCycleMonth = (v) => { _setCycleMonth(v); writeLS('amasci_cycle_month', v) }
-
-  const setCycleTrainedUntil = (v) => { _setCycleTrainedUntil(v); writeLS('amasci_cycle_trained_until', v) }
-
+  const setCycleStep            = (v) => { _setCycleStep(v);            writeLS('amasci_cycle_step', v) }
+  const setCycleMonth           = (v) => { _setCycleMonth(v);           writeLS('amasci_cycle_month', v) }
+  const setCycleTrainedUntil    = (v) => { _setCycleTrainedUntil(v);    writeLS('amasci_cycle_trained_until', v) }
   const setCycleActualsUploaded = (v) => { _setCycleActualsUploaded(v); writeLS('amasci_cycle_actuals_uploaded', v) }
+  const setCycleModelRetrained  = (v) => { _setCycleModelRetrained(v) }
 
-  const setCycleModelRetrained = (v) => { _setCycleModelRetrained(v); writeLS('amasci_cycle_model_retrained', v) }
-
-  // Cycle API state
-
+  // cycleUploadResult persisted so charts survive navigation away/back within same session
   const [cycleUploadResult, _setCycleUploadResult] = useState(() => readLS('amasci_cycle_upload_result', null))
-
   const [cycleRcaResult, setCycleRcaResult]         = useState(null)
-
   const [cycleCfResult, setCycleCfResult]           = useState(null)
-
   const [cycleRetrainResult, setCycleRetrainResult] = useState(null)
-
   const setCycleUploadResult = (v) => { _setCycleUploadResult(v); writeLS('amasci_cycle_upload_result', v) }
 
-  // Accumulates chart_point from every completed cycle so bars persist as user advances months
+  // Accumulates chart_point from every completed cycle — session-only
 
-  const [completedCycles, _setCompletedCycles] = useState(() => readLS('amasci_completed_cycles', []))
+  const [completedCycles, _setCompletedCycles] = useState([])
 
   const setCompletedCycles = (fn) => {
 
-    _setCompletedCycles(prev => {
-
-      const next = typeof fn === 'function' ? fn(prev) : fn
-
-      writeLS('amasci_completed_cycles', next)
-
-      return next
-
-    })
+    _setCompletedCycles(prev => typeof fn === 'function' ? fn(prev) : fn)
 
   }
 
@@ -246,6 +235,25 @@ export default function ForecastPage() {
   const [activeCycleId, setActiveCycleId] = useState(null)
 
   // Per-step live status messages
+
+  // On mount: wipe upload state ONLY on a fresh project start.
+  // A fresh start = no sessionStorage marker (new tab, hard refresh, or dev server restart).
+  useEffect(() => {
+    const sessionKey = 'amasci_session_active'
+    if (!sessionStorage.getItem(sessionKey)) {
+      // Only wipe upload state when starting fresh at step 1, not mid-cycle
+      const savedStep = (() => { try { return JSON.parse(localStorage.getItem('amasci_cycle_step')) } catch { return 1 } })()
+      if (!savedStep || savedStep <= 1) {
+        localStorage.removeItem('amasci_cycle_actuals_uploaded')
+        localStorage.removeItem('amasci_cycle_upload_result')
+      }
+      localStorage.removeItem('amasci_cycle_tab')
+      localStorage.removeItem('amasci_step4_navigated')
+      localStorage.removeItem('amasci_step5_navigated')
+      localStorage.removeItem('amasci_step6_navigated')
+      sessionStorage.setItem(sessionKey, '1')
+    }
+  }, [])
 
   // ── Backend restart detection: if session_id changes, backend restarted → reset lifecycle
   useEffect(() => {
@@ -256,22 +264,22 @@ export default function ForecastPage() {
       if (stored && stored !== sid) {
         const keys = [
           'amasci_cycle_step', 'amasci_cycle_month', 'amasci_cycle_trained_until',
-          'amasci_cycle_actuals_uploaded', 'amasci_cycle_model_retrained',
-          'amasci_cycle_upload_result', 'amasci_completed_cycles',
-          'amasci_upload_history', 'amasci_rca_focus', 'amasci_graph_focus',
-          'amasci_forecast_incidents',
+          'amasci_cycle_actuals_uploaded', 'amasci_cycle_upload_result', 'amasci_cycle_tab',
+          'amasci_rca_focus', 'amasci_graph_focus', 'amasci_forecast_incidents',
         ]
         keys.forEach(k => localStorage.removeItem(k))
+        sessionStorage.removeItem('amasci_session_active') // allow next mount to re-init
         _setCycleStep(1)
-        _setCycleMonth('2018-02')
-        _setCycleTrainedUntil('2018-01')
+        _setCycleMonth('2017-10')
+        _setCycleTrainedUntil('2017-09')
         _setCycleActualsUploaded(false)
         _setCycleModelRetrained(false)
         _setCycleUploadResult(null)
         _setCompletedCycles([])
         setUploadHistory([])
         setStepLogs({})
-        toast.info('Backend restarted — lifecycle reset to 2018-02 Step 1')
+        _setActiveTab('intelligence')
+        toast.info('Backend restarted — lifecycle reset to 2017-10 Step 1')
       }
       localStorage.setItem('amasci_backend_session', sid)
     }).catch(() => {})
@@ -309,11 +317,14 @@ export default function ForecastPage() {
 
   const [isIngestingActuals, setIsIngestingActuals] = useState(false)
 
-  // Step 2 — directs to validation tab upload zone (no inline picker state needed)
+  // Step 2 — file upload state
+  const [step2File, setStep2File] = useState(null)
+  const [step2DragOver, setStep2DragOver] = useState(false)
+  const step2InputRef = useRef(null)
 
-  // Upload History — persisted in component state across uploads
+  // Upload History — session-only, resets on every project start
 
-  const [uploadHistory, setUploadHistory] = useState(() => readLS('amasci_upload_history', []))
+  const [uploadHistory, setUploadHistory] = useState([])
 
   // ── Central API Queries ────────────────────────────────────────────────
 
@@ -324,6 +335,8 @@ export default function ForecastPage() {
     queryFn:  () => api.getAutoForecast().then(r => r.data),
 
     staleTime: 30_000,
+
+    refetchInterval: 60_000,
 
   })
 
@@ -822,8 +835,7 @@ export default function ForecastPage() {
 
       }
 
-      setUploadHistory(prev => {
-        const next = [{
+      setUploadHistory(prev => [{
 
         period:    periodStr,
 
@@ -837,10 +849,7 @@ export default function ForecastPage() {
 
         timestamp: new Date().toLocaleString(),
 
-      }, ...prev]
-        writeLS('amasci_upload_history', next)
-        return next
-      })
+      }, ...prev])
 
       toast.success(`Actuals for ${periodStr} ingested \u2014 ${validRecs.length} categories matched`)
 
@@ -896,15 +905,31 @@ export default function ForecastPage() {
 
   const overallConf     = safe(f.overall_confidence, 0.924)
 
-  // forecastPeriod from backend = 2018-02 (next month after DataCo training data ends 2018-01-31)
+  // forecastPeriod from backend = 2017-10 (next month after DataCo training data ends 2017-09-30)
 
   // cycleMonth tracks which period the user is currently ingesting actuals for
 
-  const forecastPeriod  = f.forecast_period || '2018-02'
+  const forecastPeriod  = f.forecast_period || '2017-10'
 
   const highRiskCount   = safe(f.high_risk_count, 3)
 
-  const categoryForecasts = f.category_forecasts || []
+  // Real DataCo category forecasts from backend — top 6 by combined_risk
+  const categoryForecasts = useMemo(() => {
+    const raw = f.category_forecasts || []
+    if (raw.length === 0) return []
+    // Sort by combined_risk desc, take top 6
+    return [...raw]
+      .sort((a, b) => (b.combined_risk || 0) - (a.combined_risk || 0))
+      .slice(0, 6)
+      .map(c => ({
+        category:           c.category,
+        region:             c.region,
+        predicted_demand:   Math.round(c.predicted_demand || 0),
+        late_delivery_risk: safe(c.supplier_risk, 0.28),
+        stock_risk:         safe(c.logistics_risk, 0.18),
+        avg_shipping_days:  safe(c.demand_risk, 1.25),
+      }))
+  }, [f.category_forecasts])
 
   const monthlyTrend    = analytics.monthly_trend || []
 
@@ -982,95 +1007,66 @@ export default function ForecastPage() {
 
   ]), [logisticsFI.data])
 
-  // Continuous Timeline Stages Data (8 Steps)
-
   const timelineSteps = [
 
     {
-
-      step: 1, name: 'Pre-Event Forecast', status: cycleStep >= 1 ? 'Completed' : 'Waiting',
-
-      comp: '100%', exec: '1.4s', conf: `${(overallConf * 100).toFixed(1)}%`,
-
-      // Step 1 is always the forecast for cycleMonth (model trained on data up to cycleTrainedUntil)
-
-      summary: `Generated ${categoryForecasts.length || 0} category forecasts for ${cycleMonth} · Trained on data through ${cycleTrainedUntil}`,
-
+      step: 1, name: 'Pre-Event Forecast',
+      status: cycleStep > 1 ? 'Completed' : 'Active',
+      comp: cycleStep > 1 ? '100%' : '0%', exec: '1.4s', conf: `${(overallConf * 100).toFixed(1)}%`,
+      summary: cycleStep > 1
+        ? `Generated ${categoryForecasts.length || 0} category forecasts for ${cycleMonth} · Trained through ${cycleTrainedUntil}`
+        : `Ready to forecast ${cycleMonth} · Model trained through ${cycleTrainedUntil}`,
     },
-
     {
-
-      step: 2, name: 'Actuals Ingestion', status: cycleActualsUploaded ? 'Completed' : cycleStep === 2 ? 'Active' : 'Waiting',
-
+      step: 2, name: 'Actuals Ingestion',
+      status: cycleActualsUploaded ? 'Completed' : cycleStep === 2 ? 'Active' : 'Waiting',
       comp: cycleActualsUploaded ? '100%' : '0%', exec: cycleActualsUploaded ? '2.1s' : '—', conf: '94.2%',
-
-      summary: cycleActualsUploaded ? `Ingested 2,123 actual records for ${cycleMonth}` : `Awaiting actual file upload for ${cycleMonth}`,
-
+      summary: cycleActualsUploaded
+        ? `Actuals ingested for ${cycleMonth} · ${cycleUploadResult?.records_loaded?.toLocaleString() || 0} records`
+        : `Awaiting actual CSV upload for ${cycleMonth}`,
     },
-
     {
-
-      step: 3, name: 'Validation & Deviation', status: cycleStep >= 3 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 3 ? '100%' : '0%', exec: '0.8s', conf: '91.5%',
-
-      summary: cycleStep >= 3 ? `MAPE: 2.8% · MAE: 1.15 · RMSE: 2.1` : 'Pending actuals ingestion',
-
+      step: 3, name: 'Validation & Deviation',
+      status: cycleStep > 3 ? 'Completed' : cycleStep === 3 ? 'Active' : 'Waiting',
+      comp: cycleStep > 3 ? '100%' : '0%', exec: '0.8s', conf: '91.5%',
+      summary: cycleStep > 3
+        ? `MAPE: ${cycleUploadResult?.mape_val?.toFixed(2) || '2.8'}% · Accuracy: ${cycleUploadResult?.mape_val != null ? (100 - cycleUploadResult.mape_val).toFixed(1) : '97.2'}%`
+        : 'Pending actuals ingestion',
     },
-
     {
-
-      step: 4, name: 'Root Cause Analysis', status: cycleStep >= 4 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 4 ? '100%' : '0%', exec: '3.2s', conf: '93.0%',
-
-      summary: cycleStep >= 4 ? 'Identified main bottleneck: Carrier Ground Transport' : 'Pending validation stage',
-
+      step: 4, name: 'Root Cause Analysis',
+      status: cycleStep > 4 ? 'Completed' : cycleStep === 4 ? 'Active' : 'Waiting',
+      comp: cycleStep > 4 ? '100%' : '0%', exec: '3.2s', conf: '93.0%',
+      summary: cycleStep > 4 ? 'Root cause identified — see Risk Center' : 'Pending validation',
     },
-
     {
-
-      step: 5, name: 'Knowledge Graph Mutation', status: cycleStep >= 5 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 5 ? '100%' : '0%', exec: '1.1s', conf: '95.0%',
-
-      summary: cycleStep >= 5 ? `Updated Neo4j node risk for ${activeGraphVersion}` : 'Pending RCA resolution',
-
+      step: 5, name: 'Knowledge Graph Mutation',
+      status: cycleStep > 5 ? 'Completed' : cycleStep === 5 ? 'Active' : 'Waiting',
+      comp: cycleStep > 5 ? '100%' : '0%', exec: '1.1s', conf: '95.0%',
+      summary: cycleStep > 5 ? `Neo4j risk scores updated · ${activeGraphVersion}` : 'Pending RCA',
     },
-
     {
-
-      step: 6, name: 'TPKE Evolution', status: cycleStep >= 6 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 6 ? '100%' : '0%', exec: '2.5s', conf: '92.0%',
-
-      summary: cycleStep >= 6 ? `Evolved edge confidence weights (${activeTpkeVersion})` : 'Pending graph mutation',
-
+      step: 6, name: 'TPKE Evolution',
+      status: cycleStep > 6 ? 'Completed' : cycleStep === 6 ? 'Active' : 'Waiting',
+      comp: cycleStep > 6 ? '100%' : '0%', exec: '2.5s', conf: '92.0%',
+      summary: cycleStep > 6 ? `TPKE edges evolved · ${activeTpkeVersion}` : 'Pending graph mutation',
     },
-
     {
-
-      step: 7, name: 'Agent Memory & Weights', status: cycleStep >= 7 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 7 ? '100%' : '0%', exec: '1.9s', conf: '96.5%',
-
-      summary: cycleStep >= 7 ? 'Retrained agent memory on recent monthly distribution' : 'Pending TPKE completion',
-
+      step: 7, name: 'Agent Memory & Weights',
+      status: cycleStep > 7 ? 'Completed' : cycleStep === 7 ? 'Active' : 'Waiting',
+      comp: cycleStep > 7 ? '100%' : '0%', exec: '1.9s', conf: '96.5%',
+      summary: cycleStep > 7 ? 'Agent memory retrained on latest cycle data' : 'Pending TPKE evolution',
     },
-
     {
-
-      step: 8, name: 'Next Forecast Readiness', status: cycleStep >= 8 ? 'Completed' : 'Waiting',
-
-      comp: cycleStep >= 8 ? '100%' : '90%', exec: '0.2s', conf: '98.0%',
-
-      summary: cycleStep >= 8 ? `Cycle ready for next period (${cycleMonth})` : 'Awaiting cycle completion',
-
+      step: 8, name: 'Next Forecast Readiness',
+      status: cycleStep === 8 ? 'Active' : cycleStep > 8 ? 'Completed' : 'Waiting',
+      comp: cycleStep >= 8 ? '100%' : '0%', exec: '0.2s', conf: '98.0%',
+      summary: cycleStep >= 8 ? `Cycle complete — ready to advance to next period` : 'Awaiting cycle completion',
     },
-
   ]
 
-  // ── Chart sliding-window helpers ────────────────────────────────────────
+  // Track if user came back from an external page (for informational banner)
+  const returnFromStep = null // navigation no longer leaves the page
 
   const buildMonthSequence = (endPeriod, count = 12) => {
 
@@ -1096,7 +1092,7 @@ export default function ForecastPage() {
 
   const historicalForecastSeries = useMemo(() => {
 
-    // Backend trend lookup (training data 2015-01 → 2018-01)
+    // Backend trend lookup (training data 2015-01 → 2017-09)
 
     const trendMap = {}
 
@@ -1237,6 +1233,42 @@ export default function ForecastPage() {
 
   const agentAccuracyData = useMemo(() => {
 
+    const compRecs = cycleUploadResult?.comparison_records || []
+
+    if (compRecs.length > 0) {
+
+      const agentMap = { 'Demand Agent': [], 'Supplier Agent': [], 'Logistics Agent': [] }
+
+      compRecs.forEach(r => {
+
+        const agent = r.responsible_agent || 'Demand Agent'
+
+        const dev = r.deviation_pct != null ? Math.abs(parseFloat(r.deviation_pct)) : 5.0
+
+        const acc = Math.max(70.0, Math.min(99.9, 100.0 - dev))
+
+        if (agentMap[agent]) agentMap[agent].push(acc)
+
+      })
+
+      const demandAcc = agentMap['Demand Agent'].length > 0 ? (agentMap['Demand Agent'].reduce((a,b)=>a+b,0)/agentMap['Demand Agent'].length) : 94.2
+
+      const supplierAcc = agentMap['Supplier Agent'].length > 0 ? (agentMap['Supplier Agent'].reduce((a,b)=>a+b,0)/agentMap['Supplier Agent'].length) : 89.5
+
+      const logisticsAcc = agentMap['Logistics Agent'].length > 0 ? (agentMap['Logistics Agent'].reduce((a,b)=>a+b,0)/agentMap['Logistics Agent'].length) : 87.2
+
+      return [
+
+        { name: 'Demand Agent', accuracy: round(demandAcc, 1), color: 'var(--blue)' },
+
+        { name: 'Supplier Agent', accuracy: round(supplierAcc, 1), color: '#e67e22' },
+
+        { name: 'Logistics Agent', accuracy: round(logisticsAcc, 1), color: '#d63031' },
+
+      ]
+
+    }
+
     return [
 
       { name: 'Demand Agent', accuracy: 94.2, color: 'var(--blue)' },
@@ -1247,7 +1279,7 @@ export default function ForecastPage() {
 
     ]
 
-  }, [])
+  }, [cycleUploadResult])
 
   // Query real Error Diagnostics from backend API
 
@@ -1259,6 +1291,8 @@ export default function ForecastPage() {
 
     staleTime: 30_000,
 
+    refetchInterval: 60_000,
+
   })
 
   // Error Diagnostics — priority: (1) ingested comparison_records, (2) parquet API, (3) forecast-only placeholder
@@ -1269,9 +1303,45 @@ export default function ForecastPage() {
 
   const errorDiagnostics = useMemo(() => {
 
+    const compRecs = cycleUploadResult?.comparison_records || []
+
+    if (cycleActualsUploaded && compRecs.length > 0) {
+
+      return compRecs.map(r => {
+
+        const pred = r.predicted_value ?? 0
+
+        const act  = r.actual_value ?? 0
+
+        const diff = act - pred
+
+        const pct  = r.deviation_pct != null ? r.deviation_pct : (pred > 0 ? ((diff / pred) * 100).toFixed(1) : '0.0')
+
+        return {
+
+          category:          r.entity_id || `${r.category} (${r.region})`,
+
+          predicted:         `${Number(pred).toLocaleString()} units`,
+
+          actual:            `${Number(act).toLocaleString()} units`,
+
+          diff:              `${diff >= 0 ? '+' : ''}${Number(diff).toFixed(0)} (${pct}%)`,
+
+          reason:            r.reason || 'Deviation from forecast baseline',
+
+          responsible_agent: r.responsible_agent || 'Demand Agent',
+
+          root_cause:        r.root_cause || 'Variance in actual vs predicted demand',
+
+        }
+
+      })
+
+    }
+
     const apiDiag = errorDiagQuery.data?.diagnostics || []
 
-    if (cycleActualsUploaded && apiDiag.length > 0) {
+    if (apiDiag.length > 0) {
 
       return apiDiag.map(d => {
 
@@ -1293,11 +1363,11 @@ export default function ForecastPage() {
 
           diff:              `${diff >= 0 ? '+' : ''}${diff.toFixed(0)} (${pct}%)`,
 
-          reason:            d.reason || 'Deviation from forecast baseline',
+          reason:            d.reason || `Late delivery rate ${d.late_delivery_rate?.toFixed(1) || '54.8'}% on ${d.region} lane`,
 
           responsible_agent: d.responsible_agent || 'Demand Agent',
 
-          root_cause:        d.root_cause || 'Variance in actual vs predicted demand',
+          root_cause:        d.root_cause || `Demand model vs actual gap: ${diff >= 0 ? '+' : ''}${diff.toFixed(0)} units — ${d.category} · ${d.region}`,
 
         }
 
@@ -1305,19 +1375,19 @@ export default function ForecastPage() {
 
     }
 
-    const forecastCats = categoryForecasts.length > 0 ? categoryForecasts.slice(0, 6) : [
+    const forecastCats = categoryForecasts.length > 0 ? categoryForecasts : [
 
-      { category: 'Apparel',     region: 'Western Europe',  predicted_demand: 2120 },
+      { category: 'Cleats',           region: 'Western Europe',   predicted_demand: 1341 },
 
-      { category: 'Electronics', region: 'Central America', predicted_demand: 1840 },
+      { category: "Women's Apparel",  region: 'Western Europe',   predicted_demand: 1059 },
 
-      { category: 'Footwear',    region: 'South America',   predicted_demand: 1560 },
+      { category: 'Indoor/Outdoor Games', region: 'Western Europe', predicted_demand: 957 },
 
-      { category: 'Sports',      region: 'North America',   predicted_demand: 2340 },
+      { category: 'Cardio Equipment', region: 'Western Europe',   predicted_demand: 681  },
 
-      { category: 'Furniture',   region: 'Eastern Europe',  predicted_demand: 980  },
+      { category: 'Shop By Sport',    region: 'Western Europe',   predicted_demand: 598  },
 
-      { category: 'Technology',  region: 'Pacific Asia',    predicted_demand: 1720 },
+      { category: 'Camping & Hiking', region: 'Western Europe',   predicted_demand: 250  },
 
     ]
 
@@ -1327,9 +1397,9 @@ export default function ForecastPage() {
 
       predicted:         `${(cat.predicted_demand || 2120).toLocaleString()} units`,
 
-      actual:            '\u2014',
+      actual:            '—',
 
-      diff:              '\u2014',
+      diff:              '—',
 
       reason:            'Ingest actuals in Step 2 to see real deviation',
 
@@ -1339,7 +1409,7 @@ export default function ForecastPage() {
 
     }))
 
-  }, [cycleActualsUploaded, errorDiagQuery.data, categoryForecasts])
+  }, [cycleActualsUploaded, cycleUploadResult, errorDiagQuery.data, categoryForecasts])
 
   return (
 
@@ -1363,7 +1433,7 @@ export default function ForecastPage() {
 
             <div className={styles.headerSub}>
 
-              DataCo Dataset Ground Truth · 180,519 Historical Orders · Multi-Agent & TPKE Learning Loop
+              DataCo Dataset Ground Truth · {summary.date_range_start ? summary.date_range_start.slice(0,7) : 'Jan 2015'} – {summary.date_range_end ? summary.date_range_end.slice(0,7) : 'Sep 2017'} Training Window · Multi-Agent & TPKE Learning Loop
 
             </div>
 
@@ -1475,6 +1545,18 @@ export default function ForecastPage() {
 
       <div id="lifecycle-anchor" className={styles.timelineCard}>
 
+        {/* Return banner — shown when user comes back from /risk or /graph mid-cycle */}
+        {returnFromStep && (
+          <div style={{ margin: '0 0 10px 0', padding: '8px 14px', background: 'rgba(0,184,148,0.08)', border: '1.5px solid #00b894', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: '11px', color: '#00b894', fontWeight: 700 }}>
+              ✓ Step {returnFromStep} completed — you’re back on the Forecast page
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--tm)', marginLeft: 'auto' }}>
+              Continue with Step {cycleStep} below
+            </span>
+          </div>
+        )}
+
         <div className={styles.timelineHead}>
 
           <div>
@@ -1504,10 +1586,7 @@ export default function ForecastPage() {
             <div
 
               key={st.step}
-
               className={`${styles.stepItem} ${cycleStep === st.step ? styles.stepItemActive : ''}`}
-
-              onClick={() => setCycleStep(st.step)}
 
             >
 
@@ -1609,66 +1688,61 @@ export default function ForecastPage() {
 
               )}
 
-              {/* Step 2: clicking redirects to Validation tab upload zone */}
-
+              {/* Step 2: CSV upload or synthetic ingest */}
               {st.step === 2 && cycleStep === 2 && (
-
                 <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
                   <div style={{ fontSize: '9px', color: 'var(--blue)', marginBottom: 4 }}>
-
                     Forecast period: <strong>{cycleMonth}</strong>
-
                   </div>
-
                   {cycleActualsUploaded ? (
-
                     <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, padding: '4px 0' }}>
-
                       ✅ Actuals ingested — proceed to Step 3
-
                     </div>
-
                   ) : isIngestingActuals ? (
-
                     <div style={{ fontSize: '9px', color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4 }}>
-
                       <Loader size={11} className={styles.spin} /> Ingesting actuals…
-
                     </div>
-
                   ) : (
-
-                    <button
-
-                      className="btn btn-primary btn-sm"
-
-                      style={{ width: '100%' }}
-
-                      onClick={() => {
-
-                        setActiveTab('validation')
-
-                        setTimeout(() => {
-
-                          document.getElementById('upload-zone-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
-                        }, 80)
-
-                      }}
-
-                    >
-
-                      <Upload size={11} /> Upload Actuals for {cycleMonth}
-
-                    </button>
-
+                    <>
+                      <div
+                        onDragOver={e => { e.preventDefault(); setStep2DragOver(true) }}
+                        onDragLeave={() => setStep2DragOver(false)}
+                        onDrop={e => { e.preventDefault(); setStep2DragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setStep2File(f) }}
+                        onClick={() => step2InputRef.current?.click()}
+                        style={{
+                          border: `1.5px dashed ${step2DragOver ? 'var(--blue)' : step2File ? '#00b894' : 'var(--b)'}`,
+                          borderRadius: 6, padding: '8px 6px', textAlign: 'center',
+                          cursor: 'pointer', marginBottom: 6,
+                          background: step2DragOver ? 'rgba(91,138,255,0.06)' : 'transparent',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <input ref={step2InputRef} type="file" accept=".csv" style={{ display: 'none' }}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) setStep2File(f) }} />
+                        {step2File ? (
+                          <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700 }}>
+                            <FileUp size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />{step2File.name}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '9px', color: 'var(--tm)' }}>
+                            <Upload size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />Drop CSV or click to browse
+                          </div>
+                        )}
+                      </div>
+                      <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: step2File ? 4 : 0 }}
+                        onClick={() => { handleIngestSyntheticMonth(cycleMonth, step2File || null); setStep2File(null) }}>
+                        {step2File
+                          ? <><Upload size={11} /> Upload &amp; Ingest {step2File.name}</>
+                          : <><CheckCircle size={11} /> Ingest Synthetic Actuals for {cycleMonth}</>}
+                      </button>
+                      {step2File && (
+                        <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 9 }}
+                          onClick={() => setStep2File(null)}>✕ Clear file</button>
+                      )}
+                    </>
                   )}
-
                   <StepLogPanel log={stepLogs[2]} />
-
                 </div>
-
               )}
 
               {/* Step 3: Validate deviation */}
@@ -1721,190 +1795,123 @@ export default function ForecastPage() {
 
               )}
 
-              {/* Step 4: RCA */}
-
+              {/* Step 4: RCA — runs analysis here, shows link to Risk Center */}
               {st.step === 4 && cycleStep === 4 && (
-
                 <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
                   <button
-
                     className="btn btn-primary btn-sm"
-
                     style={{ width: '100%' }}
-
                     disabled={cycleRcaMut.isPending}
-
                     onClick={() => {
-
+                      const incidents = JSON.parse(localStorage.getItem('amasci_forecast_incidents') || '[]')
+                      const periodIncident = incidents.find(i => i.period === cycleMonth)
+                      localStorage.setItem('amasci_rca_focus', JSON.stringify({
+                        period: cycleMonth,
+                        incidentId: periodIncident?.id || null,
+                        filterYear: cycleMonth.slice(0, 4),
+                      }))
                       cycleRcaMut.mutate()
-
-                      setTimeout(() => {
-
-                        // Write RCA focus so RiskPage auto-selects this period's incident
-
-                        const incidents = JSON.parse(localStorage.getItem('amasci_forecast_incidents') || '[]')
-
-                        const periodIncident = incidents.find(i => i.period === cycleMonth)
-
-                        localStorage.setItem('amasci_rca_focus', JSON.stringify({
-
-                          period: cycleMonth,
-
-                          incidentId: periodIncident?.id || null,
-
-                          filterYear: cycleMonth.slice(0, 4),
-
-                        }))
-
-                        navigateToPage('/risk')
-
-                      }, 1200)
-
                     }}
-
                   >
-
                     {cycleRcaMut.isPending
-
                       ? <><Loader size={11} className={styles.spin} /> Analyzing…</>
-
                       : <><GitBranch size={11} /> Run Root Cause Analysis</>}
-
                   </button>
-
                   <StepLogPanel log={stepLogs[4]} />
-
                 </div>
-
+              )}
+              {/* After step 4 done — inline summary, optional link */}
+              {st.step === 4 && cycleStep > 4 && (
+                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
+                    ✅ RCA complete — {cycleRcaResult?.root_causes?.[0]?.cause || cycleRcaResult?.primary_cause || 'Carrier Ground Transport'}
+                  </div>
+                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
+                    onClick={() => { window.open('#/risk', '_blank') }}>
+                    <GitBranch size={10} /> Open Risk Center (new tab) →
+                  </button>
+                </div>
               )}
 
-              {/* Step 5: KG Mutation */}
-
+              {/* Step 5: KG Mutation — runs mutation here, shows link to Graph page */}
               {st.step === 5 && cycleStep === 5 && (
-
                 <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
                   <button
-
                     className="btn btn-primary btn-sm"
-
                     style={{ width: '100%' }}
-
                     onClick={() => {
-
                       clearLog(5)
-
                       appendLog(5, '🔗 Propagating RCA findings to Neo4j nodes…')
-
+                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
+                        mode: 'kg_mutation', version: activeGraphVersion,
+                        layer: 'reasoning', highlightNode: 'carrier_ground',
+                        period: cycleMonth,
+                        message: `KG Mutation applied — ${cycleMonth} · ${activeGraphVersion}`,
+                      }))
                       setTimeout(() => {
-
-                        appendLog(5, `📌 Risk scores updated — graph ${activeGraphVersion}`)
-
+                        appendLog(5, `📌 Risk scores updated — ${activeGraphVersion}`)
                         appendLog(5, '✅ Knowledge Graph mutation applied', true)
-
                         qc.invalidateQueries({ queryKey: ['supplyChain'] })
-
                         setCycleStep(6)
-
-                        // Signal GraphPage to show KG Mutation context
-
-                        localStorage.setItem('amasci_graph_focus', JSON.stringify({
-
-                          mode: 'kg_mutation',
-
-                          version: activeGraphVersion,
-
-                          layer: 'reasoning',
-
-                          highlightNode: 'carrier_ground',
-
-                          period: cycleMonth,
-
-                          message: `KG Mutation applied — risk scores updated for ${cycleMonth} · Graph ${activeGraphVersion}`,
-
-                        }))
-
-                        navigateToPage('/graph')
-
                       }, 700)
-
                     }}
-
                   >
-
                     <Network size={11} /> Apply Graph Mutation
-
                   </button>
-
                   <StepLogPanel log={stepLogs[5]} />
-
                 </div>
-
+              )}
+              {/* After step 5 done — inline summary, optional link */}
+              {st.step === 5 && cycleStep > 5 && (
+                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
+                    ✅ KG mutation applied — {activeGraphVersion}
+                  </div>
+                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
+                    onClick={() => { window.open('#/graph', '_blank') }}>
+                    <Network size={10} /> Open Knowledge Graph (new tab) →
+                  </button>
+                </div>
               )}
 
-              {/* Step 6: TPKE Evolution */}
-
+              {/* Step 6: TPKE Evolution — evolves edges here, shows link to Graph page */}
               {st.step === 6 && cycleStep === 6 && (
-
                 <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
                   <button
-
                     className="btn btn-primary btn-sm"
-
                     style={{ width: '100%' }}
-
                     onClick={() => {
-
                       clearLog(6)
-
                       appendLog(6, '⚡ Running temporal edge decay pass…')
-
                       appendLog(6, '🔄 Strengthening pattern edges from deviation events…')
-
+                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
+                        mode: 'tpke_evolution', version: activeTpkeVersion,
+                        layer: 'prediction', highlightNode: 'supplier_main',
+                        period: cycleMonth, scrollTo: 'tpke_evolution_section',
+                        message: `TPKE evolved — ${activeTpkeVersion} · ${cycleMonth}`,
+                      }))
                       setTimeout(() => {
-
                         appendLog(6, `✅ TPKE edges evolved — ${activeTpkeVersion}`, true)
-
                         setCycleStep(7)
-
-                        // Signal GraphPage to show TPKE Evolution context
-
-                        localStorage.setItem('amasci_graph_focus', JSON.stringify({
-
-                          mode: 'tpke_evolution',
-
-                          version: activeTpkeVersion,
-
-                          layer: 'prediction',
-
-                          highlightNode: 'supplier_main',
-
-                          period: cycleMonth,
-
-                          scrollTo: 'tpke_evolution_section',
-
-                          message: `TPKE edges evolved — ${activeTpkeVersion} · Period: ${cycleMonth}`,
-
-                        }))
-
-                        navigateToPage('/graph')
-
                       }, 800)
-
                     }}
-
                   >
-
                     <Layers size={11} /> Evolve TPKE Edges
-
                   </button>
-
                   <StepLogPanel log={stepLogs[6]} />
-
                 </div>
-
+              )}
+              {/* After step 6 done — inline summary, optional link */}
+              {st.step === 6 && cycleStep > 6 && (
+                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
+                    ✅ TPKE evolved — {activeTpkeVersion}
+                  </div>
+                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
+                    onClick={() => { window.open('#/graph', '_blank') }}>
+                    <Layers size={10} /> Open TPKE Evolution (new tab) →
+                  </button>
+                </div>
               )}
 
               {/* Step 7: Retrain */}
@@ -1979,11 +1986,17 @@ export default function ForecastPage() {
 
                         setActualsFile(null)
 
-                        setCycleStep(1)
+                        // Write step=1 directly to avoid session-wipe race on next mount
+                        writeLS('amasci_cycle_step', 1)
+                        _setCycleStep(1)
 
                         // Clear per-cycle localStorage keys so next cycle starts fresh
-
                         localStorage.removeItem('amasci_rca_focus')
+                        localStorage.removeItem('amasci_step4_navigated')
+                        localStorage.removeItem('amasci_step5_navigated')
+                        localStorage.removeItem('amasci_step6_navigated')
+                        localStorage.removeItem('amasci_cycle_actuals_uploaded')
+                        localStorage.removeItem('amasci_cycle_upload_result')
 
                         toast.success(`Cycle advanced → forecasting ${next.label}`)
 
@@ -2043,17 +2056,17 @@ export default function ForecastPage() {
 
               const cats = categoryForecasts.length > 0 ? categoryForecasts : [
 
-                { category: 'Apparel',     region: 'Western Europe',  predicted_demand: 2120, late_delivery_risk: 0.284, stock_risk: 0.182, avg_shipping_days: 1.25 },
+                { category: 'Cleats',           region: 'Western Europe',   predicted_demand: 1341, late_delivery_risk: 0.284, stock_risk: 0.182, avg_shipping_days: 1.25 },
 
-                { category: 'Electronics', region: 'Central America', predicted_demand: 1840, late_delivery_risk: 0.312, stock_risk: 0.201, avg_shipping_days: 1.40 },
+                { category: "Women's Apparel",  region: 'Western Europe',   predicted_demand: 1059, late_delivery_risk: 0.312, stock_risk: 0.201, avg_shipping_days: 1.40 },
 
-                { category: 'Footwear',    region: 'South America',   predicted_demand: 1560, late_delivery_risk: 0.256, stock_risk: 0.165, avg_shipping_days: 1.10 },
+                { category: 'Indoor/Outdoor Games', region: 'Western Europe', predicted_demand: 957, late_delivery_risk: 0.256, stock_risk: 0.165, avg_shipping_days: 1.10 },
 
-                { category: 'Sports',      region: 'North America',   predicted_demand: 2340, late_delivery_risk: 0.198, stock_risk: 0.143, avg_shipping_days: 0.95 },
+                { category: 'Cardio Equipment', region: 'Western Europe',   predicted_demand: 681,  late_delivery_risk: 0.198, stock_risk: 0.143, avg_shipping_days: 0.95 },
 
-                { category: 'Furniture',   region: 'Eastern Europe',  predicted_demand: 980,  late_delivery_risk: 0.341, stock_risk: 0.228, avg_shipping_days: 1.65 },
+                { category: 'Shop By Sport',    region: 'Western Europe',   predicted_demand: 598,  late_delivery_risk: 0.341, stock_risk: 0.228, avg_shipping_days: 1.65 },
 
-                { category: 'Technology',  region: 'Pacific Asia',    predicted_demand: 1720, late_delivery_risk: 0.267, stock_risk: 0.189, avg_shipping_days: 1.30 },
+                { category: 'Camping & Hiking', region: 'Western Europe',   predicted_demand: 250,  late_delivery_risk: 0.267, stock_risk: 0.189, avg_shipping_days: 1.30 },
 
               ]
 
@@ -2301,7 +2314,7 @@ export default function ForecastPage() {
 
               const cats = categoryForecasts.length > 0 ? categoryForecasts : [
 
-                { predicted_demand: 2120, late_delivery_risk: 0.284, stock_risk: 0.182, avg_shipping_days: 1.25 },
+                { predicted_demand: 1200, late_delivery_risk: 0.284, stock_risk: 0.182, avg_shipping_days: 1.25 },
 
               ]
 
@@ -2507,7 +2520,7 @@ export default function ForecastPage() {
 
                 className="btn btn-secondary btn-sm"
 
-                onClick={() => navigateToPage('/risk')}
+                onClick={() => { window.open('#/risk', '_blank') }}
 
                 style={{ marginTop: 'auto' }}
 
@@ -2543,7 +2556,7 @@ export default function ForecastPage() {
 
                 className="btn btn-secondary btn-sm"
 
-                onClick={() => navigateToPage('/graph')}
+                onClick={() => { window.open('#/graph', '_blank') }}
 
                 style={{ marginTop: 'auto' }}
 
@@ -2709,89 +2722,13 @@ export default function ForecastPage() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Actuals Upload Zone — Step 2 directs here */}
+          {/* Actuals ingestion status */}
 
-          <div id="upload-zone-anchor" className="card" style={{ padding: '16px 20px', border: cycleStep === 2 && !cycleActualsUploaded ? '2px solid var(--blue)' : '1px solid var(--b)', borderRadius: 10 }}>
-
-            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tp)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-
-              <FileUp size={15} style={{ color: 'var(--blue)' }} /> Ingest Monthly Actual Performance CSV
-
-              {cycleStep === 2 && !cycleActualsUploaded && (
-
-                <span style={{ marginLeft: 'auto', fontSize: '10px', background: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>
-
-                  ← Step 2 Active · Upload actuals for {cycleMonth}
-
-                </span>
-
-              )}
-
+          {cycleActualsUploaded && cycleUploadResult && (
+            <div style={{ padding: '10px 16px', background: 'rgba(0,184,148,0.08)', border: '1.5px solid #00b894', borderRadius: 8, fontSize: '11px', color: '#00b894', fontWeight: 700 }}>
+              ✅ {cycleUploadResult.records_loaded?.toLocaleString()} records ingested for {cycleUploadResult.period} · MAPE: {cycleUploadResult.mape_val?.toFixed(2)}% · Accuracy: {(100 - cycleUploadResult.mape_val).toFixed(1)}%
             </div>
-
-            <div style={{ fontSize: '11px', color: 'var(--tm)', marginBottom: '10px' }}>
-
-              Upload the actual CSV for <strong>{cycleMonth}</strong> to validate model predictions and compute deviation metrics:
-
-            </div>
-
-            <div style={{ maxWidth: '500px' }}>
-
-              <UploadZone
-
-                accept=".csv"
-
-                hint={`Drag & drop ${cycleMonth} actuals CSV here, or click to browse`}
-
-                hasFile={!!actualsFile}
-
-                fileName={actualsFile?.name}
-
-                onFile={(file) => {
-
-                  setActualsFile(file)
-
-                  handleIngestSyntheticMonth(cycleMonth, file)
-
-                }}
-
-                onClear={() => {
-
-                  setActualsFile(null)
-
-                  setValidationResult(null)
-
-                  setCycleUploadResult(null)
-
-                }}
-
-                disabled={isIngestingActuals || cycleActualsUploaded}
-
-              />
-
-            </div>
-
-            {isIngestingActuals && (
-
-              <div style={{ marginTop: 8, fontSize: '10px', color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 6 }}>
-
-                <Loader size={12} className={styles.spin} /> Running 6-stage upload cycle pipeline…
-
-              </div>
-
-            )}
-
-            {cycleActualsUploaded && cycleUploadResult && (
-
-              <div style={{ marginTop: 8, fontSize: '10px', color: '#00b894', fontWeight: 700 }}>
-
-                ✅ {cycleUploadResult.records_loaded?.toLocaleString()} records ingested · MAPE: {cycleUploadResult.mape_val?.toFixed(2)}%
-
-              </div>
-
-            )}
-
-          </div>
+          )}
 
           {/* Detailed Error Diagnostics Cards */}
 
@@ -2800,7 +2737,7 @@ export default function ForecastPage() {
             <span style={{ fontSize: '10px', fontWeight: 600, color: cycleUploadResult?.comparison_records?.length ? '#00b894' : '#f59e0b' }}>
               {cycleUploadResult?.comparison_records?.length
                 ? `✅ ${cycleUploadResult.period} — Predicted vs Actual (${cycleUploadResult.comparison_records.length} categories) · Backend: ${errorDiagQuery.data?.period_used || cycleMonth}`
-                : `⚠️ Upload actuals for ${cycleMonth} to see real predicted vs actual deviation`}
+                : errorDiagQuery.data?.diagnostics?.length > 0 ? `ℹ️ Showing backend model predictions for ${errorDiagQuery.data?.period_used || cycleMonth} (${errorDiagQuery.data?.diagnostics?.length} categories)` : `⚠️ Ingest actuals in Step 2 to see real predicted vs actual deviation`}
             </span>
           </div>
 
@@ -3106,7 +3043,7 @@ export default function ForecastPage() {
 
             <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tp)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
 
-              <FileUp size={15} style={{ color: 'var(--blue)' }} />
+              <Activity size={15} style={{ color: 'var(--blue)' }} />
 
               Upload History — Actual Performance Records
 
@@ -3185,10 +3122,6 @@ export default function ForecastPage() {
     </div>
 
   )
-
-      {activeTab === 'evalmatrix' && (
-        <EvaluationMatrixSlide data={evalMatrix.data} loading={evalMatrix.isLoading} />
-      )}
 
 }
 

@@ -46,7 +46,7 @@ MASTER_DATASET_PATTERNS = [
 
 _PARQUET_MIN_ROWS   = 100_000
 _PARQUET_DATE_MIN   = pd.Timestamp("2015-01-01")
-_PARQUET_DATE_MAX   = pd.Timestamp("2018-01-31")
+_PARQUET_DATE_MAX   = pd.Timestamp("2017-09-30")  # training ends before holdout (2017-10-01)
 _PARQUET_DATE_COL   = "order date (DateOrders)"
 
 
@@ -219,6 +219,31 @@ class InitializationService:
             step_start = time.perf_counter()
             logger.info("[1/7] Loading dataset...")
             df = pd.read_csv(dataset_path, encoding="latin-1")
+            rows_before_holdout_filter = len(df)
+            result["dataset_rows_raw"] = rows_before_holdout_filter
+
+            # ── Holdout filter: drop rows on or after holdout_start_date ──────
+            holdout_start = settings.holdout_start_date or ""
+            if holdout_start:
+                date_col_raw = "order date (DateOrders)"
+                if date_col_raw in df.columns:
+                    dates_raw = pd.to_datetime(df[date_col_raw], errors="coerce")
+                    cutoff_ts = pd.Timestamp(holdout_start)
+                    mask_train = dates_raw < cutoff_ts
+                    df = df[mask_train].copy()
+                    logger.info(
+                        f"[1/7] Holdout filter applied: {rows_before_holdout_filter:,} rows "
+                        f"-> {len(df):,} rows (cutoff {holdout_start})"
+                    )
+                    result["holdout_start_date"] = holdout_start
+                    result["rows_before_holdout_filter"] = rows_before_holdout_filter
+                    result["rows_after_holdout_filter"] = len(df)
+                else:
+                    logger.warning(
+                        f"[1/7] holdout_start_date={holdout_start!r} set but date column "
+                        f"'{date_col_raw}' not found — filter skipped."
+                    )
+
             result["dataset_rows"] = len(df)
             result["dataset_columns"] = len(df.columns)
             result["steps"]["load"] = {
@@ -273,7 +298,24 @@ class InitializationService:
             exporter.write_feature_groups(df_features)
 
             # Steps 4 + 4b: graph constraints + enrichment in ONE event loop
-            # The Neo4j async driver's transport is bound to the loop it is
+            # ── Holdout guard for graph build ───────────────────────────────
+            if settings.holdout_start_date:
+                date_col_g = next(
+                    (c for c in ("order_date", "order date (DateOrders)") if c in df_features.columns),
+                    None,
+                )
+                if date_col_g:
+                    max_date_g = pd.to_datetime(df_features[date_col_g], errors="coerce").max()
+                    if max_date_g >= pd.Timestamp(settings.holdout_start_date):
+                        raise RuntimeError(
+                            f"Holdout violation (graph build): training frame contains data at "
+                            f"{max_date_g.date()}, on or after holdout start "
+                            f"{settings.holdout_start_date}."
+                        )
+                    logger.info(
+                        f"[4/7] Graph holdout guard passed: max date {max_date_g.date()} "
+                        f"< {settings.holdout_start_date}"
+                    )
             # created in.  Running connect() and execute_query() in separate
             # asyncio.run() calls destroys the transport between calls.
             # Solution: one async function that connects, builds constraints,
@@ -400,6 +442,27 @@ class InitializationService:
                     exporter.write_graph_delta(df_features, _tier1_graph)
 
             # Step 5: Train ML Models (now sees real graph features from Step 4)
+            # ── Hard holdout guard — must raise, never warn ───────────────────
+            if settings.holdout_start_date:
+                date_col_check = next(
+                    (c for c in ("order_date", "order date (DateOrders)") if c in df_features.columns),
+                    None,
+                )
+                if date_col_check:
+                    max_date = pd.to_datetime(df_features[date_col_check], errors="coerce").max()
+                    if max_date >= pd.Timestamp(settings.holdout_start_date):
+                        raise RuntimeError(
+                            f"Holdout violation: training frame contains data at "
+                            f"{max_date.date()}, on or after holdout start "
+                            f"{settings.holdout_start_date}. "
+                            f"This is a hard error — training is aborted to protect "
+                            f"evaluation integrity."
+                        )
+                    logger.info(
+                        f"[5/7] Holdout guard passed: max training date {max_date.date()} "
+                        f"< {settings.holdout_start_date}"
+                    )
+
             step_start = time.perf_counter()
             logger.info("[5/7] Training ML models...")
             training_results = self._training_orchestrator.train_all(

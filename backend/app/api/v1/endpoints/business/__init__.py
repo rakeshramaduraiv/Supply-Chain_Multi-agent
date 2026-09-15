@@ -1057,3 +1057,109 @@ async def dismiss_alert(alert_id: str):
     dismissed_alerts.add(alert_id)
     _save_dismissed(dismissed_alerts)
     return {"success": True, "dismissed_id": alert_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /holdout-file/{filename}
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/holdout-file/{filename}")
+async def get_holdout_file(filename: str):
+    """
+    Serve a holdout CSV file so the frontend can POST it back as an upload.
+    Serves from user_uploads/ (named UPLOAD_N_Month_YYYY.csv) or actuals_real/.
+    """
+    from fastapi.responses import FileResponse
+    import re
+    # Allow both naming conventions
+    if not re.fullmatch(r"[\w\-]+\.csv", filename):
+        raise HTTPException(400, "Invalid filename")
+    candidates = [
+        Path("/app/data/user_uploads") / filename,
+        Path("/app/data/actuals_real") / filename,
+        Path(settings.raw_data_dir).parent / "user_uploads" / filename,
+        Path(settings.raw_data_dir).parent / "actuals_real" / filename,
+    ]
+    path = next((p for p in candidates if p.exists()), None)
+    if path is None:
+        raise HTTPException(404, f"{filename} not found")
+    return FileResponse(str(path), media_type="text/csv", filename=filename)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /cycle-history
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/cycle-history")
+async def get_cycle_history():
+    """
+    Return per-cycle metrics from replay_results.csv.
+    Metric cells that are empty strings (SKIPPED cycles) are returned as null,
+    never as 0. The frontend renders null as an em dash.
+    """
+    import csv as _csv
+
+    csv_path = Path(settings.actuals_dir) / "replay_results.csv"
+    if not csv_path.is_absolute():
+        csv_path = Path(settings.raw_data_dir).parent / settings.actuals_dir / "replay_results.csv"
+
+    if not csv_path.exists():
+        return {"cycles": [], "source": "no_data"}
+
+    def _coerce(val: str):
+        """Empty string -> None (SKIPPED). Non-empty -> float if numeric."""
+        if val == "" or val is None:
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return val
+
+    cycles = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = _csv.DictReader(f)
+        for row in reader:
+            cycles.append({
+                "month":                  row.get("month", ""),
+                "rows_uploaded":          _coerce(row.get("rows_uploaded", "")),
+                "matched_pairs":          _coerce(row.get("matched_pairs", "")),
+                "unmatched_excluded":     _coerce(row.get("unmatched_excluded", "")),
+                "demand_mae":             _coerce(row.get("demand_mae", "")),
+                "demand_rmse":            _coerce(row.get("demand_rmse", "")),
+                "demand_r2":              _coerce(row.get("demand_r2", "")),
+                "supplier_auc":           _coerce(row.get("supplier_auc", "")),
+                "supplier_f1":            _coerce(row.get("supplier_f1", "")),
+                "supplier_brier":         _coerce(row.get("supplier_brier", "")),
+                "logistics_auc":          _coerce(row.get("logistics_auc", "")),
+                "logistics_f1":           _coerce(row.get("logistics_f1", "")),
+                "logistics_brier":        _coerce(row.get("logistics_brier", "")),
+                "tpke_edges_created":     _coerce(row.get("tpke_edges_created", "")),
+                "tpke_edges_strengthened":_coerce(row.get("tpke_edges_strengthened", "")),
+                "tpke_edges_decayed":     _coerce(row.get("tpke_edges_decayed", "")),
+                "tpke_edges_removed":     _coerce(row.get("tpke_edges_removed", "")),
+                "total_inferred_edges":   _coerce(row.get("total_inferred_edges", "")),
+                "cycle_duration_s":       _coerce(row.get("cycle_duration_s", "")),
+                "stage2_status":          row.get("stage2_status", ""),
+                "stage3_status":          row.get("stage3_status", ""),
+                "notes":                  row.get("notes", ""),
+            })
+
+    return {"cycles": cycles, "source": str(csv_path)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /data-source-mode
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/data-source-mode")
+async def get_data_source_mode():
+    """
+    Return whether the system is running with real held-out data or synthetic.
+    Used by the DataSourceBadge UI component.
+    """
+    return {
+        "use_real_holdout_actuals": settings.use_real_holdout_actuals,
+        "holdout_start_date":       settings.holdout_start_date,
+        "actuals_dir":              settings.actuals_dir,
+        "actuals_range":            "2017-10 to 2018-01" if settings.use_real_holdout_actuals else None,
+    }

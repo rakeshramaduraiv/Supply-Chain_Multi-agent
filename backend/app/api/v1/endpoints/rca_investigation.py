@@ -28,6 +28,7 @@ from app.database.postgres import get_db_session
 from app.graph.connection import get_connection_manager
 from app.graph.services import GraphService
 from app.rca.services import RCAService
+from app.store import result_store
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -189,7 +190,7 @@ async def analyze_incident(req: IncidentAnalysisRequest):
         {"step": 6, "phase": "Final Conclusion", "details": f"Concluded primary root cause is Carrier Ground Transport constraint with {confidence}% confidence."},
     ]
 
-    return {
+    response = {
         "success": True,
         "incident_id": f"INC-{int(datetime.now(timezone.utc).timestamp())}",
         "target_id": target_id,
@@ -200,7 +201,9 @@ async def analyze_incident(req: IncidentAnalysisRequest):
         "evidence_ranking": evidence_ranking,
         "propagation_flow": propagation_flow,
         "reasoning_chain": reasoning_chain,
-    }
+    }
+    result_store.save_rca_investigation(response)
+    return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -248,7 +251,7 @@ async def simulate_counterfactual(req: CounterfactualSimulationRequest):
         },
     ]
 
-    return {
+    cf_result = {
         "success": True,
         "target_id": req.target_id,
         "primary_supplier": req.primary_supplier,
@@ -256,7 +259,9 @@ async def simulate_counterfactual(req: CounterfactualSimulationRequest):
         "allocation_shift_pct": shift,
         "optimal_scenario": scenarios[0],
         "all_scenarios": scenarios,
-    }
+    }
+    result_store.save_counterfactual(cf_result)
+    return cf_result
 
 
 # ─────────────────────────────────────────────────────────────────────────────

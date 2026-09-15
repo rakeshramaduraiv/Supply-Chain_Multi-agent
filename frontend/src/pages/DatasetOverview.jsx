@@ -1,7 +1,7 @@
 /**
  * DatasetOverview.jsx — Enterprise Data Intelligence Center
  *
- * Grounded in live DataCo smart supply chain dataset (180,519 order records).
+ * Grounded in live DataCo smart supply chain dataset (Jan 2015 – Sep 2017 training window).
  * Redesigned to explain the complete lifecycle of data across 13 sections.
  * Sourced entirely from backend APIs. Zero mock/placeholder data.
  */
@@ -23,10 +23,6 @@ import Spinner from '../components/ui/Spinner'
 import InfoBox from '../components/ui/InfoBox'
 import ScoreBar from '../components/ui/ScoreBar'
 import RiskBadge from '../components/ui/RiskBadge'
-
-const MONTHS_REPLAY = [
-  '2015-01', '2015-06', '2016-01', '2016-06', '2017-01', '2017-06', '2017-12', '2018-01'
-]
 
 const ENGINEERED_FEATURES = [
   {
@@ -68,29 +64,42 @@ const ENGINEERED_FEATURES = [
 ]
 
 export default function DatasetOverview() {
-  const [replayIdx, setReplayIdx]       = useState(7)
+  const [replayIdx, setReplayIdx]       = useState(0)
   const [isPlaying, setIsPlaying]       = useState(false)
   const [selectedFeature, setSelectedFeature] = useState('shipping_delay')
 
-  // Central queries
-  const summaryQuery   = useQuery({ queryKey: ['datasetSummary'], queryFn: () => api.getDatasetSummary().then(r => r.data) })
-  const analyticsQuery = useQuery({ queryKey: ['datasetAnalytics'], queryFn: () => api.getDatasetAnalytics().then(r => r.data) })
-
-  // Replay timeline interval loop
-  useEffect(() => {
-    let timer = null
-    if (isPlaying) {
-      timer = setInterval(() => {
-        setReplayIdx(prev => (prev >= MONTHS_REPLAY.length - 1 ? 0 : prev + 1))
-      }, 1500)
-    }
-    return () => clearInterval(timer)
-  }, [isPlaying])
+  // Central queries — live polling every 10s
+  const summaryQuery   = useQuery({ queryKey: ['datasetSummary'],   queryFn: () => api.getDatasetSummary().then(r => r.data),   staleTime: 5_000, refetchInterval: 10_000 })
+  const analyticsQuery = useQuery({ queryKey: ['datasetAnalytics'], queryFn: () => api.getDatasetAnalytics().then(r => r.data), staleTime: 5_000, refetchInterval: 10_000 })
+  const graphStatsQuery = useQuery({ queryKey: ['graphStats'], queryFn: () => api.getGraphStats().then(r => r.data?.data || r.data), staleTime: 30_000, retry: false })
 
   const s = summaryQuery.data || {}
   const a = analyticsQuery.data || {}
 
-  const activeReplayMonth = MONTHS_REPLAY[replayIdx]
+  // Build replay months dynamically from real monthly_trend data
+  const MONTHS_REPLAY = useMemo(() => {
+    const periods = (a.monthly_trend || []).map(r => r.period)
+    if (!periods.length) return ['2015-01', '2015-06', '2016-01', '2016-06', '2017-01', '2017-06', '2017-09']
+    const step = Math.max(1, Math.floor(periods.length / 7))
+    const picks = []
+    for (let i = 0; i < periods.length; i += step) picks.push(periods[i])
+    if (picks[picks.length - 1] !== periods[periods.length - 1]) picks.push(periods[periods.length - 1])
+    return picks
+  }, [a.monthly_trend])
+
+  // Reset to last month when data loads
+  useEffect(() => { setReplayIdx(MONTHS_REPLAY.length - 1) }, [MONTHS_REPLAY.length])
+
+  // Replay interval
+  useEffect(() => {
+    if (!isPlaying) return
+    const timer = setInterval(() => {
+      setReplayIdx(prev => (prev >= MONTHS_REPLAY.length - 1 ? 0 : prev + 1))
+    }, 1500)
+    return () => clearInterval(timer)
+  }, [isPlaying, MONTHS_REPLAY.length])
+
+  const activeReplayMonth = MONTHS_REPLAY[replayIdx] || ''
 
   if (summaryQuery.isLoading || analyticsQuery.isLoading) {
     return <Spinner large text="Computing analytics from DataCo dataset..." />
@@ -102,21 +111,25 @@ export default function DatasetOverview() {
 
   const wf = a.walk_forward_split || {}
 
-  // Grounded KPI metrics calculated dynamically based on Replay Slider index
   const integrityScore         = 99.8
   const outlierRate            = 0.12
-  const totalOrders            = s.total_orders || 180519
-  const replayScale            = (replayIdx + 1) / MONTHS_REPLAY.length
+  const totalOrders            = s.total_orders || 0
+  const replayScale            = MONTHS_REPLAY.length > 0 ? (replayIdx + 1) / MONTHS_REPLAY.length : 1
   const ordersIngested         = Math.round(totalOrders * replayScale)
-  const lateDeliveryRate       = s.late_delivery_pct || 54.8
-  const avgSupplierReliability = s.avg_supplier_reliability || 0.702
+  const lateDeliveryRate       = s.late_delivery_pct ?? 0
+  const avgSupplierReliability = s.avg_supplier_reliability ?? 0
+
+  // Map replayIdx to actual monthly_trend index
+  const allMonthlyTrend = a.monthly_trend || []
+  const replayMonthPeriod = MONTHS_REPLAY[replayIdx] || ''
+  const replayTrendIdx = allMonthlyTrend.findIndex(r => r.period >= replayMonthPeriod)
+  const trendCutoff = replayTrendIdx >= 0 ? replayTrendIdx + 1 : allMonthlyTrend.length
+  const monthlyTrendData = allMonthlyTrend.slice(0, trendCutoff)
 
   const activeVolData = (a.category_volatility || []).map(cat => ({
     ...cat,
     order_count: Math.round(cat.order_count * replayScale)
   }))
-
-  const monthlyTrendData = (a.monthly_trend || []).slice(0, replayIdx + 1)
 
   return (
     <div className="page active" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -134,7 +147,7 @@ export default function DatasetOverview() {
               Enterprise Data Intelligence Center
             </div>
             <div style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '2px' }}>
-              DataCo Smart Supply Chain · {s.date_range_start} to {s.date_range_end} · 12-Stage Traversal Lineage
+              DataCo Smart Supply Chain · {s.date_range_start} to {s.date_range_end} (Training) · 12-Stage Traversal Lineage
             </div>
           </div>
           <span className="badge bdg-blue" style={{ fontSize: '11px' }}>
@@ -162,7 +175,7 @@ export default function DatasetOverview() {
               {isPlaying ? <Pause size={12} /> : <Play size={12} />}
               {isPlaying ? 'Pause' : 'Replay'}
             </button>
-            <button className="btn btn-secondary btn-xs" onClick={() => { setReplayIdx(7); setIsPlaying(false) }}>
+            <button className="btn btn-secondary btn-xs" onClick={() => { setReplayIdx(MONTHS_REPLAY.length - 1); setIsPlaying(false) }}>
               <RotateCcw size={12} /> Reset
             </button>
           </div>
@@ -171,11 +184,11 @@ export default function DatasetOverview() {
         {/* Section 1 KPIs Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '8px', marginTop: '4px' }}>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Dataset Period</span>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>2015-01 / 2018-01</div>
+            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Training Period</span>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>{s.date_range_start} / {s.date_range_end}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Total Records</span>
+            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Training Records</span>
             <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>{totalOrders.toLocaleString()}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
@@ -184,11 +197,11 @@ export default function DatasetOverview() {
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>KG Version</span>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>v1.4.2</div>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>{graphStatsQuery.data?.graph_version || 'v1.4.2'}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Data Freshness</span>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#00b894' }}>Live (Real-Time)</div>
+            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Next Forecast</span>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#00b894' }}>{s.next_forecast_start ? s.next_forecast_start.slice(0,7) : '—'}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Pipeline Health</span>
@@ -206,10 +219,10 @@ export default function DatasetOverview() {
             <Clock size={15} style={{ color: 'var(--blue)' }} /> Section 2: Historical Data Timeline
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '11px', color: 'var(--ts)' }}>
-            <div>• <strong>2015 Ingestion Window:</strong> Ingested baseline DataCo transactions (Start: {s.date_range_start}).</div>
-            <div>• <strong>2016 Validation Split:</strong> Partitioned training database.</div>
-            <div>• <strong>2017 Model Evaluation:</strong> Evaluated walk-forward validation matrix.</div>
-            <div>• <strong>2018 Forecast & Actuals Window:</strong> Target upload baseline ({s.date_range_end}).</div>
+            <div>• <strong>Training Start:</strong> Ingested baseline DataCo transactions from {s.date_range_start}.</div>
+            <div>• <strong>Mid-Period Validation:</strong> Partitioned training database for walk-forward splits.</div>
+            <div>• <strong>Training End:</strong> Training data ends {s.date_range_end} — holdout period begins after.</div>
+            <div>• <strong>Next Forecast Window:</strong> {s.next_forecast_start} → {s.next_forecast_end}.</div>
           </div>
         </div>
 
@@ -519,10 +532,10 @@ export default function DatasetOverview() {
           Section 13: AI Generated Dataset Ingest Summary Brief
         </div>
         <div style={{ background: 'var(--s0)', border: '1px solid var(--b)', borderRadius: '8px', padding: '12px', fontSize: '11.5px', color: 'var(--ts)', lineHeight: 1.5 }}>
-          <strong>Dataset Ingestion Evaluation:</strong> Ingested DataCo Smart Supply Chain records spanning Q1 2015 to Q1 2018. 
-          The pipeline processed <strong>{ordersIngested.toLocaleString()} orders</strong> with a validated schema integrity rate of <strong>{integrityScore}%</strong>. 
+          <strong>Dataset Ingestion Evaluation:</strong> Ingested DataCo Smart Supply Chain records spanning {s.date_range_start} to {s.date_range_end} (training window only — holdout excluded). 
+          The pipeline processed <strong>{totalOrders.toLocaleString()} training orders</strong> with a validated schema integrity rate of <strong>{integrityScore}%</strong>. 
           22 engineered features were calculated and dispatched to demand/logistics ML agents. 
-          Graph v1.4.2 mutated successfully. Validation splits evaluated via 10-fold walk-forward validation matrix.
+          Knowledge Graph built from training data. Walk-forward validation splits evaluated. Next forecast period: <strong>{s.next_forecast_start}</strong>.
         </div>
       </div>
 

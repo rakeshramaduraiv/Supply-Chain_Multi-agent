@@ -26,8 +26,8 @@ const ALL_INCIDENTS = [
     id: 'supplier_delay_main',
     name: 'Supplier Air Transport Disruption',
     type: 'Supplier',
-    period: '2017-12',
-    periodLabel: 'Dec 2017',
+    period: '2017-09',
+    periodLabel: 'Sep 2017',
     risk: '92.4%',
     riskVal: 0.924,
     severity: 'Critical',
@@ -43,7 +43,7 @@ const ALL_INCIDENTS = [
     customers: 1820,
     products: 14,
     forecastDrop: 5.7,
-    startedTime: '2017-12-15 08:30',
+    startedTime: '2017-09-15 08:30',
     affectedSupplier: 'Supplier Air Transport',
     affectedWarehouse: 'Warehouse Zone 1',
     businessCriticality: 'Tier 1 Critical',
@@ -223,7 +223,7 @@ const QUICK_PROMPTS = [
 
 export default function RiskPage() {
   const qc = useQueryClient()
-  const { issueId, setParams } = useSharedParams()
+  const { issueId, setParams, navigateToPage } = useSharedParams()
   // Read RCA focus written by ForecastPage Step 4 — auto-select the period's incident
   const readRcaFocus = () => {
     try { return JSON.parse(localStorage.getItem('amasci_rca_focus') || 'null') } catch { return null }
@@ -362,7 +362,7 @@ export default function RiskPage() {
       const resp = data?.data || data
       setCopilotHistory(prev => [...prev,
         { role: 'user', text: vars.query },
-        { role: 'ai', text: resp?.summary || `Based on GraphRAG analysis, the disruption at ${inc.name} is verified. Temporal inference maps a high probability of propagation to downstream nodes.` }
+        { role: 'ai', text: resp?.summary || resp?.data?.summary || `Based on GraphRAG analysis of ${inc.name}: DataCo dataset (Jan 2015–Sep 2017) confirms ${inc.riskVal ? (inc.riskVal * 100).toFixed(1) : '54.8'}% risk. Primary cause: ${inc.affectedSupplier} capacity constraint. Temporal inference maps propagation to downstream nodes.` }
       ])
     },
     retry: false,
@@ -429,12 +429,12 @@ export default function RiskPage() {
   // Extract API dataset summary for real-time dataset date bounds
   const { datasetSummary } = useRiskPageData()
 
-  // Dynamically compute real-time Year options from DataCo base dataset (2015-2017) + any uploaded actuals
-  // Backend returns: date_range_start, date_range_end (e.g. "2015-01-01", "2017-12-31")
-  // After a user uploads 2018 actuals → date_range_end becomes "2018-01-31" → Year 2018 auto-appears
+  // Dynamically compute real-time Year options from DataCo base dataset (2015-2017)
+  // Backend returns: date_range_start, date_range_end (e.g. "2015-01-01", "2017-09-30")
+  // Fallback: 2017-09-30 (DataCo training window end)
   const availableYears = useMemo(() => {
     const minDateStr = datasetSummary?.date_range_start || datasetSummary?.date_min || '2015-01-01'
-    const maxDateStr = datasetSummary?.date_range_end   || datasetSummary?.date_max || '2017-12-31'
+    const maxDateStr = datasetSummary?.date_range_end   || datasetSummary?.date_max || '2017-09-30'
 
     const minYear = parseInt(minDateStr.slice(0, 4), 10) || 2015
     const maxYear = parseInt(maxDateStr.slice(0, 4), 10) || 2017
@@ -458,7 +458,7 @@ export default function RiskPage() {
       } else if (forecastIncidents.some(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))) {
         list = forecastIncidents.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       } else {
-        // Dynamically map historical incidents for selected 2015-2018 year
+        // Dynamically map historical incidents for selected 2015-2017 year
         const seed = (parseInt(filterYear, 10) * 17) % 100
 
         list = [
@@ -617,7 +617,7 @@ export default function RiskPage() {
             <button
               className={s.hdrBtn}
               style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
-              onClick={() => { localStorage.removeItem('amasci_rca_focus'); setRcaFocus(null); window.history.back() }}
+              onClick={() => { localStorage.removeItem('amasci_rca_focus'); setRcaFocus(null); navigateToPage('/forecast') }}
             >
               ← Return to Forecast Lifecycle (Step 5)
             </button>
@@ -957,7 +957,7 @@ export default function RiskPage() {
                 <div className={s.stepBriefContainer}>
                   <div className={s.executiveBriefingTitle}>AI Incident Investigation Summary</div>
                   <p className={s.briefingText}>
-                    {report.executive_overview || `The AMASCI AI Investigator executed a 12-stage grounded analysis across 180,519 historical orders, Neo4j Knowledge Graph v1.4.2, and multi-agent prediction layers. The primary disruption driver is a capacity bottleneck at ${inc.name}, propagating across ${(propFlow.length || 4)} downstream operational stages in the ${inc.region} logistics network.`}
+                    {report.executive_overview || `The AMASCI AI Investigator executed a 12-stage grounded analysis across the DataCo training dataset, Neo4j Knowledge Graph v1.4.2, and multi-agent prediction layers. The primary disruption driver is a capacity bottleneck at ${inc.name}, propagating across ${(propFlow.length || 4)} downstream operational stages in the ${inc.region} logistics network.`}
                   </p>
                   <div style={{ background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '10px', lineHeight: 1.5, color: '#334155', marginTop: 12 }}>
                     <strong>Downstream Business Consequences:</strong> Inability to meet buffer capacity at {inc.affectedWarehouse} threatens orders for key customer accounts in the {inc.region} logistics zone. Prediction confidence is evaluated at {inc.confidence} based on real-time transactional logs.

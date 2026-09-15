@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     # --- Graph Enrichment ---
     allow_enrichment_fallback: bool = True
 
+    # --- Holdout / Evaluation ---
+    # Set to "2017-10-01" to train only on rows before that date.
+    # Set to None (or empty string) to use the full dataset (legacy behaviour).
+    holdout_start_date: str | None = None
+    use_real_holdout_actuals: bool = False
+    actuals_dir: str = "data/actuals_real"
+
     # --- TPKE Configuration ---
     # θ: minimum P(B|A) for an edge to be created
     tpke_confidence_threshold: float = 0.6

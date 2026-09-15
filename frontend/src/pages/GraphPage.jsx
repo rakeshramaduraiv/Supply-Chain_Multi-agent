@@ -51,12 +51,12 @@ const GRAPH_VERSIONS = [
   { ver: 'v1.1', label: 'v1.1 Actuals Ingest', date: '2017-06', nodes: 2450, edges: 4100, tpkeEdges: 12,  conf: 90.2 },
   { ver: 'v1.2', label: 'v1.2 RCA Grounded',  date: '2017-10', nodes: 2600, edges: 4800, tpkeEdges: 28,  conf: 92.5 },
   { ver: 'v1.3', label: 'v1.3 TPKE Evolved', date: '2017-12', nodes: 2750, edges: 5200, tpkeEdges: 45,  conf: 94.8 },
-  { ver: 'v1.4.2', label: 'v1.4.2 Active Live', date: '2018-02', nodes: 2890, edges: 5640, tpkeEdges: 62,  conf: 96.1 },
+  { ver: 'v1.4.2', label: 'v1.4.2 Active Live', date: '2017-09', nodes: 2890, edges: 5640, tpkeEdges: 62,  conf: 96.1 },
 ]
 
 export default function GraphPage() {
   const qc = useQueryClient()
-  const { entityId: sharedEntityId, setParams } = useSharedParams()
+  const { entityId: sharedEntityId, setParams, navigateToPage } = useSharedParams()
 
   const [selectedVersion, setSelectedVersion] = useState(() => {
     try {
@@ -277,7 +277,7 @@ export default function GraphPage() {
               <button
                 className="btn btn-secondary btn-sm"
                 style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
-                onClick={() => { setGraphFocusBanner(null); window.history.back() }}
+                onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
               >
                 ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5' : 'Step 6'})
               </button>

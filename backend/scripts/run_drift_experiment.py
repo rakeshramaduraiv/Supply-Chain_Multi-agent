@@ -1,11 +1,13 @@
 """
 run_drift_experiment.py
 ========================
-Uploads data/continuation/2018-02.csv .. 2018-06.csv IN ORDER via
+Uploads the four REAL held-out months (2017-10 through 2018-01) IN ORDER via
 POST /api/v1/business/upload/actual, capturing each CycleResponse.
 
-Emits artifacts/drift_experiment.json with per-period results.
-Compares against data/continuation/manifests/*.json and prints MET / NOT MET.
+Source: backend/data/actuals_real/ (real DataCo rows, never seen during training)
+
+Emits artifacts/drift_results.json and artifacts/drift_experiment.json.
+Records the TPKE edge trajectory across the four cycles.
 
 Frozen parameters (do NOT tune):
     theta=0.70, K=3, delta=0.05, theta_rem=0.10
@@ -25,18 +27,23 @@ logger = logging.getLogger("run_drift_experiment")
 BACKEND = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(BACKEND))
 
-CONTINUATION_DIR = BACKEND / "data" / "continuation"
-MANIFESTS_DIR    = CONTINUATION_DIR / "manifests"
+# Real held-out months — never seen during training
+ACTUALS_REAL_DIR = BACKEND / "data" / "actuals_real"
 ARTIFACTS_DIR    = BACKEND / "artifacts"
 ARTIFACTS_DIR.mkdir(exist_ok=True)
 
-PERIODS = ["2018-02", "2018-03", "2018-04", "2018-05", "2018-06"]
+# Month -> filename mapping for real holdout data
+PERIODS = ["2017-10", "2017-11", "2017-12", "2018-01"]
+MONTH_FILE_MAP = {
+    "2017-10": "2017_10_actual.csv",
+    "2017-11": "2017_11_actual.csv",
+    "2017-12": "2017_12_actual.csv",
+    "2018-01": "2018_01_actual.csv",
+}
 
 
 def _load_manifest(period: str) -> dict:
-    path = MANIFESTS_DIR / f"{period}.json"
-    if path.exists():
-        return json.loads(path.read_text())
+    # No synthetic manifests for real holdout data — return empty
     return {}
 
 
@@ -173,16 +180,12 @@ async def main():
     all_met = True
 
     for period in PERIODS:
-        csv_path = CONTINUATION_DIR / f"{period}.csv"
+        csv_path = ACTUALS_REAL_DIR / MONTH_FILE_MAP.get(period, f"{period.replace('-', '_')}_actual.csv")
         if not csv_path.exists():
-            # Try monthly_synthetic_uploads
-            alt = BACKEND / "data" / "monthly_synthetic_uploads" / f"synthetic_{period}.csv"
-            if alt.exists():
-                csv_path = alt
-            else:
-                logger.error(f"CSV not found for {period}: {csv_path}")
-                experiment.append({"period": period, "error": "CSV not found"})
-                continue
+            logger.error(f"CSV not found for {period}: {csv_path}")
+            logger.error(f"Run: python -m scripts.create_holdout_actuals  to generate holdout files.")
+            experiment.append({"period": period, "error": "CSV not found"})
+            continue
 
         logger.info(f"\n=== Uploading {period} ===")
         try:
@@ -234,6 +237,23 @@ async def main():
     out = ARTIFACTS_DIR / "drift_experiment.json"
     out.write_text(json.dumps(experiment, indent=2, default=str))
     logger.info(f"\nArtifact written to {out}")
+
+    # Also write drift_results.json with TPKE trajectory summary
+    drift_results = [
+        {
+            "period":          e.get("period"),
+            "rows_ingested":   e.get("rows_ingested"),
+            "match_rate":      e.get("match_rate"),
+            "stage3_status":   e.get("stage3_status"),
+            "tpke_detail":     e.get("tpke_detail"),
+            "tpke_counts":     e.get("tpke_counts"),
+            "manifest_check":  e.get("manifest_check"),
+        }
+        for e in experiment if "error" not in e
+    ]
+    drift_out = ARTIFACTS_DIR / "drift_results.json"
+    drift_out.write_text(json.dumps(drift_results, indent=2, default=str))
+    logger.info(f"drift_results.json written to {drift_out}")
 
     # Summary
     print("\n=== DRIFT EXPERIMENT SUMMARY ===")

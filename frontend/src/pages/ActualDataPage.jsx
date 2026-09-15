@@ -8,6 +8,7 @@
 import { useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import DataCoverageBadge from '../components/ui/DataCoverageBadge'
 import {
   Upload, CheckCircle, AlertTriangle, Clock, BarChart2,
   FileText, Zap, RefreshCw, ChevronDown, ChevronUp,
@@ -126,6 +127,7 @@ export default function ActualDataPage() {
       // Fetch real ML metrics from cycle history after upload
       queryClient.invalidateQueries({ queryKey: ['cycleHistory'] })
       queryClient.invalidateQueries({ queryKey: ['supplyChain'] })
+      queryClient.invalidateQueries({ queryKey: ['datasetCoverage'] })
       setResults(prev => {
         const filtered = prev.filter(r => r.period !== data.period)
         return [data, ...filtered]
@@ -171,6 +173,9 @@ export default function ActualDataPage() {
           <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--tp)', margin: 0 }}>
             Actual Data Upload
           </h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+          <DataCoverageBadge />
         </div>
         <p style={{ fontSize: 12, color: 'var(--tm)', margin: 0 }}>
           Upload monthly actual performance data to evaluate model predictions against real outcomes.

@@ -47,6 +47,9 @@ MASTER_DATASET_PATTERNS = [
 _PARQUET_MIN_ROWS        = 100_000
 _PARQUET_COVERAGE_MIN_DATE = pd.Timestamp("2015-01-01")  # dataset must reach back to here
 _PARQUET_DATE_COL        = "order date (DateOrders)"
+# Aliases for test compatibility
+_PARQUET_DATE_MIN = _PARQUET_COVERAGE_MIN_DATE
+_PARQUET_DATE_MAX = pd.Timestamp("2017-01-01")  # dataset must extend at least to here
 
 
 def assert_parquet_integrity(df: pd.DataFrame, path: str = "") -> None:
@@ -537,6 +540,21 @@ class InitializationService:
                 assert_parquet_integrity(df_features, str(processed_path))
 
             df_features.to_parquet(processed_path, index=False)
+
+            # Write base.parquet to CumulativeStore so load_full() works immediately
+            try:
+                from app.store.cumulative import CumulativeStore
+                import shutil
+                _store = CumulativeStore()
+                _store._base_parquet.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(processed_path, _store._base_parquet)
+                _store._update_manifest_from_base()
+                # Validate holdout boundary on base.parquet
+                if settings.holdout_start_date:
+                    _store.assert_base_no_holdout(settings.holdout_start_date)
+                logger.info(f"[7/7] CumulativeStore base.parquet written: {len(df_features)} rows")
+            except Exception as _cs_err:
+                logger.warning(f"[7/7] CumulativeStore base write warning: {_cs_err}")
 
             result["steps"]["save"] = {
                 "status": "completed",

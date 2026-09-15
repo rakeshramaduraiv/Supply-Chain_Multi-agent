@@ -61,6 +61,8 @@ class CumulativeStore:
     Thread/process safety: reads are always safe (immutable parquet files).
     Writes acquire a simple file lock via a .lock sentinel file.
     """
+    # In-process cache: keyed on manifest JSON hash so any write invalidates it
+    _cache: dict[str, pd.DataFrame] = {}
 
     def __init__(
         self,
@@ -86,6 +88,59 @@ class CumulativeStore:
                 self._update_manifest_from_base()
 
     # ── Public API ────────────────────────────────────────────────────────────
+
+    def load_full(self, as_of: str | None = None) -> pd.DataFrame:
+        """
+        Return base.parquet concatenated with every increment in chronological
+        period order.  If as_of is given, include only periods <= as_of.
+        Validates each listed increment against manifest checksums and raises
+        if a file is missing or its checksum does not match.
+        Result is cached in memory keyed on the manifest JSON hash.
+        """
+        manifest = self._read_manifest()
+        cache_key = hashlib.sha256(
+            json.dumps(manifest, sort_keys=True).encode()
+        ).hexdigest()[:16]
+        if as_of:
+            cache_key += f"_asof_{as_of}"
+
+        if cache_key in CumulativeStore._cache:
+            return CumulativeStore._cache[cache_key]
+
+        frames: list[pd.DataFrame] = []
+        if not self._base_parquet.exists():
+            raise FileNotFoundError(
+                "CumulativeStore: base.parquet not found. Run initialization first."
+            )
+        frames.append(pd.read_parquet(self._base_parquet))
+
+        periods = manifest.get("periods", [])
+        checksums = manifest.get("checksums", {})
+        for period in periods:
+            if as_of and period > as_of:
+                continue
+            inc_path = self._increments_dir / f"{period}.parquet"
+            if not inc_path.exists():
+                raise FileNotFoundError(
+                    f"CumulativeStore: increment {period!r} listed in manifest "
+                    f"but file {inc_path} is missing."
+                )
+            actual_cs = self._checksum(inc_path)
+            expected_cs = checksums.get(period)
+            if expected_cs and actual_cs != expected_cs:
+                raise ValueError(
+                    f"CumulativeStore: checksum mismatch for period {period!r}. "
+                    f"Expected {expected_cs}, got {actual_cs}. File may be corrupted."
+                )
+            frames.append(pd.read_parquet(inc_path))
+
+        df = pd.concat(frames, ignore_index=True)
+        logger.info(f"CumulativeStore.load_full: {len(df)} rows (as_of={as_of!r})")
+        CumulativeStore._cache[cache_key] = df
+        return df
+
+    def _invalidate_cache(self) -> None:
+        CumulativeStore._cache.clear()
 
     def load_cumulative(self) -> pd.DataFrame:
         """Load base + all increments in chronological order."""
@@ -133,8 +188,21 @@ class CumulativeStore:
                 f"Use rollback() first if you need to replace it."
             )
 
+        # Assert increment has same column set as base
+        if self._base_parquet.exists():
+            base_cols = set(pd.read_parquet(self._base_parquet).columns)
+            inc_cols  = set(df_engineered.columns)
+            missing_cols = base_cols - inc_cols
+            if missing_cols:
+                raise ValueError(
+                    f"CumulativeStore.append: increment for period {period!r} is missing "
+                    f"columns present in base.parquet: {sorted(missing_cols)}. "
+                    f"Run engineer_features_on_new before appending."
+                )
+
         inc_path = self._increments_dir / f"{period}.parquet"
         df_engineered.to_parquet(inc_path, index=False)
+        self._invalidate_cache()
 
         checksum = self._checksum(inc_path)
         manifest.setdefault("periods", []).append(period)
@@ -148,10 +216,12 @@ class CumulativeStore:
             (c for c in ("order date (DateOrders)", "order_date") if c in df_engineered.columns),
             None,
         )
+        new_max_date = None
         if date_col:
             ts = pd.to_datetime(df_engineered[date_col], errors="coerce").max()
             if pd.notna(ts):
                 manifest["data_end"] = ts.strftime("%Y-%m-%d")
+                new_max_date = ts.strftime("%Y-%m-%d")
 
         self._write_manifest(manifest)
 
@@ -162,8 +232,8 @@ class CumulativeStore:
             checksum=checksum,
         )
         logger.info(
-            f"CumulativeStore.append: period={period} rows={len(df_engineered)} "
-            f"cumulative={manifest['total_rows']}"
+            "CumulativeStore.append: period=%s rows=%d cumulative=%d new_max_date=%s",
+            period, len(df_engineered), manifest["total_rows"], new_max_date or "unknown",
         )
         return report
 
@@ -193,11 +263,78 @@ class CumulativeStore:
         manifest["last_increment"] = periods[-1] if periods else None
 
         self._write_manifest(manifest)
+        self._invalidate_cache()
         logger.info(f"CumulativeStore.rollback: removed period={period}")
 
     def periods(self) -> list[str]:
         """Return list of loaded increment periods in order."""
         return self._read_manifest().get("periods", [])
+
+    def coverage(self) -> dict:
+        """
+        Return a structured coverage report for the /dataset/coverage endpoint.
+        Includes base period range, base row count, each increment with its row
+        count, combined total, and the latest date present.
+        """
+        manifest = self._read_manifest()
+        base_rows = 0
+        base_min_date = None
+        base_max_date = None
+        if self._base_parquet.exists():
+            try:
+                base_df = pd.read_parquet(self._base_parquet)
+                base_rows = len(base_df)
+                date_col = next(
+                    (c for c in ("order date (DateOrders)", "order_date") if c in base_df.columns),
+                    None,
+                )
+                if date_col:
+                    dates = pd.to_datetime(base_df[date_col], errors="coerce").dropna()
+                    if not dates.empty:
+                        base_min_date = dates.min().strftime("%Y-%m-%d")
+                        base_max_date = dates.max().strftime("%Y-%m-%d")
+            except Exception as e:
+                logger.warning(f"CumulativeStore.coverage: base read error: {e}")
+
+        increments = []
+        for period in manifest.get("periods", []):
+            increments.append({
+                "period": period,
+                "rows": manifest.get("row_counts", {}).get(period, 0),
+                "checksum": manifest.get("checksums", {}).get(period, ""),
+            })
+
+        increment_rows = sum(i["rows"] for i in increments)
+        return {
+            "base_period_start": base_min_date,
+            "base_period_end": base_max_date,
+            "base_row_count": base_rows,
+            "increments": increments,
+            "increment_count": len(increments),
+            "combined_total": base_rows + increment_rows,
+            "latest_date": manifest.get("data_end"),
+        }
+
+    def assert_base_no_holdout(self, holdout_start_date: str) -> None:
+        """
+        Assert that base.parquet contains no row on or after holdout_start_date.
+        Raises ValueError if violated.
+        """
+        if not self._base_parquet.exists():
+            return
+        base_df = pd.read_parquet(self._base_parquet)
+        date_col = next(
+            (c for c in ("order date (DateOrders)", "order_date") if c in base_df.columns),
+            None,
+        )
+        if date_col is None:
+            return
+        max_date = pd.to_datetime(base_df[date_col], errors="coerce").max()
+        if pd.notna(max_date) and max_date >= pd.Timestamp(holdout_start_date):
+            raise ValueError(
+                f"CumulativeStore: base.parquet max date {max_date.date()} is on or after "
+                f"holdout_start_date {holdout_start_date}. Training data is contaminated."
+            )
 
     def summary(self) -> dict[str, Any]:
         """Return manifest summary for API responses."""

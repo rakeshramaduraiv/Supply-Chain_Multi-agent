@@ -490,6 +490,7 @@
   overflow: hidden;
 }
 .eCard:hover {
+  border-color: var(--card-color);
   border-color: color-mix(in srgb, var(--card-color) 40%, transparent);
   box-shadow: 0 6px 16px rgba(0,0,0,0.1);
   transform: translateY(-1px);

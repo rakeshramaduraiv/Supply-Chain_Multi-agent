@@ -34,6 +34,7 @@ export const api = {
   // Dataset Analytics (real DataCo values, no DB needed)
   getDatasetSummary:    () => http.get('/api/v1/dataset/summary'),
   getDatasetAnalytics:  () => http.get('/api/v1/dataset/analytics'),
+  getDatasetCoverage:   () => http.get('/api/v1/dataset/coverage'),
   getNextForecastPeriod:() => http.get('/api/v1/dataset/next-forecast-period'),
   getAutoForecast:      () => http.get('/api/v1/dataset/auto-forecast'),
   getErrorDiagnostics:  (period) => http.get('/api/v1/dataset/error-diagnostics', { params: { period_start: period } }),

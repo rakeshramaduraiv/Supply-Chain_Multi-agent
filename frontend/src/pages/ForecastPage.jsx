@@ -861,6 +861,12 @@ export default function ForecastPage() {
 
     if (csvFile) {
 
+      api.uploadActual(csvFile, periodStr).then(res => {
+
+        appendLog(2, `🚀 Backend actuals pipeline complete: ${res?.data?.records_loaded || 'matched'} records ingested`)
+
+      }).catch(() => {})
+
       const reader = new FileReader()
 
       reader.onload = (e) => {

@@ -76,38 +76,27 @@ def _resolve_intelligence_type(value: str) -> IntelligenceType:
 
 
 def _load_processed_dataset() -> pd.DataFrame:
-    """Load the processed master dataset from disk (parquet preferred, CSV fallback)."""
+    """Load the cumulative dataset (base + all uploaded increments)."""
+    from app.store.cumulative import CumulativeStore
+    try:
+        store = CumulativeStore()
+        df = store.load_full()
+        logger.info(f"Loaded cumulative dataset: {len(df)} rows")
+        return df
+    except FileNotFoundError:
+        pass
+    # Fallback to processed_master.parquet
     settings = get_settings()
     data_dir = Path(settings.upload_dir)
-
-    # Primary: parquet saved by initialization pipeline
     parquet_path = data_dir / "processed_master.parquet"
     if parquet_path.exists():
         df = pd.read_parquet(parquet_path)
-        logger.info(f"Loaded dataset: processed_master.parquet ({len(df)} rows)")
+        logger.info(f"Loaded dataset (fallback): processed_master.parquet ({len(df)} rows)")
         return df
-
-    # Fallback: any parquet
-    parquet_candidates = sorted(data_dir.glob("*.parquet"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if parquet_candidates:
-        df = pd.read_parquet(parquet_candidates[0])
-        logger.info(f"Loaded dataset: {parquet_candidates[0].name} ({len(df)} rows)")
-        return df
-
-    # Last resort: CSV
-    csv_candidates = sorted(data_dir.glob("*_processed.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not csv_candidates:
-        csv_candidates = sorted(data_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-
-    if not csv_candidates:
-        raise HTTPException(
-            status_code=404,
-            detail="No processed dataset found. Place DataCoSupplyChainDataset.csv in data/raw/ and restart.",
-        )
-
-    df = pd.read_csv(csv_candidates[0])
-    logger.info(f"Loaded dataset: {csv_candidates[0].name} ({len(df)} rows)")
-    return df
+    raise HTTPException(
+        status_code=404,
+        detail="No processed dataset found. Run initialization first.",
+    )
 
 
 # ============================================================

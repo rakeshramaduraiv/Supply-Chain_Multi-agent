@@ -300,6 +300,7 @@
   padding: 9px 10px 9px 12px;
   cursor: pointer;
   min-height: 46px;
+  -webkit-user-select: none;
   user-select: none;
 }
 .slideSeverityDot {

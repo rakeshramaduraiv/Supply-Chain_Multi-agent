@@ -32,26 +32,32 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AgentPredictionPayload:
-    """Standardized 6-field agent prediction payload."""
+    """Standardized agent prediction payload with per-entity breakdown."""
     agent_id: str
-    prediction: float
+    prediction: float                        # aggregate scalar — retained for backward compat
     confidence: float
     reasoning: str
     business_impact: str
     execution_timestamp: str
     model_version: str
     raw_details: dict[str, Any] = field(default_factory=dict)
+    predictions: list[float] = field(default_factory=list)          # per-row full array
+    entity_predictions: list[dict] = field(default_factory=list)    # per-entity breakdown
+    prediction_unit: str = "units"                                   # "units" | "probability"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "prediction": round(self.prediction, 4),
-            "confidence": round(self.confidence, 4),
+            "confidence": round(self.confidence, 4) if self.confidence is not None else None,
             "reasoning": self.reasoning,
             "business_impact": self.business_impact,
             "execution_timestamp": self.execution_timestamp,
             "model_version": self.model_version,
             "raw_details": self.raw_details,
+            "predictions": [round(p, 4) for p in self.predictions],
+            "entity_predictions": self.entity_predictions,
+            "prediction_unit": self.prediction_unit,
         }
 
 
@@ -166,8 +172,43 @@ class AgentCoordinator:
     def _on_logistics_evaluated(self, topic: str, payload: dict[str, Any]) -> None:
         self.event_bus.event_log.append(f"[Coordinator Router] Ingested '{topic}'. Pipeline execution complete.")
 
+    @staticmethod
+    def _group_predictions(
+        df: pd.DataFrame,
+        preds: list[float],
+        keys: list[str],
+        value_name: str,
+        unit: str,
+    ) -> list[dict]:
+        """
+        Aggregate per-row predictions to per-entity records.
+        Returns [{entity_key, entity_type, value, n_rows, p25, p50, p75}].
+        Groups by each key in `keys` independently.
+        """
+        import numpy as np
+        pred_arr = np.array(preds)
+        results: list[dict] = []
+        for key in keys:
+            if key not in df.columns:
+                continue
+            for entity_val, idx in df.groupby(key).groups.items():
+                group_preds = pred_arr[idx]
+                results.append({
+                    "entity_key": str(entity_val),
+                    "entity_type": key,
+                    "value_name": value_name,
+                    "unit": unit,
+                    value_name: round(float(np.mean(group_preds)), 4),
+                    "n_rows": int(len(group_preds)),
+                    "p25": round(float(np.percentile(group_preds, 25)), 4),
+                    "p50": round(float(np.percentile(group_preds, 50)), 4),
+                    "p75": round(float(np.percentile(group_preds, 75)), 4),
+                })
+        return results
+
     def execute_coordinated_pipeline(self, df: pd.DataFrame) -> CoordinatorSummaryResult:
         """Execute Pub/Sub event-driven collaborative pipeline."""
+        import numpy as np
         self.event_bus.event_log.clear()
         conflicts: list[str] = []
         payloads: dict[str, Any] = {}
@@ -176,11 +217,21 @@ class AgentCoordinator:
         from app.ml.agent_memory import get_agent_memory
         memory = get_agent_memory()
 
-        # Step 1: Demand Planning Agent publishes "demand.predicted"
+        # Step 1: Demand Planning Agent — unit = "units" (regressor)
         demand_res = self.pipeline.demand_agent.predict(df)
+        d_preds = demand_res.predictions          # per-row array
+        d_pred  = float(np.mean(d_preds))         # aggregate scalar retained
+        d_conf  = demand_res.mean_confidence or None
+        # Sanity guard: constant prediction across >1 rows means degenerate features
+        if len(np.unique(d_preds)) == 1 and len(d_preds) > 1:
+            logger.error(
+                "Demand Planning Agent produced a constant prediction across %d rows — "
+                "feature matrix is likely degenerate", len(d_preds)
+            )
+        d_entities = self._group_predictions(
+            df, d_preds, ["Order Region", "Category Name"], "forecast_quantity", "units"
+        )
         d_dict = demand_res.to_dict()
-        d_pred = d_dict["predictions_summary"]["mean"]
-        d_conf = d_dict.get("mean_confidence")  # None if model did not produce confidence
         d_payload = AgentPredictionPayload(
             agent_id="Demand Planning Agent",
             prediction=d_pred,
@@ -190,6 +241,9 @@ class AgentCoordinator:
             execution_timestamp=now,
             model_version=d_dict.get("model_version", "v2.1.0-demand-lightgbm"),
             raw_details=d_dict,
+            predictions=d_preds,
+            entity_predictions=d_entities,
+            prediction_unit="units",
         )
         payloads["Demand Planning Agent"] = d_payload.to_dict()
         self.event_bus.publish("demand.predicted", d_payload.to_dict())
@@ -198,11 +252,20 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Step 2: Supplier Intelligence Agent triggered by EventBus, publishes "supplier.evaluated"
+        # Step 2: Supplier Intelligence Agent — unit = "probability" (classifier)
         sup_res = self.pipeline.supplier_agent.predict(df)
+        s_preds = sup_res.probabilities if sup_res.probabilities else sup_res.predictions
+        s_pred  = float(np.mean(s_preds))
+        s_conf  = sup_res.mean_confidence or None
+        if len(np.unique(s_preds)) == 1 and len(s_preds) > 1:
+            logger.error(
+                "Supplier Intelligence Agent produced a constant prediction across %d rows — "
+                "feature matrix is likely degenerate", len(s_preds)
+            )
+        s_entities = self._group_predictions(
+            df, s_preds, ["Order Region", "Category Name"], "late_delivery_probability", "probability"
+        )
         s_dict = sup_res.to_dict()
-        s_pred = s_dict["predictions_summary"]["mean"]
-        s_conf = s_dict.get("mean_confidence")  # None if model did not produce confidence
         s_payload = AgentPredictionPayload(
             agent_id="Supplier Intelligence Agent",
             prediction=s_pred,
@@ -212,6 +275,9 @@ class AgentCoordinator:
             execution_timestamp=now,
             model_version=s_dict.get("model_version", "v2.1.0-supplier-randomforest"),
             raw_details=s_dict,
+            predictions=s_preds,
+            entity_predictions=s_entities,
+            prediction_unit="probability",
         )
         payloads["Supplier Intelligence Agent"] = s_payload.to_dict()
         self.event_bus.publish("supplier.evaluated", s_payload.to_dict())
@@ -220,11 +286,20 @@ class AgentCoordinator:
         except Exception:
             pass
 
-        # Step 3: Logistics & Transportation Agent
+        # Step 3: Logistics & Transportation Agent — unit = "probability" (classifier)
         log_res = self.pipeline.logistics_agent.predict(df)
+        l_preds = log_res.probabilities if log_res.probabilities else log_res.predictions
+        l_pred  = float(np.mean(l_preds))
+        l_conf  = log_res.mean_confidence or None
+        if len(np.unique(l_preds)) == 1 and len(l_preds) > 1:
+            logger.error(
+                "Logistics & Transportation Agent produced a constant prediction across %d rows — "
+                "feature matrix is likely degenerate", len(l_preds)
+            )
+        l_entities = self._group_predictions(
+            df, l_preds, ["Order Region", "Category Name"], "delay_probability", "probability"
+        )
         l_dict = log_res.to_dict()
-        l_pred = l_dict["predictions_summary"]["mean"]
-        l_conf = l_dict.get("mean_confidence")  # None if model did not produce confidence
         l_payload = AgentPredictionPayload(
             agent_id="Logistics & Transportation Agent",
             prediction=l_pred,
@@ -234,6 +309,9 @@ class AgentCoordinator:
             execution_timestamp=now,
             model_version=l_dict.get("model_version", "v2.1.0-logistics-lightgbm"),
             raw_details=l_dict,
+            predictions=l_preds,
+            entity_predictions=l_entities,
+            prediction_unit="probability",
         )
         payloads["Logistics & Transportation Agent"] = l_payload.to_dict()
         self.event_bus.publish("logistics.evaluated", l_payload.to_dict())

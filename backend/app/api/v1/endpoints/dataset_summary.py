@@ -19,6 +19,7 @@ from fastapi import APIRouter
 
 from app.core.config import get_settings
 from app.store import result_store
+from app.store.cumulative import CumulativeStore
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -27,33 +28,57 @@ router = APIRouter(prefix="/dataset", tags=["Dataset Analytics"])
 
 _cache: dict | None = None
 _analytics_cache: dict | None = None
-_cache_mtime: float = 0.0          # parquet mtime when _cache was built
-_analytics_mtime: float = 0.0      # parquet mtime when _analytics_cache was built
+_cache_mtime: float = 0.0
+_analytics_mtime: float = 0.0
 
-# ── Session-scoped temperature list ─────────────────────────────────────────
-# Reloaded from disk whenever the parquet file changes.
-_BASE_PARQUET_PATH: Path | None = None
-_temp_df: pd.DataFrame | None = None   # base DataCo + any session uploads
-_temp_df_mtime: float = 0.0            # mtime when _temp_df was last loaded
+# Singleton CumulativeStore — replaces _temp_df global
+_cumulative_store: CumulativeStore | None = None
+
+
+def _get_store() -> CumulativeStore:
+    global _cumulative_store
+    if _cumulative_store is None:
+        _cumulative_store = CumulativeStore()
+    return _cumulative_store
 
 
 def _get_base_parquet_path() -> Path:
-    global _BASE_PARQUET_PATH
-    if _BASE_PARQUET_PATH is None:
-        _BASE_PARQUET_PATH = Path(settings.upload_dir) / "processed_master.parquet"
-    return _BASE_PARQUET_PATH
+    """Return path to processed_master.parquet (fallback only)."""
+    return Path(settings.upload_dir) / "processed_master.parquet"
 
 
 def get_temp_df() -> pd.DataFrame | None:
-    """Return the session temperature DataFrame — reloads if parquet changed."""
-    global _temp_df, _temp_df_mtime, _cache, _analytics_cache, _cache_mtime, _analytics_mtime
-    base_path = _get_base_parquet_path()
-    if not base_path.exists():
-        return None
+    """Return the cumulative DataFrame from CumulativeStore (base + all increments)."""
     try:
-        current_mtime = base_path.stat().st_mtime
-    except OSError:
-        return _temp_df
+        df = _get_store().load_full()
+        if "shipping_delay_days" not in df.columns:
+            if "shipping_delay" in df.columns:
+                df["shipping_delay_days"] = df["shipping_delay"]
+            elif "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
+                df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+            else:
+                df["shipping_delay_days"] = 0.0
+        return df
+    except FileNotFoundError:
+        base_path = _get_base_parquet_path()
+        if not base_path.exists():
+            return None
+        try:
+            df = pd.read_parquet(base_path)
+            if "shipping_delay_days" not in df.columns:
+                if "shipping_delay" in df.columns:
+                    df["shipping_delay_days"] = df["shipping_delay"]
+                elif "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
+                    df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
+                else:
+                    df["shipping_delay_days"] = 0.0
+            return df
+        except Exception as e:
+            logger.warning(f"[TempList] Base parquet load failed: {e}")
+            return None
+    except Exception as e:
+        logger.warning(f"[TempList] CumulativeStore.load_full failed: {e}")
+        return None
     if _temp_df is None or current_mtime != _temp_df_mtime:
         try:
             df = pd.read_parquet(base_path)
@@ -78,31 +103,39 @@ def get_temp_df() -> pd.DataFrame | None:
     return _temp_df
 
 
-def append_to_temp_df(df_new: pd.DataFrame) -> int:
+def append_to_temp_df(df_engineered: pd.DataFrame, period: str | None = None) -> int:
     """
-    Append uploaded rows to the session temperature list.
-    The base parquet on disk is never modified.
+    Append engineered rows to the CumulativeStore (disk-persistent).
     Returns the new total row count.
     """
-    global _temp_df, _cache, _analytics_cache
-    base = get_temp_df()
-    if base is None:
-        _temp_df = df_new.copy()
-    else:
-        _temp_df = pd.concat([base, df_new], ignore_index=True)
-        if "Order Item Id" in _temp_df.columns:
-            _temp_df = _temp_df.drop_duplicates(subset=["Order Item Id"], keep="last")
-    _cache = None
-    _analytics_cache = None
-    logger.info(f"[TempList] Appended {len(df_new)} rows — session total: {len(_temp_df)}")
-    return len(_temp_df)
+    global _cache, _analytics_cache
+    if period is None:
+        import time as _time
+        period = f"upload_{int(_time.time())}"
+    try:
+        store = _get_store()
+        report = store.append(df_engineered, period)
+        _cache = None
+        _analytics_cache = None
+        logger.info(
+            f"[CumulativeStore] Appended {report.rows_appended} rows "
+            f"period={period} cumulative={report.cumulative_rows}"
+        )
+        return report.cumulative_rows
+    except ValueError as e:
+        logger.warning(f"[CumulativeStore] append skipped: {e}")
+        return _get_store()._read_manifest().get("total_rows", 0)
 
 
 def clear_dataset_cache():
-    """Invalidate summary & analytics cache (temperature list is kept)."""
+    """Invalidate summary & analytics cache and CumulativeStore in-process cache."""
     global _cache, _analytics_cache
     _cache = None
     _analytics_cache = None
+    try:
+        _get_store()._invalidate_cache()
+    except Exception:
+        pass
     try:
         from app.api.v1.endpoints.live_ops import clear_live_ops_cache
         clear_live_ops_cache()
@@ -111,7 +144,7 @@ def clear_dataset_cache():
 
 
 def _load_parquet() -> pd.DataFrame | None:
-    """Return the session temperature DataFrame (base DataCo + session uploads)."""
+    """Return the cumulative DataFrame (base DataCo + all persisted increments)."""
     return get_temp_df()
 
 
@@ -575,6 +608,36 @@ _forecast_cache: dict | None = None
 def clear_forecast_cache():
     global _forecast_cache
     _forecast_cache = None
+
+
+
+@router.get("/coverage")
+def get_dataset_coverage():
+    """
+    Report what data the system is currently using.
+    Returns base period range, base row count, each appended period with its
+    row count, the combined total, and the latest date present.
+    """
+    try:
+        return _get_store().coverage()
+    except Exception as e:
+        logger.warning(f"Coverage endpoint fallback: {e}")
+        base_path = _get_base_parquet_path()
+        rows = 0
+        if base_path.exists():
+            try:
+                rows = len(pd.read_parquet(base_path))
+            except Exception:
+                pass
+        return {
+            "base_period_start": None,
+            "base_period_end": None,
+            "base_row_count": rows,
+            "increments": [],
+            "increment_count": 0,
+            "combined_total": rows,
+            "latest_date": None,
+        }
 
 
 @router.get("/summary")

@@ -51,47 +51,24 @@ class DynamicDatasetUpgradeService(BaseService):
         self._model_registry = ModelRegistry()
 
     def load_existing_master_dataset(self) -> pd.DataFrame:
-        """
-        Load the existing master dataset (DataCo baseline + previous uploads).
-        If processed_master.parquet does not exist, look for raw DataCo CSV.
-        """
+        """Load the cumulative dataset (base + all uploaded increments)."""
+        from app.store.cumulative import CumulativeStore
+        try:
+            store = CumulativeStore()
+            df = store.load_full()
+            logger.info(f"[DynamicUpgrade] Loaded cumulative dataset: {len(df)} rows")
+            return df
+        except FileNotFoundError:
+            pass
+        # Fallback to processed_master.parquet
         if self.master_parquet_path.exists():
             try:
                 df = pd.read_parquet(self.master_parquet_path)
-                logger.info(f"[DynamicUpgrade] Loaded existing master parquet: {len(df)} rows")
+                logger.info(f"[DynamicUpgrade] Loaded master parquet (fallback): {len(df)} rows")
                 return df
             except Exception as e:
-                logger.warning(f"[DynamicUpgrade] Failed to read existing master parquet: {e}")
-
-        # Fallback to raw DataCo dataset in data/raw
-        raw_dir = Path(settings.raw_data_dir)
-        raw_candidates = [
-            raw_dir / "DataCoSupplyChainDataset.csv",
-            raw_dir / "DataCoSupplyChain.csv",
-            raw_dir / "dataco_supply_chain.csv",
-        ]
-        for candidate in raw_candidates:
-            if candidate.exists():
-                try:
-                    df = pd.read_csv(candidate, encoding="latin-1")
-                    logger.info(f"[DynamicUpgrade] Loaded base DataCo raw CSV: {len(df)} rows")
-                    return df
-                except Exception as e:
-                    logger.warning(f"[DynamicUpgrade] Failed to read raw DataCo CSV {candidate}: {e}")
-
-        # Check any CSV in raw_dir
-        if raw_dir.exists():
-            csvs = list(raw_dir.glob("*.csv"))
-            if csvs:
-                largest_csv = max(csvs, key=lambda p: p.stat().st_size)
-                try:
-                    df = pd.read_csv(largest_csv, encoding="latin-1")
-                    logger.info(f"[DynamicUpgrade] Loaded largest raw CSV {largest_csv.name}: {len(df)} rows")
-                    return df
-                except Exception as e:
-                    logger.warning(f"[DynamicUpgrade] Failed to read {largest_csv}: {e}")
-
-        logger.warning("[DynamicUpgrade] No existing master dataset found. Creating empty DataFrame.")
+                logger.warning(f"[DynamicUpgrade] Failed to read master parquet: {e}")
+        logger.warning("[DynamicUpgrade] No existing dataset found. Creating empty DataFrame.")
         return pd.DataFrame()
 
     async def upgrade_with_actuals(

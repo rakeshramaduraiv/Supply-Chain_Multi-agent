@@ -149,30 +149,23 @@ class EnterpriseContinuousLearningEngine(BaseService):
         self._memory = get_agent_memory()
 
     def _load_ground_truth_dataset(self) -> pd.DataFrame:
-        """Load existing historical enterprise dataset."""
+        """Load existing historical enterprise dataset from CumulativeStore."""
+        from app.store.cumulative import CumulativeStore
+        try:
+            store = CumulativeStore()
+            df = store.load_full()
+            logger.info(f"[ContinuousLearning] Loaded cumulative dataset: {len(df)} rows")
+            return df
+        except FileNotFoundError:
+            pass
+        # Fallback to processed_master.parquet
         if self.master_parquet_path.exists():
             try:
                 df = pd.read_parquet(self.master_parquet_path)
-                logger.info(f"[ContinuousLearning] Loaded master dataset parquet: {len(df)} rows")
+                logger.info(f"[ContinuousLearning] Loaded master dataset parquet (fallback): {len(df)} rows")
                 return df
             except Exception as e:
                 logger.warning(f"[ContinuousLearning] Parquet load warning: {e}")
-
-        raw_dir = Path(settings.raw_data_dir)
-        raw_candidates = [
-            raw_dir / "DataCoSupplyChainDataset.csv",
-            raw_dir / "DataCoSupplyChain.csv",
-            raw_dir / "dataco_supply_chain.csv",
-        ]
-        for candidate in raw_candidates:
-            if candidate.exists():
-                try:
-                    df = pd.read_csv(candidate, encoding="latin-1")
-                    logger.info(f"[ContinuousLearning] Loaded raw DataCo base: {len(df)} rows")
-                    return df
-                except Exception as e:
-                    logger.warning(f"[ContinuousLearning] CSV load warning for {candidate}: {e}")
-
         return pd.DataFrame()
 
     async def run_continuous_learning_cycle(
@@ -337,10 +330,17 @@ class EnterpriseContinuousLearningEngine(BaseService):
         # Every backend restart rebuilds the temperature list from the base file alone.
         t0 = time.perf_counter()
         from app.api.v1.endpoints.dataset_summary import append_to_temp_df
-        df_features = self._feature_pipeline.transform(df_new)
+        from app.store.cumulative import engineer_features_on_new, CumulativeStore
+        _store = CumulativeStore()
+        try:
+            base_df = _store.load_base()
+            df_features = engineer_features_on_new(df_new, base_df)
+        except Exception as _fe_err:
+            logger.warning(f"[ECLE] Feature engineering fallback: {_fe_err}")
+            df_features = self._feature_pipeline.transform(df_new)
         for col in df_features.select_dtypes(include=["object"]).columns:
             df_features[col] = df_features[col].astype(str)
-        cumulative_rows = append_to_temp_df(df_features)
+        cumulative_rows = append_to_temp_df(df_features, period)
 
         new_version_tag = f"2015-{period}_v2"
         stages_output.append(EnterpriseLearningStageResult(

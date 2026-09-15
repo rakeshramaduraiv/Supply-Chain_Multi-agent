@@ -1,4 +1,4 @@
-agent,model_type,target,n_features,train_rows,test_rows,mae,rmse,mape,r2,n_samples,accuracy,precision,recall,f1,roc_auc,confusion_matrix
-demand,regression,demand,17,137021,34348,0.743832,1.128915,42.786264,0.386751,34348,,,,,,
-supplier,classification,supplier,15,137021,34348,,,,,34348,0.690928,0.827712,0.545936,0.657924,0.719766,"[[13523, 2125], [8491, 10209]]"
-logistics,classification,logistics,18,137021,34348,,,,,34348,0.68921,0.808109,0.562781,0.663493,0.724046,"[[13149, 2499], [8176, 10524]]"
+agent,model_type,target,n_features,train_rows,test_rows,r2
+demand,<MagicMock name='mock.task' id='134862813706128'>,<MagicMock name='mock.intelligence_type' id='134862813707984'>,17,<MagicMock name='mock.n_training_samples' id='134863350009616'>,<MagicMock name='mock.n_test_samples' id='134863352945616'>,0.5
+supplier,<MagicMock name='mock.task' id='134862813706128'>,<MagicMock name='mock.intelligence_type' id='134862813707984'>,15,<MagicMock name='mock.n_training_samples' id='134863350009616'>,<MagicMock name='mock.n_test_samples' id='134863352945616'>,0.5
+logistics,<MagicMock name='mock.task' id='134862813706128'>,<MagicMock name='mock.intelligence_type' id='134862813707984'>,18,<MagicMock name='mock.n_training_samples' id='134863350009616'>,<MagicMock name='mock.n_test_samples' id='134863352945616'>,0.5

@@ -44,26 +44,22 @@ def _get_graph_service(session=None) -> GraphService:
 
 
 def _load_processed_dataset() -> pd.DataFrame:
-    """Load the most recently processed dataset (parquet preferred, CSV fallback)."""
-    settings = get_settings()
-    data_dir = Path(settings.upload_dir)
-
-    parquet_path = data_dir / "processed_master.parquet"
-    if parquet_path.exists():
-        df = pd.read_parquet(parquet_path)
-        logger.info(f"Loaded dataset: processed_master.parquet ({len(df)} rows)")
+    """Load the cumulative dataset (base + all uploaded increments)."""
+    from app.store.cumulative import CumulativeStore
+    try:
+        store = CumulativeStore()
+        df = store.load_full()
+        logger.info(f"Loaded cumulative dataset: {len(df)} rows")
         return df
-
-    candidates = sorted(data_dir.glob("*_processed.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not candidates:
-        candidates = sorted(data_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-
-    if not candidates:
-        raise HTTPException(status_code=404, detail="No processed dataset found. Upload and process data first.")
-
-    df = pd.read_csv(candidates[0])
-    logger.info(f"Loaded dataset: {candidates[0].name} ({len(df)} rows)")
-    return df
+    except FileNotFoundError:
+        # Fall back to processed_master.parquet during first-run before init
+        settings = get_settings()
+        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
+        if parquet_path.exists():
+            df = pd.read_parquet(parquet_path)
+            logger.info(f"Loaded dataset (fallback): processed_master.parquet ({len(df)} rows)")
+            return df
+        raise HTTPException(status_code=404, detail="No processed dataset found. Run initialization first.")
 
 
 # ============================================================

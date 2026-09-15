@@ -118,6 +118,7 @@ class BaseTrainer:
         graph_enriched: bool = False,
         already_engineered: bool = False,
         training_path: str = "initialization",
+        enrichment_source: str = "neo4j",
     ) -> TrainingResult:
         """
         Execute full training pipeline.
@@ -257,6 +258,12 @@ class BaseTrainer:
         if wf_result:
             hyperparams["walk_forward_folds"] = wf_result.get("folds", [])
 
+        # When fallback was used, force graph_enriched=False and record source
+        if enrichment_source == "tier1_pandas_fallback":
+            graph_enriched = False
+            coverage = 0.0
+            hyperparams["enrichment_source"] = "tier1_pandas_fallback"
+
         # Save to registry
         version = self.registry.save_model(
             model=model,
@@ -298,22 +305,22 @@ class BaseTrainer:
 class DemandTrainer(BaseTrainer):
     """Trainer for Demand Intelligence (LightGBM Regressor)."""
 
-    def train_demand(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
-        return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+    def train_demand(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization", enrichment_source: str = "neo4j") -> TrainingResult:
+        return self.train(df, IntelligenceType.DEMAND, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
 
 
 class SupplierTrainer(BaseTrainer):
     """Trainer for Supplier Intelligence (RandomForest Classifier)."""
 
-    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
-        return self.train(df, IntelligenceType.SUPPLIER, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+    def train_supplier(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization", enrichment_source: str = "neo4j") -> TrainingResult:
+        return self.train(df, IntelligenceType.SUPPLIER, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
 
 
 class LogisticsTrainer(BaseTrainer):
     """Trainer for Logistics Intelligence (LightGBM Classifier)."""
 
-    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization") -> TrainingResult:
-        return self.train(df, IntelligenceType.LOGISTICS, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+    def train_logistics(self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False, already_engineered: bool = False, training_path: str = "initialization", enrichment_source: str = "neo4j") -> TrainingResult:
+        return self.train(df, IntelligenceType.LOGISTICS, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
 
 
 class TrainingOrchestrator:
@@ -328,18 +335,22 @@ class TrainingOrchestrator:
     def train_all(
         self, df: pd.DataFrame, dataset_version: str = "", graph_enriched: bool = False,
         already_engineered: bool = False, training_path: str = "initialization",
+        enrichment_source: str = "neo4j",
     ) -> dict[str, TrainingResult]:
         """
         Train all viable intelligence models on the same dataset.
 
         already_engineered=True: df has already been through engineer_features
         and graph enrichment. Skip re-engineering inside each trainer.
-        training_path: recorded in registry — "initialization" or "other".
+        training_path: recorded in registry.
+        enrichment_source: "neo4j" (default) or "tier1_pandas_fallback".
+            When "tier1_pandas_fallback", graph_enriched is forced False and
+            the registry entry records the degraded source.
         """
         results = {}
-        results["demand"]    = self.demand_trainer.train_demand(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
-        results["supplier"]  = self.supplier_trainer.train_supplier(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
-        results["logistics"] = self.logistics_trainer.train_logistics(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+        results["demand"]    = self.demand_trainer.train_demand(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
+        results["supplier"]  = self.supplier_trainer.train_supplier(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
+        results["logistics"] = self.logistics_trainer.train_logistics(df, dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)
         logger.info(f"All models trained: {list(results.keys())}")
         return results
 
@@ -351,7 +362,8 @@ class TrainingOrchestrator:
         graph_enriched: bool = False,
         already_engineered: bool = False,
         training_path: str = "initialization",
+        enrichment_source: str = "neo4j",
     ) -> TrainingResult:
         """Train a single intelligence model."""
         trainer = BaseTrainer(self.registry)
-        return trainer.train(df, intelligence_type, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path)
+        return trainer.train(df, intelligence_type, dataset_version=dataset_version, graph_enriched=graph_enriched, already_engineered=already_engineered, training_path=training_path, enrichment_source=enrichment_source)

@@ -230,6 +230,29 @@ def main():
     df = pd.read_parquet(parquet)
     logger.info(f"Loaded {len(df):,} rows x {len(df.columns)} cols")
 
+    # ── Guard: refuse to report metrics from fallback-trained models ─────────
+    registry_path = Path(settings.model_dir) / "registry.json"
+    if registry_path.exists():
+        import json as _json
+        registry_data = _json.loads(registry_path.read_text())
+        fallback_models = []
+        for agent, versions in registry_data.items():
+            active = [v for v in versions if v.get("is_active")]
+            for v in active:
+                src = v.get("hyperparameters", {}).get("enrichment_source", "neo4j")
+                if src == "tier1_pandas_fallback" or not v.get("graph_enriched", True):
+                    fallback_models.append(f"{agent} v={v['version_id']} source={src}")
+        if fallback_models:
+            logger.error(
+                "ABLATION ABORTED: the following active models were trained under "
+                "Tier-1 pandas fallback (enrichment_source=tier1_pandas_fallback). "
+                "Reporting ablation metrics from these models is invalid because the "
+                "graph contribution cannot be measured against unenriched features.\n"
+                "  %s\n"
+                "Re-run initialization with Neo4j available and ALLOW_ENRICHMENT_FALLBACK=false.",
+                "\n  ".join(fallback_models),
+            )
+            sys.exit(1)
     logger.info("Engineering features ...")
     df_eng = engineer_features(df)
     logger.info(f"Engineered: {len(df_eng):,} rows x {len(df_eng.columns)} cols")

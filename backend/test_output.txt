@@ -1,0 +1,16 @@
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/unit/ml/test_training.py _______________
+ImportError while importing test module 'c:\Users\balan\OneDrive\Desktop\supply-chain\backend\tests\unit\ml\test_training.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\..\AppData\Local\Programs\Python\Python313\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\unit\ml\test_training.py:13: in <module>
+    from app.ml.training import (
+E   ImportError: cannot import name 'InventoryTrainer' from 'app.ml.training' (c:\Users\balan\OneDrive\Desktop\supply-chain\backend\app\ml\training\__init__.py)
+=========================== short test summary info ===========================
+ERROR tests/unit/ml/test_training.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 1.10s

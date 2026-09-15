@@ -71,7 +71,13 @@ class Settings(BaseSettings):
     openai_model_name: str = "gpt-4o"
 
     # --- Graph Enrichment ---
-    allow_enrichment_fallback: bool = True
+    # Safe default is False: a Neo4j outage aborts training rather than
+    # silently producing models trained on Tier-1 pandas proxy values.
+    # Set to True only when deliberately running without Neo4j, and be
+    # aware that models trained under fallback are flagged in the registry
+    # with enrichment_source="tier1_pandas_fallback" and excluded from
+    # results reporting.
+    allow_enrichment_fallback: bool = False
 
     # --- Holdout / Evaluation ---
     # Training is restricted to rows strictly before holdout_start_date.

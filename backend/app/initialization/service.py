@@ -451,16 +451,24 @@ class InitializationService:
                         f"Training on unenriched features is not permitted. "
                         f"Original error: {enrich_err}"
                     ) from enrich_err
-                logger.warning(
-                    f"[4/7] Graph enrichment failed ({enrich_err}); "
-                    f"ALLOW_ENRICHMENT_FALLBACK=True — Tier-1 aggregates retained."
+                # Fallback is explicitly enabled — record it loudly so it cannot
+                # be missed in logs or results.
+                logger.error(
+                    "[4/7] ENRICHMENT FALLBACK ACTIVE: graph enrichment failed (%s). "
+                    "ALLOW_ENRICHMENT_FALLBACK=True — Tier-1 pandas aggregates retained. "
+                    "Models trained in this run will be flagged enrichment_source="
+                    "'tier1_pandas_fallback' in the registry and excluded from "
+                    "results reporting.",
+                    enrich_err,
                 )
+                result["enrichment_source"] = "tier1_pandas_fallback"
                 result["steps"]["knowledge_graph"] = {
                     "status": "skipped", "reason": str(enrich_err),
                     "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
                 result["steps"]["graph_enrichment"] = {
                     "status": "skipped", "reason": str(enrich_err), "degraded": True,
+                    "enrichment_source": "tier1_pandas_fallback",
                     "duration_ms": round((time.perf_counter() - step_start) * 1000, 1),
                 }
                 exporter.export(4, "graph_enriched", df_features,
@@ -497,6 +505,7 @@ class InitializationService:
                 graph_enriched=graph_enriched_flag,
                 already_engineered=True,
                 training_path="initialization",
+                enrichment_source=result.get("enrichment_source", "neo4j"),
             )
             result["steps"]["training"] = {
                 "status": "completed",
@@ -544,11 +553,16 @@ class InitializationService:
             # Write base.parquet to CumulativeStore so load_full() works immediately
             try:
                 from app.store.cumulative import CumulativeStore
-                import shutil
                 _store = CumulativeStore()
-                _store._base_parquet.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(processed_path, _store._base_parquet)
-                _store._update_manifest_from_base()
+                # write_base() handles the copy, checksum, and manifest in one call
+                if not _store._base_parquet.exists():
+                    _store.write_base(df_features)
+                else:
+                    # base already exists (e.g. re-run) — overwrite via shutil
+                    import shutil
+                    _store._base_parquet.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(processed_path, _store._base_parquet)
+                    logger.info(f"[7/7] CumulativeStore base.parquet overwritten: {len(df_features)} rows")
                 # Validate holdout boundary on base.parquet
                 if settings.holdout_start_date:
                     _store.assert_base_no_holdout(settings.holdout_start_date)

@@ -270,9 +270,9 @@ class TestCumulativeStoreLoadFull:
         inc_df = _make_increment_df(20)
         tmp_store.append(inc_df, "2017-10")
 
-        # Corrupt the checksum in manifest
+        # Corrupt the checksum in manifest with a full 64-char fake SHA-256
         manifest = tmp_store._read_manifest()
-        manifest["checksums"]["2017-10"] = "deadbeef"
+        manifest["checksums"]["2017-10"] = "a" * 64
         tmp_store._write_manifest(manifest)
         tmp_store._invalidate_cache()
 

@@ -617,7 +617,7 @@ export default function ForecastPage() {
 
             if (!cat || !reg) return
 
-            const key = cat + '||' + reg
+            const key = cat.toLowerCase() + '||' + reg.toLowerCase()
 
             if (!actualMap[key]) actualMap[key] = { count: 0, qty: 0, late: 0 }
 
@@ -639,7 +639,7 @@ export default function ForecastPage() {
 
         const pred  = Math.round(cat.predicted_demand || 2000)
 
-        const key   = cat.category + '||' + cat.region
+        const key   = (cat.category || '').toLowerCase() + '||' + (cat.region || '').toLowerCase()
 
         const entry = actualMap[key]
 
@@ -661,13 +661,19 @@ export default function ForecastPage() {
 
         } else if (hasRealData) {
 
-          const totalQty = Object.values(actualMap).reduce((s, e) => s + (e.qty > 0 ? e.qty : e.count), 0)
-
-          act = Math.round(totalQty / cats.length)
-
-          reason = `Category/region not found in uploaded CSV \u2014 proportional estimate used`
-
-          root_cause = `No exact match for ${cat.category} \u00b7 ${cat.region} in uploaded file`
+          // Try partial match: category only, ignoring region
+          const catOnlyKey = (cat.category || '').toLowerCase()
+          const partialEntry = Object.entries(actualMap).find(([k]) => k.startsWith(catOnlyKey + '||'))
+          if (partialEntry) {
+            const [, pe] = partialEntry
+            act = Math.round(pe.qty > 0 ? pe.qty : pe.count)
+            reason = `Matched by category only (region mismatch) \u2014 ${partialEntry[0].split('||')[1]} used`
+            root_cause = `Partial match for ${cat.category} in uploaded file (region: ${cat.region} not found)`
+          } else {
+            act = null
+            reason = `Category/region not found in uploaded CSV \u2014 no match for ${cat.category} \u00b7 ${cat.region}`
+            root_cause = `No match for ${cat.category} \u00b7 ${cat.region} in uploaded file`
+          }
 
         } else {
 

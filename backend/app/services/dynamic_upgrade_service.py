@@ -162,7 +162,8 @@ class DynamicDatasetUpgradeService(BaseService):
         try:
             logger.info("[Step 3/5] Retraining ML models on cumulative dataset...")
             training_results = self._training_orchestrator.train_all(
-                df_features, dataset_version=f"cumulative_{period}_{int(time.time())}"
+                df_features, dataset_version=f"cumulative_{period}_{int(time.time())}",
+                training_path="dynamic_upgrade",
             )
             training_results_summary = {
                 k: {

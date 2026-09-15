@@ -121,6 +121,24 @@ def test_assert_parquet_integrity_raises_on_stub():
         assert_parquet_integrity(stub, "test_stub")
 
 
+def test_load_base_rejects_stub(tmp_path):
+    """CumulativeStore.write_base() must refuse a 200-row DataFrame."""
+    import numpy as np
+    from app.store.cumulative import CumulativeStore
+
+    stub = pd.DataFrame({
+        "order date (DateOrders)": pd.date_range("2017-01-01", periods=200, freq="D"),
+        "Order Item Quantity": np.ones(200),
+    })
+    # Use a fresh tmp dir with no existing base.parquet and no processed_master.parquet
+    base_dir = tmp_path / "cumulative_stub_test"
+    base_dir.mkdir()
+    # Instantiate with explicit source_parquet=None so bootstrap doesn't copy anything
+    store = CumulativeStore(base_dir=base_dir, source_parquet="/nonexistent/path.parquet")
+    with pytest.raises(RuntimeError, match="refusing to write"):
+        store.write_base(stub)
+
+
 def test_assert_parquet_integrity_raises_on_wrong_date_range():
     """assert_parquet_integrity must raise when date range is too narrow."""
     import numpy as np
@@ -143,8 +161,9 @@ def test_assert_parquet_integrity_raises_on_missing_graph_features():
     import numpy as np
 
     n = _PARQUET_MIN_ROWS
-    # Use a date range that spans 2015-01-01 to 2018-01-31 so checks 1 and 2 pass
-    dates = pd.date_range("2015-01-01", "2018-01-31", periods=n)
+    # Use a date range that covers 2015-01-01 to 2017-09-30 (before holdout)
+    # so checks 1 and 2 pass but check 3 (holdout contamination) does not fire
+    dates = pd.date_range("2015-01-01", "2017-09-30", periods=n)
     df = pd.DataFrame({
         _PARQUET_DATE_COL: dates,
         "Order Item Quantity": np.ones(n),

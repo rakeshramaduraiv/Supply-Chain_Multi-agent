@@ -325,17 +325,19 @@ class EnterpriseContinuousLearningEngine(BaseService):
             details={"indexed": True}
         ).__dict__)
 
-        # ── Stage 8: Session Temperature List Expansion ────────────────────────────────────
-        # Appends uploaded rows to the in-memory temperature list only.
-        # The base DataCo parquet on disk is NEVER modified.
-        # Every backend restart rebuilds the temperature list from the base file alone.
+        # ── Stage 8: Dataset Expansion (in-memory, resets on restart) ──────────────────────
+        # Engineer new rows anchored on the FULL cumulative history (base + all prior
+        # uploads this session) so rolling windows and expanding rates are correct.
+        # Append to CumulativeStore in-memory layer — disk base is NEVER modified.
+        # On restart the system returns to the clean 2015-01 to 2017-09 base.
         t0 = time.perf_counter()
         from app.api.v1.endpoints.dataset_summary import append_to_temp_df
         from app.store.cumulative import engineer_features_on_new, CumulativeStore
         _store = CumulativeStore()
         try:
-            base_df = _store.load_base()
-            df_features = engineer_features_on_new(df_new, base_df)
+            # Use load_full() so each new upload sees all previous session uploads
+            history_df = _store.load_full()
+            df_features = engineer_features_on_new(df_new, history_df)
         except Exception as _fe_err:
             logger.warning(f"[ECLE] Feature engineering fallback: {_fe_err}")
             df_features = self._feature_pipeline.transform(df_new)
@@ -368,6 +370,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
                 training_results = self._training_orchestrator.train_all(
                     df_cumulative, dataset_version=new_version_tag,
                     already_engineered=True,
+                    training_path="continuous_learning",
                 )
                 retrained_models = list(training_results.keys())
                 stage9_status = "Completed"
@@ -418,9 +421,9 @@ class EnterpriseContinuousLearningEngine(BaseService):
             from app.ml.prediction.collaborative_pipeline import get_agent_coordinator
             coord = get_agent_coordinator()
             _cap = settings.coordinator_row_cap
-        _coord_df = df_features.tail(_cap) if _cap and _cap > 0 else df_features
-        _coord_rows = len(_coord_df)
-        coord_summary = coord.execute_coordinated_pipeline(_coord_df)
+            _coord_df = df_features.tail(_cap) if _cap and _cap > 0 else df_features
+            _coord_rows = len(_coord_df)
+            coord_summary = coord.execute_coordinated_pipeline(_coord_df)
             self._memory.store_agent_action(
                 agent_id="Enterprise Agent Orchestrator",
                 action_type="continuous_learning_cycle",

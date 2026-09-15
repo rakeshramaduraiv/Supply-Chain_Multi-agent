@@ -1,0 +1,14 @@
+{
+  "periods": [
+    "2018-01"
+  ],
+  "checksums": {
+    "2018-01": "54e01d1ea40d8edd"
+  },
+  "row_counts": {
+    "2018-01": 200
+  },
+  "total_rows": 400,
+  "last_increment": "2018-01",
+  "data_end": "2018-01-02"
+}

@@ -79,28 +79,6 @@ def get_temp_df() -> pd.DataFrame | None:
     except Exception as e:
         logger.warning(f"[TempList] CumulativeStore.load_full failed: {e}")
         return None
-    if _temp_df is None or current_mtime != _temp_df_mtime:
-        try:
-            df = pd.read_parquet(base_path)
-            if "shipping_delay_days" not in df.columns:
-                if "shipping_delay" in df.columns:
-                    df["shipping_delay_days"] = df["shipping_delay"]
-                elif "Days for shipping (real)" in df.columns and "Days for shipment (scheduled)" in df.columns:
-                    df["shipping_delay_days"] = df["Days for shipping (real)"] - df["Days for shipment (scheduled)"]
-                else:
-                    df["shipping_delay_days"] = 0.0
-            _temp_df = df
-            _temp_df_mtime = current_mtime
-            # Invalidate derived caches when base data changes
-            _cache = None
-            _analytics_cache = None
-            _cache_mtime = 0.0
-            _analytics_mtime = 0.0
-            logger.info(f"[TempList] Reloaded base DataCo parquet: {len(_temp_df)} rows (mtime changed)")
-        except Exception as e:
-            logger.warning(f"[TempList] Base parquet load failed: {e}")
-            return None
-    return _temp_df
 
 
 def append_to_temp_df(df_engineered: pd.DataFrame, period: str | None = None) -> int:
@@ -124,7 +102,7 @@ def append_to_temp_df(df_engineered: pd.DataFrame, period: str | None = None) ->
         return report.cumulative_rows
     except ValueError as e:
         logger.warning(f"[CumulativeStore] append skipped: {e}")
-        return _get_store()._read_manifest().get("total_rows", 0)
+        return len(_get_store().periods())
 
 
 def clear_dataset_cache():
@@ -554,11 +532,12 @@ def _compute_auto_forecast() -> dict:
                 preds_grp = model.predict(X_grp)
                 row_result[f"{intel_type.value}_risk"] = round(float(np.mean(preds_grp)), 4)
 
-            # Calculate predicted demand & revenue for this category
-            mean_demand = float(grp["Sales"].mean()) if "Sales" in grp.columns else 2120.0
+            # Calculate predicted demand (units) & revenue for this category
+            mean_qty = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
+            total_qty = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
             avg_price = float(grp["Product Price"].mean()) if "Product Price" in grp.columns else 50.0
-            row_result["predicted_demand"] = round(mean_demand, 2)
-            row_result["predicted_revenue"] = round(mean_demand * avg_price, 2)
+            row_result["predicted_demand"] = round(total_qty, 2)
+            row_result["predicted_revenue"] = round(total_qty * avg_price, 2)
 
             # Combined risk
             risks = [float(row_result.get(f"{t.value}_risk", 0)) for t in IntelligenceType]
@@ -609,6 +588,32 @@ def clear_forecast_cache():
     global _forecast_cache
     _forecast_cache = None
 
+
+
+@router.delete("/increments")
+def delete_increments(confirm: bool = False):
+    """
+    Delete all uploaded increment parquets and clear the manifest period list.
+    base.parquet is NEVER touched.
+
+    Verifies base.parquet checksum before and after to confirm it is unchanged.
+    Requires ?confirm=true — refuses without it.
+    """
+    from fastapi import HTTPException
+    if not confirm:
+        raise HTTPException(
+            400,
+            "Pass ?confirm=true to delete all increments. "
+            "This operation cannot be undone.",
+        )
+    try:
+        result = _get_store().reset_increments(confirm=True)
+        clear_dataset_cache()
+        return {"status": "ok", **result}
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @router.get("/coverage")

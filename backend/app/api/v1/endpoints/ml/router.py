@@ -133,7 +133,8 @@ async def train_all_models(request: TrainAllRequest):
 
     try:
         df = _load_processed_dataset()
-        results = _orchestrator.train_all(df, dataset_version=request.dataset_version)
+        results = _orchestrator.train_all(df, dataset_version=request.dataset_version,
+                                          training_path="api_train_all")
 
         result_schemas = {
             k: TrainingResultSchema(**v.to_dict()) for k, v in results.items()

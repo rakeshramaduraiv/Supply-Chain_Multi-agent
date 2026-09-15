@@ -660,3 +660,17 @@ def _aliases(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # _zscore deleted — used full-df mu/sigma (leaky) and was called from nowhere.
+
+
+class FeatureEngineeringPipeline:
+    """
+    Thin wrapper around engineer_features() for callers that expect a
+    pipeline-style .transform(df) interface (e.g. dynamic_upgrade_service,
+    enterprise_learning_engine fallback path).
+    """
+
+    def transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        return engineer_features(df)
+
+    def fit_transform(self, df: pd.DataFrame) -> pd.DataFrame:
+        return engineer_features(df)

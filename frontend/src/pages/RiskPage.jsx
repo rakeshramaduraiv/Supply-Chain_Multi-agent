@@ -200,7 +200,6 @@ const ALL_INCIDENTS = [
 
 const GUIDED_STEPS = [
   { stepNum: 1, label: 'Incident Overview', icon: Shield },
-  { stepNum: 2, label: 'AI Executive Summary', icon: FileText },
   { stepNum: 3, label: 'Business Impact', icon: DollarSign },
   { stepNum: 4, label: 'Evidence Ranking', icon: Layers },
   { stepNum: 5, label: 'Propagation Map', icon: GitBranch },
@@ -209,7 +208,6 @@ const GUIDED_STEPS = [
   { stepNum: 8, label: 'LLM Investigation', icon: Brain },
   { stepNum: 9, label: 'Recommendations', icon: Lightbulb },
   { stepNum: 10, label: 'Decision Approval', icon: CheckCircle2 },
-  { stepNum: 11, label: 'Executive Report', icon: FileSpreadsheet },
 ]
 
 const QUICK_PROMPTS = [
@@ -950,21 +948,7 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 2: AI Executive Summary */}
-            {activeStep === 2 && (
-              <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><FileText size={14} color="var(--blue)" /> Step 2: Grounded Executive Briefing Memo</div>
-                <div className={s.stepBriefContainer}>
-                  <div className={s.executiveBriefingTitle}>AI Incident Investigation Summary</div>
-                  <p className={s.briefingText}>
-                    {report.executive_overview || `The AMASCI AI Investigator executed a 12-stage grounded analysis across the DataCo training dataset, Neo4j Knowledge Graph v1.4.2, and multi-agent prediction layers. The primary disruption driver is a capacity bottleneck at ${inc.name}, propagating across ${(propFlow.length || 4)} downstream operational stages in the ${inc.region} logistics network.`}
-                  </p>
-                  <div style={{ background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #cbd5e1', fontSize: '10px', lineHeight: 1.5, color: '#334155', marginTop: 12 }}>
-                    <strong>Downstream Business Consequences:</strong> Inability to meet buffer capacity at {inc.affectedWarehouse} threatens orders for key customer accounts in the {inc.region} logistics zone. Prediction confidence is evaluated at {inc.confidence} based on real-time transactional logs.
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* STEP 2: AI Executive Summary — removed */}
 
             {/* STEP 3: Business Impact Dashboard */}
             {activeStep === 3 && (
@@ -1271,20 +1255,7 @@ export default function RiskPage() {
               </div>
             )}
 
-            {/* STEP 11: Decision Export Executive Report */}
-            {activeStep === 11 && (
-              <div className={s.stepPane}>
-                <div className={s.stepHeaderTitle}><FileSpreadsheet size={14} color="var(--blue)" /> Step 11: Export Executive Presentation & JSON Audit Pack</div>
-                <div className={s.briefBriefing}>
-                  <p>Prepare the compliance reports and board presentation summaries for other departments. You can generate PowerPoint decks, PDF summaries, or a raw JSON package containing all simulated values:</p>
-                  <div className={s.exportOptionsRow} style={{ marginTop: '12px' }}>
-                    <button className={s.hdrBtn} onClick={() => alert('PowerPoint file created in export folder.')}><FileText size={12} /> Export PowerPoint Slides</button>
-                    <button className={s.hdrBtn} onClick={() => alert('PDF document exported successfully.')}><FileSpreadsheet size={12} /> Export PDF Report</button>
-                    <button className={s.hdrBtn} onClick={() => setExportModalOpen(true)}><Download size={12} /> Download JSON Decision Package</button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* STEP 11: Executive Report — removed */}
 
           </div>
 
@@ -1293,8 +1264,8 @@ export default function RiskPage() {
             <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.max(1, s - 1))} disabled={activeStep === 1}>
               <ChevronLeft size={13} /> Back
             </button>
-            <span className={s.wizardIndexTracker}>Step {activeStep} of 11</span>
-            <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.min(11, s + 1))} disabled={activeStep === 11}>
+            <span className={s.wizardIndexTracker}>Step {activeStep} of 9</span>
+            <button className={s.hdrBtn} onClick={() => setActiveStep(s => Math.min(10, s + 1))} disabled={activeStep === 10}>
               Next <ChevronRight size={13} />
             </button>
           </div>

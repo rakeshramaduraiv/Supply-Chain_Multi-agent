@@ -36,7 +36,7 @@ class ActualUploadResponse(BaseModel):
     period: str
     records_loaded: int
     records_matched: int
-    overall_accuracy: float  # % of forecasts that were correct
+    overall_accuracy: float | None = None  # None when not yet computed
     deviation_summary: dict[str, Any]
     status: str
     uploaded_at: str

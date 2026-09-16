@@ -25,7 +25,6 @@ const PAGES = [
   { id: 'risk',         path: '/risk',         label: 'Root Cause Center' },
   { id: 'graph',        path: '/graph',        label: 'Knowledge Intelligence' },
   { id: 'reports',      path: '/reports',      label: 'System & Reports' },
-  { id: 'figures',      path: '/figures',      label: 'Figures' },
 ]
 
 export default function AppShell() {

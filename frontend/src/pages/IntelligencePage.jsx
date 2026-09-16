@@ -68,12 +68,10 @@ const REL_COLORS = {
 }
 
 const LAYERS = [
-  { id: 'Combined',    label: 'Current Graph',       color: '#3b82f6' },
-  { id: 'Historical',  label: 'Historical Graph',    color: '#60a5fa' },
-  { id: 'Prediction',  label: 'Prediction Layer',    color: '#a855f7' },
-  { id: 'Actual',      label: 'Actual Layer',        color: '#10b981' },
-  { id: 'Reasoning',   label: 'Reasoning Layer',     color: '#ef4444' },
-  { id: 'Counterfact', label: 'Counterfactual Layer', color: '#06b6d4' },
+  { id: 'Combined',    label: 'Current Graph',        color: '#3b82f6' },
+  { id: 'Historical',  label: 'Historical Graph',     color: '#60a5fa' },
+  { id: 'Prediction',  label: 'Prediction Layer',     color: '#a855f7' },
+  { id: 'Actual',      label: 'Actual Layer',         color: '#10b981' },
   { id: 'Impact',      label: 'Business Impact Layer', color: '#f97316' },
   { id: 'TPKE',        label: 'TPKE Evolution Layer', color: '#6366f1' },
 ]
@@ -82,8 +80,6 @@ const LAYER_FILTER = {
   Historical:  ['SUPPLIES','SHIPS_TO','STORED_IN','PURCHASED_BY','BELONGS_TO','OBSERVED_IN'],
   Prediction:  ['PREDICTS','CONNECTED_TO'],
   Actual:      ['ACTUAL_RESULT','OBSERVED_IN'],
-  Reasoning:   ['CAUSES','ROOT_CAUSE'],
-  Counterfact: ['PREDICTS','ACTUAL_RESULT'],
   Impact:      ['IMPACTS','CAUSES','BELONGS_TO'],
   TPKE:        ['TPKE_INFERRED'],
   Combined:    null,

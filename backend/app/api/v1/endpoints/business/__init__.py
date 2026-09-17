@@ -204,7 +204,7 @@ async def upload_actual_data(
                 # "column not present" which is distinct from "all zeros"
 
         agent_cycle = ["Logistics Agent", "Demand Agent", "Supplier Agent"]
-        for i, cf in enumerate(cat_forecasts[:6]):
+        for i, cf in enumerate(cat_forecasts):
             cat    = cf.get("category", "")
             reg    = cf.get("region", "")
             f_val  = cf.get("predicted_demand")  # may be None
@@ -221,7 +221,7 @@ async def upload_actual_data(
                 matched = True
                 records_matched += 1
                 if f_val is not None and a_val is not None and f_val > 0:
-                    dev = round(((a_val - f_val) / f_val) * 100, 1)
+                    dev = round(((f_val - a_val) / f_val) * 100, 1)  # positive = over-forecast
                     abs_dev = abs(dev)
                     if abs_dev < 10:
                         within_threshold += 1

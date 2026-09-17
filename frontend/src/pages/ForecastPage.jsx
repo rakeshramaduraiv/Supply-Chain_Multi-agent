@@ -561,6 +561,11 @@ export default function ForecastPage() {
     if (forecastRaw?.forecast_period && !cycleMonth) {
       setCycleMonth(forecastRaw.forecast_period)
     }
+    // If backend period is valid and stored month is not in FORECAST_MONTHS, reset
+    if (forecastRaw?.forecast_period && cycleMonth &&
+        !FORECAST_MONTHS.some(m => m.period === cycleMonth)) {
+      setCycleMonth(forecastRaw.forecast_period)
+    }
   }, [forecastRaw?.forecast_period])
 
   const assertNoBroadcastConstant = (records) => {
@@ -609,9 +614,9 @@ export default function ForecastPage() {
       const totalForecast = recs.reduce((s, r) => s + (r.forecast_value ?? 0), 0)
       const totalActual   = matchedRecs.reduce((s, r) => s + (r.actual_value ?? 0), 0)
 
-      const validDev = matchedRecs.filter(r => r.deviation_pct != null)
+      const validDev = matchedRecs.filter(r => r.deviation_pct != null && r.actual_value != null && r.actual_value > 0)
       const mape = validDev.length > 0
-        ? validDev.reduce((s, r) => s + Math.abs(parseFloat(r.deviation_pct)), 0) / validDev.length
+        ? validDev.reduce((s, r) => s + Math.abs(r.forecast_value - r.actual_value) / r.actual_value * 100, 0) / validDev.length
         : null
       const accuracy = mape != null ? parseFloat((100 - mape).toFixed(1)) : null
 
@@ -2650,7 +2655,7 @@ export default function ForecastPage() {
 
                       </div>
 
-                      <div style={{ fontSize: '11px', fontWeight: 800, color: err.diff.startsWith('+') ? '#d63031' : '#00b894' }}>Variance: {err.diff}</div>
+                      <div style={{ fontSize: '11px', fontWeight: 800, color: err.diff.startsWith('+') ? '#d63031' : err.diff.startsWith('-') ? '#00b894' : 'var(--ts)' }}>Variance: {err.diff}</div>
 
                     </>
 

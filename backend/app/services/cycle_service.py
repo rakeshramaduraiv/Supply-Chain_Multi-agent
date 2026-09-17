@@ -158,17 +158,14 @@ def _stage1_ingest_validate(
         # Non-fatal: log and continue if cumulative store is empty/unavailable
         logger.warning(f"Stage 1: continuity check skipped ({exc})")
 
-    # 3. Period sequence guard
+    # 3. Period sequence guard — warn but don't block (next_period() anchors on base data)
     expected = next_period()
     if period != expected:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Stage 1 FAILED: period continuity violation. "
-                f"Expected {expected!r}, got {period!r}. "
-                f"Upload periods must be consecutive."
-            ),
+        logger.warning(
+            f"Stage 1: period {period!r} differs from next_period()={expected!r}. "
+            f"Allowing upload — period continuity is advisory only."
         )
+        continuity_warnings.append(f"Period {period!r} differs from expected {expected!r}")
 
     # 4. Intra-upload duplicate dedup
     dup_count = 0

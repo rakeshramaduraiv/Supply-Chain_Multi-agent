@@ -107,9 +107,10 @@ def append_to_temp_df(df_engineered: pd.DataFrame, period: str | None = None) ->
 
 def clear_dataset_cache():
     """Invalidate summary & analytics cache and CumulativeStore in-process cache."""
-    global _cache, _analytics_cache
+    global _cache, _analytics_cache, _forecast_cache
     _cache = None
     _analytics_cache = None
+    _forecast_cache = None
     try:
         _get_store()._invalidate_cache()
     except Exception:

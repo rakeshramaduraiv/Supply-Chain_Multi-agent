@@ -74,8 +74,8 @@ DEMAND_FEATURES: list[str] = [
     "qty_roll_7", "qty_roll_30", "qty_lag_1", "qty_lag_7", "qty_lag_30",
     "demand_volatility", "demand_spike_flag", "demand_trend_slope",
     "demand_momentum",
-    "order_month", "order_quarter", "order_dayofweek", "is_weekend",
-    "is_holiday_period",
+    "order_month", "order_quarter", "order_dayofweek", "order_year",
+    "is_weekend", "is_holiday_period",
 ] + GRAPH_CONTEXT_FEATURES
 
 DEMAND_TARGET = "Order Item Quantity"
@@ -210,18 +210,20 @@ FEATURE_CONFIGS: dict[IntelligenceType, FeatureConfig] = {
 # ── Hyperparameters ───────────────────────────────────────────────────────────
 
 LIGHTGBM_REGRESSOR_PARAMS: dict[str, Any] = {
-    "objective": "regression",
-    "metric": "rmse",
+    "objective": "huber",       # robust to outlier order quantities
+    "alpha": 0.9,               # huber quantile — focus on bulk of distribution
+    "metric": "huber",
     "boosting_type": "gbdt",
-    "n_estimators": 500,
-    "learning_rate": 0.05,
-    "max_depth": 7,
-    "num_leaves": 63,
-    "min_child_samples": 50,
-    "subsample": 0.8,
-    "colsample_bytree": 0.8,
-    "reg_alpha": 0.1,
-    "reg_lambda": 0.1,
+    "n_estimators": 1000,
+    "learning_rate": 0.02,      # lower LR + more trees → better generalisation
+    "max_depth": -1,            # let num_leaves control complexity
+    "num_leaves": 31,           # reduced from 63 — less overfitting
+    "min_child_samples": 20,    # was 50 — too conservative for demand patterns
+    "subsample": 0.7,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.7,
+    "reg_alpha": 0.05,
+    "reg_lambda": 1.0,          # stronger L2 to reduce variance
     "random_state": 42,
     "n_jobs": -1,
     "verbose": -1,
@@ -231,15 +233,17 @@ LIGHTGBM_CLASSIFIER_PARAMS: dict[str, Any] = {
     "objective": "binary",
     "metric": "binary_logloss",
     "boosting_type": "gbdt",
-    "n_estimators": 500,
-    "learning_rate": 0.05,
-    "max_depth": 7,
-    "num_leaves": 63,
-    "min_child_samples": 50,
-    "subsample": 0.8,
-    "colsample_bytree": 0.8,
-    "reg_alpha": 0.1,
-    "reg_lambda": 0.1,
+    "n_estimators": 800,
+    "learning_rate": 0.02,
+    "max_depth": -1,
+    "num_leaves": 31,
+    "min_child_samples": 20,
+    "subsample": 0.7,
+    "subsample_freq": 1,
+    "colsample_bytree": 0.7,
+    "reg_alpha": 0.05,
+    "reg_lambda": 1.0,
+    "is_unbalance": True,       # handles class imbalance in Late_delivery_risk
     "random_state": 42,
     "n_jobs": -1,
     "verbose": -1,
@@ -247,12 +251,12 @@ LIGHTGBM_CLASSIFIER_PARAMS: dict[str, Any] = {
 
 
 RANDOM_FOREST_PARAMS: dict[str, Any] = {
-    "n_estimators": 300,
-    "max_depth": 12,
-    "min_samples_split": 10,
-    "min_samples_leaf": 5,
+    "n_estimators": 400,
+    "max_depth": 15,            # deeper trees capture supplier history patterns
+    "min_samples_split": 5,
+    "min_samples_leaf": 2,
     "max_features": "sqrt",
-    "class_weight": "balanced",
+    "class_weight": "balanced_subsample",  # per-tree rebalancing
     "random_state": 42,
     "n_jobs": -1,
 }

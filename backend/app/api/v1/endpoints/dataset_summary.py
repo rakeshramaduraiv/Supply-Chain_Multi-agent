@@ -526,28 +526,45 @@ def _compute_auto_forecast() -> dict:
                 active_models[intel_type] = m
                 active_features[intel_type] = avail_feats
 
+        # Build a scaling map: (cat, region) -> expected_rows_next_period
+        # Use the mean monthly row count from the last 3 months of training data
+        # so the forecast scales to realistic order volumes, not template density.
+        _dates_col = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
+        df["_period_str"] = _dates_col.dt.strftime("%Y-%m")
+        _recent_periods = sorted(df["_period_str"].dropna().unique())[-3:]
+        _recent_df = df[df["_period_str"].isin(_recent_periods)]
+        _expected_rows: dict[tuple, float] = {}
+        if len(_recent_periods) > 0:
+            for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
+                # Mean rows per period across the recent window
+                rows_per_period = g.groupby("_period_str").size().mean()
+                _expected_rows[(c, r)] = float(rows_per_period)
+
         for (cat, region), grp in template.groupby(["Category Name", "Order Region"]):
             if len(grp) < 3:
                 continue
 
             row_result = {"category": cat, "region": region, "order_count": len(grp)}
 
-            # Demand: use model predictions (sum of per-row predicted quantities)
+            # Demand: predict mean per-row quantity, then scale by expected row count.
+            # This decouples the forecast from template density so it matches the
+            # actual upload volume rather than the (much larger) training group size.
             demand_model = active_models.get(IntelligenceType.DEMAND)
             demand_feats = active_features.get(IntelligenceType.DEMAND, [])
             if demand_model is not None and demand_feats:
                 try:
                     X_grp = grp[demand_feats].fillna(0)
                     preds_demand = demand_model.predict(X_grp)
-                    # Sum of per-row predictions = total predicted demand for this group
-                    predicted_demand_val = float(np.sum(preds_demand))
-                    # Clip to reasonable range: [0, 3x historical mean * n_rows]
+                    mean_per_row = float(np.mean(preds_demand))  # avg qty per order row
+                    expected_rows = _expected_rows.get((cat, region), float(len(grp)))
+                    predicted_demand_val = mean_per_row * expected_rows
+                    # Clip to [0, 5x historical mean * expected_rows] to avoid runaway
                     hist_mean = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
-                    predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * len(grp) * 3))
+                    predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * expected_rows * 5))
                 except Exception:
-                    predicted_demand_val = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
+                    predicted_demand_val = float(grp["Order Item Quantity"].mean() * _expected_rows.get((cat, region), len(grp))) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
             else:
-                predicted_demand_val = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
+                predicted_demand_val = float(grp["Order Item Quantity"].mean() * _expected_rows.get((cat, region), len(grp))) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
 
             avg_price = float(grp["Product Price"].mean()) if "Product Price" in grp.columns else 50.0
             row_result["predicted_demand"] = round(predicted_demand_val, 2)

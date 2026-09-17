@@ -12,11 +12,21 @@
 
  *
 
- * ALL metrics, LightGBM feature importances, timelines, confidence scores, and validation error
+ * ALL metrics, LightGBM feature importances, and validation error diagnostics are computed from
 
- * diagnostics are 100% computed from backend services.
+ * backend services. Confidence timeline uses a formula anchored on backend overallConf.
 
  * ZERO Math.random(), zero static JSON, zero placeholder values.
+
+ * Stage durations come from backend StageResult.duration_ms. Stage completion comes from backend status.
+
+ * Feature importances are filtered to items with a real importance value; no 0.1 fallback.
+
+ * Totals sum only non-null records and display coverage. Counts preserve null (rendered as em dash).
+
+ * MAPE is displayed directly; accuracy is never derived as 100−MAPE without clamping and labelling.
+
+ * deviation_pct null is guarded before formatting; NaN% cannot appear.
 
  */
 
@@ -141,7 +151,7 @@ const CustomTooltip = ({ active, payload, label, fmt }) => {
 
 }
 
-const safe = (v, d = 0) => (v == null || isNaN(v)) ? d : v
+// safe() is intentionally removed — callers must handle null explicitly to avoid masking unknowns
 
 // Live log panel shown inside each active step
 
@@ -611,14 +621,19 @@ export default function ForecastPage() {
       assertNoMislabelledProbability(recs)
 
       const matchedRecs = recs.filter(r => r.matched && r.actual_value != null)
-      const totalForecast = recs.reduce((s, r) => s + (r.forecast_value ?? 0), 0)
-      const totalActual   = matchedRecs.reduce((s, r) => s + (r.actual_value ?? 0), 0)
+      const forecastRecs = recs.filter(r => r.forecast_value != null)
+      // Defect 4: sum only non-null records; track coverage so totals are never read as complete
+      const totalForecast = forecastRecs.length > 0 ? forecastRecs.reduce((s, r) => s + r.forecast_value, 0) : null
+      const totalActual   = matchedRecs.length  > 0 ? matchedRecs.reduce((s, r) => s + r.actual_value, 0)   : null
+      const forecastCoverage = { total: forecastRecs.length, of: recs.length }
+      const actualCoverage   = { total: matchedRecs.length, of: recs.length }
 
       const validDev = matchedRecs.filter(r => r.deviation_pct != null && r.actual_value != null && r.actual_value > 0)
       const mape = validDev.length > 0
         ? validDev.reduce((s, r) => s + Math.abs(r.forecast_value - r.actual_value) / r.actual_value * 100, 0) / validDev.length
         : null
-      const accuracy = mape != null ? parseFloat((100 - mape).toFixed(1)) : null
+      // Do not derive accuracy from MAPE — display MAPE directly. Defect 6: exclude zero-actual rows from denominator (already done by filtering actual_value > 0)
+      const zeroActualCount = matchedRecs.filter(r => r.actual_value === 0).length
 
       const devSummary = data.deviation_summary || {}
 
@@ -626,6 +641,9 @@ export default function ForecastPage() {
         records_loaded:    data.records_loaded ?? recs.length,
         records_matched:   data.records_matched ?? matchedRecs.length,
         mape_val:          mape != null ? parseFloat(mape.toFixed(2)) : null,
+        zero_actual_count: zeroActualCount,
+        forecast_coverage: forecastCoverage,
+        actual_coverage:   actualCoverage,
         deviation_summary: {
           within_threshold: devSummary.within_threshold ?? 0,
           minor_deviation:  devSummary.minor_deviation  ?? 0,
@@ -636,9 +654,8 @@ export default function ForecastPage() {
         chart_point: { period: periodStr, actual: totalActual, forecast: totalForecast },
       }
 
-      const accuracyStr = accuracy != null ? `${accuracy}%` : '—'
       const mapeStr     = mape     != null ? `${mape.toFixed(2)}%` : '—'
-      appendLog(2, `✅ ${result.records_loaded.toLocaleString()} records · ${matchedRecs.length} matched · Accuracy: ${accuracyStr} · MAPE: ${mapeStr}`, true)
+      appendLog(2, `✅ ${result.records_loaded.toLocaleString()} records · ${matchedRecs.length} matched · MAPE: ${mapeStr} · Coverage: ${forecastCoverage.total}/${forecastCoverage.of} entities`, true)
 
       setCycleUploadResult(result)
       setCycleActualsUploaded(true)
@@ -647,7 +664,8 @@ export default function ForecastPage() {
       setCompletedCycles(prev => {
         const filtered = prev.filter(c => c.period !== periodStr)
         // Store order-count-based values for the historical chart
-        const forecastOrders = categoryForecasts.reduce((s, c) => s + (c.order_count || 0), 0)
+        // Defect 5: preserve null order_count — use only non-null values for the sum
+        const forecastOrders = categoryForecasts.filter(c => c.order_count != null).reduce((s, c) => s + c.order_count, 0) || null
         return [...filtered, {
           ...result.chart_point,
           forecast_orders: forecastOrders > 0 ? forecastOrders : result.chart_point.forecast,
@@ -657,18 +675,22 @@ export default function ForecastPage() {
 
       // Propagate incidents from matched deviations
       const newIncidents = recs
-        .filter(r => r.deviation_pct != null && Math.abs(parseFloat(r.deviation_pct)) > 5)
+        .filter(r => r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct)) && Math.abs(parseFloat(r.deviation_pct)) > 5)
         .map(r => ({
           id: `forecast_deviation_${periodStr}_${r.entity_id?.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
           name: `Forecast Deviation: ${r.entity_id}`,
           type: 'Product',
           period: periodStr,
           periodLabel: FORECAST_MONTHS.find(m => m.period === periodStr)?.label || periodStr,
-          risk: `${Math.abs(parseFloat(r.deviation_pct)).toFixed(1)}%`,
-          riskVal: Math.abs(parseFloat(r.deviation_pct)) / 100,
+          risk: r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct))
+            ? `${Math.abs(parseFloat(r.deviation_pct)).toFixed(1)}%`
+            : '—',
+          riskVal: r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct))
+            ? Math.abs(parseFloat(r.deviation_pct)) / 100
+            : null,
           severity: Math.abs(parseFloat(r.deviation_pct)) > 8 ? 'High' : 'Medium',
           impact: 'Medium',
-          confidence: accuracyStr,
+          confidence: mapeStr,
           financialLoss: r.forecast_value != null && r.actual_value != null
             ? Math.round(Math.abs(r.forecast_value - r.actual_value) * 45) : 0,
           affectedOrders: r.forecast_value != null && r.actual_value != null
@@ -684,7 +706,7 @@ export default function ForecastPage() {
           affectedSupplier: r.responsible_agent || 'Demand Agent',
           affectedWarehouse: 'Warehouse Zone 1',
           businessCriticality: 'Medium Priority',
-          graphConfidence: accuracyStr,
+          graphConfidence: mapeStr,
           predictionSource: `Forecast Cycle — ${periodStr}`,
           timeSinceDetection: `Uploaded ${periodStr} Actuals`,
           _fromForecast: true,
@@ -700,9 +722,9 @@ export default function ForecastPage() {
       setUploadHistory(prev => [{
         period:    periodStr,
         records:   result.records_loaded,
-        status:    'Validated',
-        accuracy:  accuracyStr,
+        status:    result.records_matched === 0 ? 'Skipped' : 'Validated',
         mape:      mapeStr,
+        coverage:  `${forecastCoverage.total}/${forecastCoverage.of}`,
         timestamp: new Date().toLocaleString(),
       }, ...prev])
 
@@ -749,7 +771,9 @@ export default function ForecastPage() {
           chart_point: {
             period: periodStr,
             actual: null,
-            forecast: (categoryForecasts.length > 0 ? categoryForecasts : []).reduce((s, c) => s + (c.predicted_demand ?? 0), 0),
+            forecast: categoryForecasts.length > 0
+              ? categoryForecasts.filter(c => c.predicted_demand != null).reduce((s, c) => s + c.predicted_demand, 0) || null
+              : null,
           },
         }
         assertNoBroadcastConstant(syntheticResult.comparison_records)
@@ -776,7 +800,7 @@ export default function ForecastPage() {
 
   const tpkeStatus = tpkeStatusRaw?.data || tpkeStatusRaw || {}
 
-  const overallConf     = safe(f.overall_confidence, 0.924)
+  const overallConf     = (f.overall_confidence != null && !isNaN(f.overall_confidence)) ? f.overall_confidence : null
 
   // forecastPeriod from backend = next month after DataCo training data ends
 
@@ -784,7 +808,7 @@ export default function ForecastPage() {
 
   const forecastPeriod  = f.forecast_period || ''
 
-  const highRiskCount   = safe(f.high_risk_count, 3)
+  const highRiskCount   = (f.high_risk_count != null && !isNaN(f.high_risk_count)) ? f.high_risk_count : null
 
   // All DataCo category forecasts from backend — all categories, sorted by combined_risk
   const categoryForecasts = useMemo(() => {
@@ -798,146 +822,206 @@ export default function ForecastPage() {
         predicted_demand:   c.predicted_demand != null ? Math.round(c.predicted_demand) : null,
         predicted_revenue:  c.predicted_revenue != null ? Math.round(c.predicted_revenue) : null,
         prediction_unit:    'units',
-        late_delivery_risk: safe(c.supplier_risk, null),
-        stock_risk:         safe(c.logistics_risk, null),
-        avg_shipping_days:  safe(c.demand_risk, null),
-        combined_risk:      safe(c.combined_risk, null),
-        order_count:        c.order_count || 0,
+        late_delivery_risk: c.supplier_risk  != null ? c.supplier_risk  : null,
+        stock_risk:         c.logistics_risk != null ? c.logistics_risk : null,
+        avg_shipping_days:  c.demand_risk    != null ? c.demand_risk    : null,
+        combined_risk:      c.combined_risk  != null ? c.combined_risk  : null,
+        order_count:        c.order_count != null ? c.order_count : null,
       }))
   }, [f.category_forecasts])
 
   const monthlyTrend    = analytics.monthly_trend || []
 
-  const activeGraphVersion = graphStats.graph_version || 'v1.4.2'
+  const activeGraphVersion = graphStats.graph_version || null
 
-  const activeTpkeVersion  = tpkeStatus.version || 'v2.1'
+  const activeTpkeVersion  = tpkeStatus.version || null
 
   // Feature Importance data derived from LightGBM registry response
 
-  const formatFI = (fiData, defaultFeatures) => {
-
+  const formatFI = (fiData) => {
     const list = fiData?.feature_importances || fiData?.features || []
-
-    if (list.length > 0) {
-
-      const sorted = [...list].sort((a, b) => (b.importance || b.score || 0) - (a.importance || a.score || 0)).slice(0, 5)
-
-      const sum = sorted.reduce((acc, curr) => acc + (curr.importance || curr.score || 0.1), 0)
-
-      return sorted.map(item => ({
-
-        name: (item.feature || item.name || '').replace(/_/g, ' '),
-
-        pct: round((item.importance || item.score || 0.1) / sum * 100, 1),
-
-      }))
-
-    }
-
-    return defaultFeatures
-
+    if (list.length === 0) return []
+    const sorted = [...list]
+      .filter(item => {
+        const v = item.importance ?? item.score
+        return v != null && !isNaN(v)
+      })
+      .sort((a, b) => (b.importance ?? b.score) - (a.importance ?? a.score))
+      .slice(0, 5)
+    if (sorted.length < 2) return []
+    const sum = sorted.reduce((acc, curr) => acc + (curr.importance ?? curr.score), 0)
+    if (sum === 0) return []
+    return sorted.map(item => ({
+      name: (item.feature || item.name || '').replace(/_/g, ' '),
+      pct: round((item.importance ?? item.score) / sum * 100, 1),
+    }))
   }
 
   const round = (num, dec = 1) => Number(Math.round(num + 'e' + dec) + 'e-' + dec)
 
-  const demandFeatures = useMemo(() => formatFI(demandFI.data, [
+  const demandFeatures   = useMemo(() => formatFI(demandFI.data),   [demandFI.data])
+  const supplierFeatures  = useMemo(() => formatFI(supplierFI.data),  [supplierFI.data])
+  const logisticsFeatures = useMemo(() => formatFI(logisticsFI.data), [logisticsFI.data])
 
-    { name: 'Historical Sales Volume', pct: 38.5 },
+  // stage_durations: map from backend stage index (1-6) to seconds, derived from StageResult.duration_ms
+  const stageDurations = useMemo(() => {
+    const stages = cycleUploadResult?.stages || []
+    const map = {}
+    stages.forEach(s => { if (s.stage != null && s.duration_ms != null) map[s.stage] = s.duration_ms / 1000 })
+    return map
+  }, [cycleUploadResult])
 
-    { name: 'Order Item Quantity', pct: 24.2 },
+  // stageStatuses: map from backend stage index (1-6) to COMPLETED|SKIPPED|FAILED
+  const stageStatuses = useMemo(() => {
+    const stages = cycleUploadResult?.stages || []
+    const map = {}
+    stages.forEach(s => { if (s.stage != null && s.status) map[s.stage] = s.status })
+    return map
+  }, [cycleUploadResult])
 
-    { name: 'Category Base Price', pct: 18.3 },
+  // Derive comp string from backend stage status — never from UI counter alone
+  // UI steps 1-8 map to backend stages: step2→stage1-3, step5→stage4, step6→stage4, step7→stage5
+  // For steps without a backend stage, fall back to cycleStep position
+  const stepComp = (uiStep, backendStage) => {
+    if (backendStage != null && stageStatuses[backendStage]) {
+      const s = stageStatuses[backendStage]
+      if (s === 'COMPLETED') return '100%'
+      if (s === 'SKIPPED')   return '—'
+      if (s === 'FAILED')    return '—'
+    }
+    if (cycleStep > uiStep) return '100%'
+    if (cycleStep === uiStep) return '0%'
+    return '0%'
+  }
 
-    { name: 'Holiday Seasonality', pct: 12.0 },
+  // Derive exec string from backend stage duration_ms
+  const stepExec = (backendStage) => {
+    if (backendStage != null && stageDurations[backendStage] != null) {
+      const s = stageDurations[backendStage]
+      return s < 1 ? `${Math.round(s * 1000)}ms` : `${s.toFixed(1)}s`
+    }
+    return '—'
+  }
 
-    { name: 'Customer Segment Density', pct: 7.0 },
+  // Derive status label from backend stage status for steps that have one
+  const stepStatus = (uiStep, backendStage) => {
+    if (backendStage != null && stageStatuses[backendStage]) {
+      const s = stageStatuses[backendStage]
+      if (s === 'SKIPPED') return 'Skipped'
+      if (s === 'FAILED')  return 'Failed'
+      if (s === 'COMPLETED') return cycleStep > uiStep ? 'Completed' : 'Active'
+    }
+    if (cycleStep > uiStep) return 'Completed'
+    if (cycleStep === uiStep) return 'Active'
+    return 'Waiting'
+  }
 
-  ]), [demandFI.data])
-
-  const supplierFeatures = useMemo(() => formatFI(supplierFI.data, [
-
-    { name: 'Late Delivery Risk Rate', pct: 42.1 },
-
-    { name: 'Shipping Delay Days', pct: 28.4 },
-
-    { name: 'Department Reliability', pct: 15.5 },
-
-    { name: 'Fulfillment Lead Delta', pct: 9.0 },
-
-    { name: 'Order Region Capacity', pct: 5.0 },
-
-  ]), [supplierFI.data])
-
-  const logisticsFeatures = useMemo(() => formatFI(logisticsFI.data, [
-
-    { name: 'Days for Shipping Real', pct: 44.0 },
-
-    { name: 'Shipping Mode Class', pct: 26.5 },
-
-    { name: 'Transit Carrier Delay', pct: 16.0 },
-
-    { name: 'Destination Region Distance', pct: 8.5 },
-
-    { name: 'Route Congestion Factor', pct: 5.0 },
-
-  ]), [logisticsFI.data])
+  // stepSkipReason: surface backend skip/fail reason in summary
+  const stepSkipReason = (backendStage) => {
+    if (backendStage == null) return null
+    const stages = cycleUploadResult?.stages || []
+    const s = stages.find(st => st.stage === backendStage)
+    if (!s) return null
+    if (s.status === 'SKIPPED') return s.detail?.reason || 'Skipped'
+    if (s.status === 'FAILED')  return s.error || 'Failed'
+    return null
+  }
 
   const timelineSteps = [
-
     {
       step: 1, name: 'Pre-Event Forecast',
       status: cycleStep > 1 ? 'Completed' : 'Active',
-      comp: cycleStep > 1 ? '100%' : '0%', exec: '1.4s', conf: `${(overallConf * 100).toFixed(1)}%`,
+      comp: cycleStep > 1 ? '100%' : '0%',
+      exec: stepExec(null),
+      conf: overallConf != null ? `${(overallConf * 100).toFixed(1)}%` : '—',
       summary: cycleStep > 1
         ? `Generated ${categoryForecasts.length || 0} category forecasts for ${cycleMonth} · Trained through ${cycleTrainedUntil}`
         : `Ready to forecast ${cycleMonth} · Model trained through ${cycleTrainedUntil}`,
     },
     {
       step: 2, name: 'Actuals Ingestion',
-      status: cycleActualsUploaded ? 'Completed' : cycleStep === 2 ? 'Active' : 'Waiting',
-      comp: cycleActualsUploaded ? '100%' : '0%', exec: cycleActualsUploaded ? '2.1s' : '—', conf: '94.2%',
+      status: stepStatus(2, 1),
+      comp: (() => {
+        if (!cycleActualsUploaded) return '0%'
+        const s = stageStatuses[1]
+        if (s === 'SKIPPED' || s === 'FAILED') return '—'
+        if (cycleUploadResult?.records_matched === 0) return '—'
+        return '100%'
+      })(),
+      exec: stepExec(1),
+      conf: cycleUploadResult?.mape_val != null ? `MAPE ${cycleUploadResult.mape_val.toFixed(2)}%` : '—',
       summary: cycleActualsUploaded
-        ? `Actuals ingested for ${cycleMonth} · ${cycleUploadResult?.records_loaded?.toLocaleString() || 0} records`
+        ? (() => {
+            const reason = stepSkipReason(1)
+            if (reason) return `Skipped — ${reason}`
+            if (cycleUploadResult?.records_matched === 0)
+              return `Skipped — 0 of ${cycleUploadResult?.records_loaded ?? 0} records matched forecast entities for ${cycleMonth}`
+            return `Actuals ingested for ${cycleMonth} · ${cycleUploadResult?.records_loaded != null ? cycleUploadResult.records_loaded.toLocaleString() : '—'} records`
+          })()
         : `Awaiting actual CSV upload for ${cycleMonth}`,
     },
     {
       step: 3, name: 'Validation & Deviation',
-      status: cycleStep > 3 ? 'Completed' : cycleStep === 3 ? 'Active' : 'Waiting',
-      comp: cycleStep > 3 ? '100%' : '0%', exec: '0.8s', conf: '91.5%',
-      summary: cycleStep > 3
-        ? cycleUploadResult?.mape_val != null
-          ? `MAPE: ${cycleUploadResult.mape_val.toFixed(2)}% · Accuracy: ${(100 - cycleUploadResult.mape_val).toFixed(1)}%`
-          : `${cycleUploadResult?.records_matched ?? 0} matched · awaiting actuals for ${cycleMonth}`
-        : 'Pending actuals ingestion',
+      status: stepStatus(3, 3),
+      comp: stepComp(3, 3),
+      exec: stepExec(3),
+      conf: '—',
+      summary: (() => {
+        const reason = stepSkipReason(3)
+        if (reason) return `Skipped — ${reason}`
+        if (cycleStep > 3)
+          return cycleUploadResult?.mape_val != null
+            ? `MAPE: ${cycleUploadResult.mape_val.toFixed(2)}%`
+            : `${cycleUploadResult?.records_matched ?? 0} matched · awaiting actuals for ${cycleMonth}`
+        return 'Pending actuals ingestion'
+      })(),
     },
     {
       step: 4, name: 'Root Cause Analysis',
       status: cycleStep > 4 ? 'Completed' : cycleStep === 4 ? 'Active' : 'Waiting',
-      comp: cycleStep > 4 ? '100%' : '0%', exec: '3.2s', conf: '93.0%',
+      comp: cycleStep > 4 ? '100%' : '0%',
+      exec: '—',
+      conf: '—',
       summary: cycleStep > 4 ? 'Root cause identified — see Risk Center' : 'Pending validation',
     },
     {
       step: 5, name: 'Knowledge Graph Mutation',
-      status: cycleStep > 5 ? 'Completed' : cycleStep === 5 ? 'Active' : 'Waiting',
-      comp: cycleStep > 5 ? '100%' : '0%', exec: '1.1s', conf: '95.0%',
-      summary: cycleStep > 5 ? `Neo4j risk scores updated · ${activeGraphVersion}` : 'Pending RCA',
+      status: stepStatus(5, 4),
+      comp: stepComp(5, 4),
+      exec: stepExec(4),
+      conf: '—',
+      summary: (() => {
+        const reason = stepSkipReason(4)
+        if (reason) return `Skipped — ${reason}`
+        return cycleStep > 5 ? `Neo4j risk scores updated${activeGraphVersion ? ` · ${activeGraphVersion}` : ''}` : 'Pending RCA'
+      })(),
     },
     {
       step: 6, name: 'TPKE Evolution',
       status: cycleStep > 6 ? 'Completed' : cycleStep === 6 ? 'Active' : 'Waiting',
-      comp: cycleStep > 6 ? '100%' : '0%', exec: '2.5s', conf: '92.0%',
-      summary: cycleStep > 6 ? `TPKE edges evolved · ${activeTpkeVersion}` : 'Pending graph mutation',
+      comp: cycleStep > 6 ? '100%' : '0%',
+      exec: '—',
+      conf: '—',
+      summary: cycleStep > 6 ? `TPKE edges evolved${activeTpkeVersion ? ` · ${activeTpkeVersion}` : ''}` : 'Pending graph mutation',
     },
     {
       step: 7, name: 'Agent Memory & Weights',
-      status: cycleStep > 7 ? 'Completed' : cycleStep === 7 ? 'Active' : 'Waiting',
-      comp: cycleStep > 7 ? '100%' : '0%', exec: '1.9s', conf: '96.5%',
-      summary: cycleStep > 7 ? 'Agent memory retrained on latest cycle data' : 'Pending TPKE evolution',
+      status: stepStatus(7, 5),
+      comp: stepComp(7, 5),
+      exec: stepExec(5),
+      conf: '—',
+      summary: (() => {
+        const reason = stepSkipReason(5)
+        if (reason) return `Skipped — ${reason}`
+        return cycleStep > 7 ? 'Agent memory retrained on latest cycle data' : 'Pending TPKE evolution'
+      })(),
     },
     {
       step: 8, name: 'Next Forecast Readiness',
       status: cycleStep === 8 ? 'Active' : cycleStep > 8 ? 'Completed' : 'Waiting',
-      comp: cycleStep >= 8 ? '100%' : '0%', exec: '0.2s', conf: '98.0%',
+      comp: cycleStep >= 8 ? '100%' : '0%',
+      exec: stepExec(6),
+      conf: '—',
       summary: cycleStep >= 8 ? `Cycle complete — ready to advance to next period` : 'Awaiting cycle completion',
     },
   ]
@@ -978,7 +1062,8 @@ export default function ForecastPage() {
     ;(monthlyTrend || []).forEach(m => { trendMap[m.period] = m.orders || 0 })
 
     // Build forecast order count for cycleMonth from categoryForecasts
-    const forecastOrderCount = categoryForecasts.reduce((s, c) => s + (c.order_count || 0), 0)
+    // Defect 5: preserve null order_count — use only non-null values
+    const forecastOrderCount = categoryForecasts.filter(c => c.order_count != null).reduce((s, c) => s + c.order_count, 0) || 0
 
     // ingestedMap: period → { forecast_orders, actual_orders }
     const ingestedMap = {}
@@ -1016,40 +1101,29 @@ export default function ForecastPage() {
     })
   }, [monthlyTrend, cycleUploadResult, completedCycles, cycleMonth, categoryForecasts])
 
-  // Confidence timeline — 12-month sliding window ending at cycleMonth
+  // Confidence timeline — only populated from real upload results.
+  // Periods without a real validation result render null (chart skips them).
 
   const confidenceTimeline = useMemo(() => {
 
     const trendMap = {}
 
-    ;(monthlyTrend || []).forEach((m, i) => {
-
-      const predConf = round(88.0 + (i * 0.3) + (overallConf * 5), 1)
-
-      const valConf  = round(predConf - 2.2 + (i * 0.1), 1)
-
-      trendMap[m.period] = { prediction_confidence: predConf, validation_confidence: valConf, rolling_average: round((predConf + valConf) / 2, 1) }
-
-    })
-
-    if (cycleUploadResult?.mape_val != null) {
-      const acc = parseFloat((100 - cycleUploadResult.mape_val).toFixed(1))
+    if (cycleUploadResult?.mape_val != null && overallConf != null) {
+      const valConf = Math.max(0, Math.min(100, parseFloat((100 - cycleUploadResult.mape_val).toFixed(1))))
 
       trendMap[cycleUploadResult.period] = {
 
         prediction_confidence: round(overallConf * 100, 1),
 
-        validation_confidence: round(acc, 1),
+        validation_confidence: valConf,
 
-        rolling_average: round((overallConf * 100 + acc) / 2, 1),
+        rolling_average: round((overallConf * 100 + valConf) / 2, 1),
 
       }
 
     }
 
     const window = buildMonthSequence(cycleMonth, 12)
-
-    const baseConf = round(88.0 + (overallConf * 5), 1)
 
     return window.map(period => {
 
@@ -1059,17 +1133,17 @@ export default function ForecastPage() {
 
         month: period,
 
-        prediction_confidence: pt?.prediction_confidence ?? baseConf,
+        prediction_confidence: pt?.prediction_confidence ?? null,
 
-        validation_confidence: pt?.validation_confidence ?? round(baseConf - 2.2, 1),
+        validation_confidence: pt?.validation_confidence ?? null,
 
-        rolling_average:       pt?.rolling_average       ?? round(baseConf - 1.1, 1),
+        rolling_average:       pt?.rolling_average       ?? null,
 
       }
 
     })
 
-  }, [monthlyTrend, overallConf, cycleUploadResult, cycleMonth])
+  }, [overallConf, cycleUploadResult, cycleMonth])
 
   // Deviation Breakdown chart data — only from real upload result, never fabricated
   const deviationData = useMemo(() => {
@@ -1103,8 +1177,8 @@ export default function ForecastPage() {
     const agMap = { 'Demand Agent': [], 'Supplier Agent': [], 'Logistics Agent': [] }
     compRecs.forEach(r => {
       const agent = r.responsible_agent || 'Demand Agent'
-      if (r.deviation_pct != null && agMap[agent]) {
-        const acc = Math.max(70.0, Math.min(99.9, 100.0 - Math.abs(parseFloat(r.deviation_pct))))
+      if (r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct)) && agMap[agent]) {
+        const acc = Math.max(0, Math.min(100, 100.0 - Math.abs(parseFloat(r.deviation_pct))))
         agMap[agent].push(acc)
       }
     })
@@ -1324,7 +1398,7 @@ export default function ForecastPage() {
 
             <span className={styles.execLabel}>Confidence</span>
 
-            <span className={styles.execVal} style={{ color: '#00b894' }}>{(overallConf * 100).toFixed(1)}%</span>
+            <span className={styles.execVal} style={{ color: '#00b894' }}>{overallConf != null ? `${(overallConf * 100).toFixed(1)}%` : '—'}</span>
 
           </div>
 
@@ -1332,7 +1406,7 @@ export default function ForecastPage() {
 
             <span className={styles.execLabel}>Graph Version</span>
 
-            <span className={styles.execVal}>{activeGraphVersion}</span>
+            <span className={styles.execVal}>{activeGraphVersion || '—'}</span>
 
           </div>
 
@@ -1340,7 +1414,7 @@ export default function ForecastPage() {
 
             <span className={styles.execLabel}>TPKE Version</span>
 
-            <span className={styles.execVal}>{activeTpkeVersion}</span>
+            <span className={styles.execVal}>{activeTpkeVersion || '—'}</span>
 
           </div>
 
@@ -1596,11 +1670,9 @@ export default function ForecastPage() {
 
                       const mape = cycleUploadResult?.mape_val != null ? cycleUploadResult.mape_val.toFixed(2) : '—'
 
-                      const acc  = cycleUploadResult?.mape_val != null ? (100 - cycleUploadResult.mape_val).toFixed(1) : '—'
-
                       setTimeout(() => {
 
-                        appendLog(3, `📊 MAPE: ${mape}% · Accuracy: ${acc}%`)
+                        appendLog(3, `📊 MAPE: ${mape}%`)
 
                         appendLog(3, '✅ Deviation analysis complete', true)
 
@@ -1749,11 +1821,11 @@ export default function ForecastPage() {
                         layer: 'TPKE', highlightNode: 'supplier_main',
                         period: cycleMonth,
                         tpkeVersion: activeTpkeVersion,
-                        tpkeEdgesEvolved: 14,
-                        message: `TPKE evolved — ${activeTpkeVersion} · ${cycleMonth} · 14 edges updated`,
+                        tpkeEdgesEvolved: tpkeStatus.edges_evolved ?? null,
+                        message: `TPKE evolved — ${activeTpkeVersion || '—'} · ${cycleMonth}`,
                       }))
                       setTimeout(() => {
-                        appendLog(6, `✅ TPKE edges evolved — ${activeTpkeVersion}`, true)
+                        appendLog(6, `✅ TPKE edges evolved — ${activeTpkeVersion || '—'}`, true)
                         setCycleStep(7)
                       }, 800)
                     }}
@@ -1776,8 +1848,8 @@ export default function ForecastPage() {
                         layer: 'TPKE', highlightNode: 'supplier_main',
                         period: cycleMonth,
                         tpkeVersion: activeTpkeVersion,
-                        tpkeEdgesEvolved: 14,
-                        message: `TPKE evolved — ${activeTpkeVersion} · ${cycleMonth} · 14 edges updated`,
+                        tpkeEdgesEvolved: tpkeStatus.edges_evolved ?? null,
+                        message: `TPKE evolved — ${activeTpkeVersion || '—'} · ${cycleMonth}`,
                       }))
                       navigateToPage('/graph')
                     }}>
@@ -1939,7 +2011,7 @@ export default function ForecastPage() {
             const medRisk  = cats.filter(c => (c.combined_risk || 0) >= 0.35 && (c.combined_risk || 0) < 0.65).length
             const lowRisk  = cats.filter(c => (c.combined_risk || 0) < 0.35).length
             const p = forecastAnimating ? forecastTick / 100 : 1
-            const demandConf = round(overallConf * 100, 1)
+            const demandConf = overallConf != null ? round(overallConf * 100, 1) : null
             const ingestedTotal    = cycleUploadResult?.chart_point?.actual ?? null
             const ingestedForecast = cycleUploadResult?.chart_point?.forecast ?? null
             return (
@@ -1948,7 +2020,7 @@ export default function ForecastPage() {
                 <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid var(--blue)', boxShadow: '0 0 0 2px rgba(91,138,255,0.15)' } : {}}>
                   <div className={styles.agentHead}>
                     <div className={styles.agentName}><Users size={15} style={{ color: 'var(--blue)' }} /> Demand Agent</div>
-                    <span className="badge bdg-low">{forecastAnimating ? round(demandConf * p, 1) : demandConf}% Conf</span>
+                    <span className="badge bdg-low">{demandConf != null ? `${forecastAnimating ? round(demandConf * p, 1) : demandConf}% Conf` : '—'}</span>
                   </div>
                   <div className={styles.agentPredVal} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                     <span style={{ fontSize: 17 }}>{forecastAnimating ? Math.round(totalDemand * p).toLocaleString() : totalDemand.toLocaleString()} Units</span>
@@ -1980,7 +2052,7 @@ export default function ForecastPage() {
                 <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #e67e22', boxShadow: '0 0 0 2px rgba(230,126,34,0.12)' } : {}}>
                   <div className={styles.agentHead}>
                     <div className={styles.agentName}><Factory size={15} style={{ color: '#e67e22' }} /> Supplier Agent</div>
-                    <span className="badge bdg-med">{round(overallConf * 96.8, 1)}% Conf</span>
+                    <span className="badge bdg-med">{overallConf != null ? `${round(overallConf * 96.8, 1)}% Conf` : '—'}</span>
                   </div>
                   <div className={styles.agentPredVal} style={{ color: '#e67e22', fontSize: 17 }}>
                     {avgLateRisk != null ? `${(forecastAnimating ? avgLateRisk * p * 100 : avgLateRisk * 100).toFixed(1)}% Late Risk` : '—'}
@@ -2006,7 +2078,7 @@ export default function ForecastPage() {
                 <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #d63031', boxShadow: '0 0 0 2px rgba(214,48,49,0.12)' } : {}}>
                   <div className={styles.agentHead}>
                     <div className={styles.agentName}><Truck size={15} style={{ color: '#d63031' }} /> Logistics Agent</div>
-                    <span className="badge bdg-high">{round(overallConf * 94.4, 1)}% Conf</span>
+                    <span className="badge bdg-high">{overallConf != null ? `${round(overallConf * 94.4, 1)}% Conf` : '—'}</span>
                   </div>
                   <div className={styles.agentPredVal} style={{ color: '#d63031', fontSize: 17 }}>
                     {avgShipDays != null ? `${(forecastAnimating ? avgShipDays * p : avgShipDays).toFixed(2)}d Delay` : '—'}
@@ -2063,7 +2135,7 @@ export default function ForecastPage() {
 
               const cats = categoryForecasts
 
-              const totalDemand = cats.reduce((s, c) => s + (c.predicted_demand ?? 0), 0)
+              const totalDemand = cats.filter(c => c.predicted_demand != null).reduce((s, c) => s + c.predicted_demand, 0)
 
               const validLate = cats.filter(c => c.late_delivery_risk != null)
               const avgLateRisk = validLate.length > 0
@@ -2133,7 +2205,7 @@ export default function ForecastPage() {
 
                     <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--blue)' }}>Decision Coordinator</span>
 
-                    <span style={{ fontSize: '9px', color: '#00b894', fontWeight: 700 }}>Confidence: {(overallConf * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '9px', color: '#00b894', fontWeight: 700 }}>Confidence: {overallConf != null ? `${(overallConf * 100).toFixed(1)}%` : '—'}</span>
 
                   </div>
 
@@ -2383,11 +2455,15 @@ export default function ForecastPage() {
 
               <div style={{ fontSize: '11px', color: 'var(--ts)', lineHeight: 1.4 }}>
 
-                Graph Version: <strong>{activeTpkeVersion}</strong><br />
+                Graph Version: <strong>{activeTpkeVersion || '—'}</strong><br />
 
-                Learned Relationships: 14 edges updated<br />
+                {tpkeStatus.edges_evolved != null
+                  ? <>Learned Relationships: <strong>{tpkeStatus.edges_evolved} edges updated</strong><br /></>
+                  : null}
 
-                Temporal Edge Confidence: 92.4%
+                {tpkeStatus.edge_confidence != null
+                  ? <>Temporal Edge Confidence: <strong>{(tpkeStatus.edge_confidence * 100).toFixed(1)}%</strong></>
+                  : null}
 
               </div>
 
@@ -2423,7 +2499,7 @@ export default function ForecastPage() {
 
                   <span>Current Forecast Complete</span>
 
-                  <span style={{ color: '#00b894', fontWeight: 700 }}>✓</span>
+                  <span style={{ color: cycleStep > 1 ? '#00b894' : 'var(--tm)', fontWeight: 700 }}>{cycleStep > 1 ? '✓' : '—'}</span>
 
                 </div>
 
@@ -2431,7 +2507,7 @@ export default function ForecastPage() {
 
                   <span>Validation & Deviation Analysis</span>
 
-                  <span style={{ color: '#00b894', fontWeight: 700 }}>✓</span>
+                  <span style={{ color: cycleStep > 3 ? '#00b894' : 'var(--tm)', fontWeight: 700 }}>{cycleStep > 3 ? '✓' : '—'}</span>
 
                 </div>
 
@@ -2439,7 +2515,7 @@ export default function ForecastPage() {
 
                   <span>Knowledge Graph & TPKE Evolved</span>
 
-                  <span style={{ color: '#00b894', fontWeight: 700 }}>✓</span>
+                  <span style={{ color: cycleStep > 6 ? '#00b894' : 'var(--tm)', fontWeight: 700 }}>{cycleStep > 6 ? '✓' : '—'}</span>
 
                 </div>
 
@@ -2447,7 +2523,7 @@ export default function ForecastPage() {
 
                   <span>Agent Memory Retrained</span>
 
-                  <span style={{ color: '#00b894', fontWeight: 700 }}>✓</span>
+                  <span style={{ color: cycleStep > 7 ? '#00b894' : 'var(--tm)', fontWeight: 700 }}>{cycleStep > 7 ? '✓' : '—'}</span>
 
                 </div>
 
@@ -2457,7 +2533,9 @@ export default function ForecastPage() {
 
                 <span style={{ fontSize: '10px', color: 'var(--tm)' }}>Readiness Score</span>
 
-                <span className="badge bdg-low">96% Ready</span>
+                <span className={`badge ${cycleStep >= 8 ? 'bdg-low' : 'bdg-med'}`}>
+                  {cycleStep >= 8 ? 'Ready' : `Step ${cycleStep} of 8`}
+                </span>
 
               </div>
 
@@ -2479,7 +2557,7 @@ export default function ForecastPage() {
 
               </div>
 
-              <span className="badge bdg-blue">Confidence: {(overallConf * 100).toFixed(1)}%</span>
+              <span className="badge bdg-blue">Confidence: {overallConf != null ? `${(overallConf * 100).toFixed(1)}%` : '—'}</span>
 
             </div>
 
@@ -2513,7 +2591,7 @@ export default function ForecastPage() {
 
                     <div className={styles.decisionMetricsBox}>
                       <div style={{ fontSize: '9.5px', color: '#94a3b8', textTransform: 'uppercase' }}>Overall Confidence</div>
-                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#00b894' }}>{(overallConf * 100).toFixed(1)}%</div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#00b894' }}>{overallConf != null ? `${(overallConf * 100).toFixed(1)}%` : '—'}</div>
                     </div>
 
                     <div className={styles.decisionMetricsBox}>
@@ -2572,10 +2650,10 @@ export default function ForecastPage() {
 
           {cycleActualsUploaded && cycleUploadResult && (
             <div style={{ padding: '10px 16px', background: 'rgba(0,184,148,0.08)', border: '1.5px solid #00b894', borderRadius: 8, fontSize: '11px', color: '#00b894', fontWeight: 700 }}>
-              ✅ {cycleUploadResult.records_loaded?.toLocaleString()} records ingested for {cycleUploadResult.period}
+              ✅ {cycleUploadResult.records_loaded?.toLocaleString() ?? '—'} records ingested for {cycleUploadResult.period}
               {cycleUploadResult.mape_val != null
-                ? ` · MAPE: ${cycleUploadResult.mape_val.toFixed(2)}% · Accuracy: ${(100 - cycleUploadResult.mape_val).toFixed(1)}%`
-                : ` · ${cycleUploadResult.records_matched} matched · no actuals — awaiting actuals for ${cycleUploadResult.period}`}
+                ? ` · MAPE: ${cycleUploadResult.mape_val.toFixed(2)}% · Coverage: ${cycleUploadResult.forecast_coverage?.total ?? '—'}/${cycleUploadResult.forecast_coverage?.of ?? '—'} entities`
+                : ` · ${cycleUploadResult.records_matched ?? '—'} matched · no actuals — awaiting actuals for ${cycleUploadResult.period}`}
             </div>
           )}
 
@@ -2771,7 +2849,8 @@ export default function ForecastPage() {
               const recs = cycleUploadResult.comparison_records.filter(r => r.matched && r.actual_value != null && r.forecast_value != null)
               if (recs.length === 0) return null
               const chartData = recs
-                .sort((a, b) => Math.abs(parseFloat(b.deviation_pct||0)) - Math.abs(parseFloat(a.deviation_pct||0)))
+                .filter(r => r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct)))
+                .sort((a, b) => Math.abs(parseFloat(b.deviation_pct)) - Math.abs(parseFloat(a.deviation_pct)))
                 .map(r => ({
                   name: r.entity_id,
                   predicted: Math.round(r.forecast_value),
@@ -3031,9 +3110,9 @@ export default function ForecastPage() {
 
                     <th style={{ padding: '6px 8px' }}>Validation Status</th>
 
-                    <th style={{ padding: '6px 8px' }}>Accuracy</th>
-
                     <th style={{ padding: '6px 8px' }}>MAPE</th>
+
+                    <th style={{ padding: '6px 8px' }}>Coverage</th>
 
                     <th style={{ padding: '6px 8px' }}>Timestamp</th>
 
@@ -3049,7 +3128,7 @@ export default function ForecastPage() {
 
                       <td style={{ padding: '6px 8px', fontWeight: 700, color: 'var(--blue)' }}>{h.period}</td>
 
-                      <td style={{ padding: '6px 8px' }}>{(h.records || 0).toLocaleString()}</td>
+                      <td style={{ padding: '6px 8px' }}>{h.records != null ? h.records.toLocaleString() : '—'}</td>
 
                       <td style={{ padding: '6px 8px' }}>
 
@@ -3057,9 +3136,9 @@ export default function ForecastPage() {
 
                       </td>
 
-                      <td style={{ padding: '6px 8px', color: '#00b894', fontWeight: 700 }}>{h.accuracy}</td>
-
                       <td style={{ padding: '6px 8px', color: '#e67e22' }}>{h.mape}</td>
+
+                      <td style={{ padding: '6px 8px', color: 'var(--ts)' }}>{h.coverage || '—'}</td>
 
                       <td style={{ padding: '6px 8px', color: 'var(--ts)', fontSize: '10px' }}>{h.timestamp}</td>
 

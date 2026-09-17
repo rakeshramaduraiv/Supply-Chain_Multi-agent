@@ -211,8 +211,22 @@ class BaseTrainer:
                     fold_dict["n_test"] = fold_dict.get("test_size", 0)
 
         # Step 5: Train final model on full training set
+        # LightGBM models use early stopping on a chronological 10% val split
+        # to prevent overfitting — the primary cause of high prediction error.
         model = self._create_model(intelligence_type)
-        model.fit(X_train, y_train)
+        is_lgbm = isinstance(model, (LGBMRegressor, LGBMClassifier))
+        if is_lgbm and len(X_train) > 1000:
+            val_split = int(len(X_train) * 0.9)
+            X_tr, X_val = X_train.iloc[:val_split], X_train.iloc[val_split:]
+            y_tr, y_val = y_train.iloc[:val_split], y_train.iloc[val_split:]
+            model.fit(
+                X_tr, y_tr,
+                eval_set=[(X_val, y_val)],
+                callbacks=[__import__("lightgbm").early_stopping(50, verbose=False),
+                           __import__("lightgbm").log_evaluation(period=-1)],
+            )
+        else:
+            model.fit(X_train, y_train)
 
         # Step 6: Evaluate on leakage-free holdout
         y_pred = model.predict(X_test)

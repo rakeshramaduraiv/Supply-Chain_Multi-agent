@@ -86,7 +86,7 @@ class ClosedLoopOrchestrator:
         self._memory = get_agent_memory()
 
     async def run_closed_loop_cycle(
-        self, dataset_name: str = "synthetic_2018-01.csv", target_entity_id: str = "SUP_001"
+        self, dataset_name: str = "actuals_upload.csv", target_entity_id: str = "SUP_001"
     ) -> ClosedLoopCycleResult:
         """
         Execute full 17-stage closed-loop intelligent cycle.

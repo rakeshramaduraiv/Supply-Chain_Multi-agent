@@ -29,6 +29,21 @@ class MonthlyUploadResponse(BaseModel):
     uploaded_at: str
 
 
+class ComparisonRecord(BaseModel):
+    """Per-entity forecast vs actual comparison row."""
+    entity_id: str
+    entity_type: str
+    forecast_value: float | None       # null = no forecast generated
+    actual_value: float | None         # null = entity absent from actuals
+    actual_unit: str                   # "units" for demand, "probability" for risk agents
+    n_rows: int                        # rows in uploaded CSV that matched this entity
+    n_unparsed: int                    # rows whose quantity could not be parsed
+    matched: bool                      # True only when actual_value is not null
+    deviation_pct: float | None        # null when either value is null
+    responsible_agent: str
+    reason: str
+
+
 class ActualUploadResponse(BaseModel):
     """Response after uploading actual performance data."""
     upload_id: str
@@ -38,6 +53,7 @@ class ActualUploadResponse(BaseModel):
     records_matched: int
     overall_accuracy: float | None = None  # None when not yet computed
     deviation_summary: dict[str, Any]
+    comparison_records: list[ComparisonRecord] = []
     status: str
     uploaded_at: str
 

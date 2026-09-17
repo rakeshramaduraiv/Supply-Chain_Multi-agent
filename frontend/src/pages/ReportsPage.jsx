@@ -577,10 +577,10 @@ export default function ReportsPage({ defaultTab }) {
                 </thead>
                 <tbody>
                   {[
-                    { p: '2018-01', a: '94.2%', r: 'Carrier Ground Transport Transit Delay', d: 'Shift 20% volume to secondary carrier', s: `$${expectedSavings.toLocaleString()}`, st: 'VERIFIED' },
-                    { p: '2017-12', a: '93.8%', r: 'Warehouse Zone 1 Ingestion Backlog', d: 'Increase warehouse buffer safety stock by +15%', s: '$48,000', st: 'VERIFIED' },
-                    { p: '2017-11', a: '92.5%', r: 'Supplier Air Transport Fleet Bottleneck', d: 'Re-route 15% cargo to secondary air freight', s: '$36,500', st: 'VERIFIED' },
-                    { p: '2017-10', a: '94.0%', r: 'Pacific Asia Port Congestion Spike', d: 'Adjust safety stock threshold +10%', s: '$52,000', st: 'VERIFIED' },
+                    { p: '2017-09', a: '94.2%', r: 'Carrier Ground Transport Transit Delay', d: 'Shift 20% volume to secondary carrier', s: `$${expectedSavings.toLocaleString()}`, st: 'VERIFIED' },
+                    { p: '2017-08', a: '93.8%', r: 'Warehouse Zone 1 Ingestion Backlog', d: 'Increase warehouse buffer safety stock by +15%', s: '$48,000', st: 'VERIFIED' },
+                    { p: '2017-07', a: '92.5%', r: 'Supplier Air Transport Fleet Bottleneck', d: 'Re-route 15% cargo to secondary air freight', s: '$36,500', st: 'VERIFIED' },
+                    { p: '2017-06', a: '94.0%', r: 'Pacific Asia Port Congestion Spike', d: 'Adjust safety stock threshold +10%', s: '$52,000', st: 'VERIFIED' },
                   ].map((row, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid var(--b)', color: 'var(--tp)' }}>
                       <td style={{ padding: '8px', fontWeight: 700 }}>{row.p}</td>

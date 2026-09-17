@@ -1,9 +1,7 @@
 /**
  * DataSourceBadge.jsx
  *
- * Shows "Real held-out data (2017-10 to 2018-01)" or "Synthetic"
- * depending on use_real_holdout_actuals from the backend.
- * A viewer always knows which mode is running.
+ * Shows data source mode from the backend.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -19,15 +17,15 @@ export default function DataSourceBadge({ style }) {
 
   const isReal = data?.use_real_holdout_actuals ?? false
   const label  = isReal
-    ? `Real held-out data (${data?.actuals_range ?? '2017-10 to 2018-01'})`
+    ? `Real held-out data (${data?.actuals_range ?? ''})`
     : 'Synthetic data'
   const color  = isReal ? '#00b894' : '#f59e0b'
 
   return (
     <span
       title={isReal
-        ? 'Models trained on data before 2017-10-01. Holdout months are genuine unseen data.'
-        : 'Evaluation uses synthetic continuation data. Set USE_REAL_HOLDOUT_ACTUALS=true for real evaluation.'}
+        ? 'Models trained on DataCo dataset. Holdout months are genuine unseen data.'
+        : 'Evaluation uses synthetic continuation data.'}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

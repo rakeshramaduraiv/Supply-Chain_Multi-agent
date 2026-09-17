@@ -218,8 +218,8 @@ def _compute_summary() -> dict:
         _next_start = (_end_ts + pd.offsets.MonthBegin(1)).strftime("%Y-%m-%d")
         _next_end = (_end_ts + pd.offsets.MonthEnd(1)).strftime("%Y-%m-%d")
     except Exception:
-        _next_start = "2017-11-01"
-        _next_end   = "2017-11-30"
+        _next_start = ""
+        _next_end   = ""
 
     _cache = {
         "ready": True,
@@ -503,53 +503,96 @@ def _compute_auto_forecast() -> dict:
 
         # Aggregate by category × region for detailed forecast
         category_forecasts = []
+
+        # Pre-load all active models once
+        active_models: dict = {}
+        active_features: dict = {}
+        for intel_type in IntelligenceType:
+            versions = registry_data.get(intel_type.value, [])
+            active = [v for v in versions if v.get("is_active")]
+            if not active:
+                continue
+            model_info = active[-1]
+            model_path = Path(settings.model_dir).parent / model_info["model_path"]
+            if not model_path.exists():
+                model_path = Path(model_info["model_path"])
+            if not model_path.exists():
+                continue
+            m = joblib.load(model_path)
+            feat_cfg = FEATURE_CONFIGS[intel_type]
+            avail_feats = [f for f in feat_cfg.features if f in template.columns]
+            if avail_feats:
+                active_models[intel_type] = m
+                active_features[intel_type] = avail_feats
+
         for (cat, region), grp in template.groupby(["Category Name", "Order Region"]):
-            if len(grp) < 5:
+            if len(grp) < 3:
                 continue
 
             row_result = {"category": cat, "region": region, "order_count": len(grp)}
 
-            for intel_type in IntelligenceType:
-                versions = registry_data.get(intel_type.value, [])
-                active = [v for v in versions if v.get("is_active")]
-                if not active:
-                    continue
+            # Demand: use model predictions (sum of per-row predicted quantities)
+            demand_model = active_models.get(IntelligenceType.DEMAND)
+            demand_feats = active_features.get(IntelligenceType.DEMAND, [])
+            if demand_model is not None and demand_feats:
+                try:
+                    X_grp = grp[demand_feats].fillna(0)
+                    preds_demand = demand_model.predict(X_grp)
+                    # Sum of per-row predictions = total predicted demand for this group
+                    predicted_demand_val = float(np.sum(preds_demand))
+                    # Clip to reasonable range: [0, 3x historical mean * n_rows]
+                    hist_mean = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
+                    predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * len(grp) * 3))
+                except Exception:
+                    predicted_demand_val = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
+            else:
+                predicted_demand_val = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
 
-                model_info = active[-1]
-                model_path = Path(settings.model_dir).parent / model_info["model_path"]
-                if not model_path.exists():
-                    model_path = Path(model_info["model_path"])
-                    if not model_path.exists():
-                        continue
-
-                model = joblib.load(model_path)
-                feature_config = FEATURE_CONFIGS[intel_type]
-                available_features = [f for f in feature_config.features if f in grp.columns]
-                if not available_features:
-                    continue
-
-                X_grp = grp[available_features].fillna(0)
-                preds_grp = model.predict(X_grp)
-                row_result[f"{intel_type.value}_risk"] = round(float(np.mean(preds_grp)), 4)
-
-            # Calculate predicted demand (units) & revenue for this category
-            mean_qty = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
-            total_qty = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
             avg_price = float(grp["Product Price"].mean()) if "Product Price" in grp.columns else 50.0
-            row_result["predicted_demand"] = round(total_qty, 2)
-            row_result["predicted_revenue"] = round(total_qty * avg_price, 2)
+            row_result["predicted_demand"] = round(predicted_demand_val, 2)
+            row_result["predicted_revenue"] = round(predicted_demand_val * avg_price, 2)
+
+            # Risk scores from classifier models
+            for intel_type in (IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS):
+                m = active_models.get(intel_type)
+                feats = active_features.get(intel_type, [])
+                if m is not None and feats:
+                    try:
+                        X_grp = grp[feats].fillna(0)
+                        if hasattr(m, "predict_proba"):
+                            risk_val = float(np.mean(m.predict_proba(X_grp)[:, 1]))
+                        else:
+                            risk_val = float(np.mean(m.predict(X_grp)))
+                        row_result[f"{intel_type.value}_risk"] = round(risk_val, 4)
+                    except Exception:
+                        pass
 
             # Combined risk
-            risks = [float(row_result.get(f"{t.value}_risk", 0)) for t in IntelligenceType]
+            risks = [float(row_result.get(f"{t.value}_risk", 0)) for t in (IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS)]
             valid_risks = [r for r in risks if r > 0]
             row_result["combined_risk"] = round(sum(valid_risks) / len(valid_risks) if valid_risks else 0.0, 4)
             category_forecasts.append(row_result)
 
         category_forecasts.sort(key=lambda x: x.get("combined_risk", 0), reverse=True)
 
-        # Overall confidence
-        numeric_confs = [float(v.get("confidence", 0)) for v in forecast_results.values() if isinstance(v, dict) and "confidence" in v]
-        overall_confidence = round(sum(numeric_confs) / len(numeric_confs) if numeric_confs else 0.0, 4)
+        # Overall confidence: use walk-forward R2/AUC from registry, not prediction std
+        overall_confidence = 0.0
+        conf_values = []
+        for intel_type in IntelligenceType:
+            versions = registry_data.get(intel_type.value, [])
+            active = [v for v in versions if v.get("is_active")]
+            if not active:
+                continue
+            v = active[-1]
+            metrics = v.get("metrics", {})
+            # Regression: use R2 clipped to [0,1]; Classification: use ROC-AUC
+            if v.get("task") == "regression":
+                r2 = float(metrics.get("r2", 0.0))
+                conf_values.append(max(0.0, min(1.0, r2)))
+            else:
+                auc = float(metrics.get("roc_auc", metrics.get("auc", 0.0)))
+                conf_values.append(max(0.0, min(1.0, auc)))
+        overall_confidence = round(sum(conf_values) / len(conf_values) if conf_values else 0.0, 4)
 
         # Derive forecast period dynamically from training data end
         summary = _compute_summary()
@@ -568,7 +611,7 @@ def _compute_auto_forecast() -> dict:
             "status": "completed",
             "overall_confidence": overall_confidence,
             "agent_results": forecast_results,
-            "category_forecasts": category_forecasts[:50],
+            "category_forecasts": category_forecasts,
             "total_forecasts": len(category_forecasts),
             "high_risk_count": sum(1 for f in category_forecasts if f.get("combined_risk", 0) >= 0.65),
             "medium_risk_count": sum(1 for f in category_forecasts if 0.35 <= f.get("combined_risk", 0) < 0.65),
@@ -757,7 +800,6 @@ def get_error_diagnostics(period_start: str = None):
     top_cats = (
         top_cats[top_cats["order_count"] >= 5]
         .sort_values("order_count", ascending=False)
-        .head(10)
     )
 
     for _, row in top_cats.iterrows():

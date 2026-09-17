@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useRiskPageData, useRcaInvestigationHistory } from '../hooks/useSupplyChainData'
 import { useSharedParams } from '../hooks/useSharedParams'
@@ -19,9 +19,9 @@ import {
 } from 'lucide-react'
 import s from './RiskPage.module.css'
 
-/* ── STATIC DATA ─────────────────────────────────────────────────────── */
+/* ── STATIC DATA (offline fallback only) ─────────────────────────────── */
 
-const ALL_INCIDENTS = [
+const FALLBACK_INCIDENTS = [
   {
     id: 'supplier_delay_main',
     name: 'Supplier Air Transport Disruption',
@@ -55,8 +55,8 @@ const ALL_INCIDENTS = [
     id: 'warehouse_bottleneck_main',
     name: 'Warehouse Zone 1 Capacity Queue',
     type: 'Warehouse',
-    period: '2017-10',
-    periodLabel: 'Oct 2017',
+    period: '2017-09',
+    periodLabel: 'Sep 2017',
     risk: '88.5%',
     riskVal: 0.885,
     severity: 'High',
@@ -72,7 +72,7 @@ const ALL_INCIDENTS = [
     customers: 680,
     products: 8,
     forecastDrop: 3.2,
-    startedTime: '2017-10-20 09:15',
+    startedTime: '2017-09-20 09:15',
     affectedSupplier: 'Supplier Ground Freight',
     affectedWarehouse: 'Warehouse Zone 1',
     businessCriticality: 'High Priority',
@@ -259,6 +259,7 @@ export default function RiskPage() {
           setSelectedIssueId(match.id)
           setSelectedType(match.type || 'Product')
           setFilterYear(focus.filterYear || 'All')
+          setActiveStep(3)
           localStorage.removeItem('amasci_rca_focus')
           setRcaFocus(null)
         }
@@ -279,23 +280,67 @@ export default function RiskPage() {
         setSelectedIssueId(match.id)
         setSelectedType(match.type || 'Product')
         setFilterYear(focus.filterYear || 'All')
+        setActiveStep(3) // Jump to Business Impact so RCA context is visible
         localStorage.removeItem('amasci_rca_focus')
         setRcaFocus(null)
         return
       }
     }
-    // No matching incident yet (e.g. deviation was below threshold) — just apply year filter
+    // No matching incident yet — apply year filter and show step 1
     if (focus.filterYear) {
       setFilterYear(focus.filterYear)
-      localStorage.removeItem('amasci_rca_focus')
-      setRcaFocus(null)
     }
+    // Keep rcaFocus so the Return banner stays visible
   }, [])
+  // Load RCA history from backend — must be declared before backendIncidents useMemo
+  const { data: rcaHistoryData } = useQuery({
+    queryKey: ['rca_history_incidents'],
+    queryFn: () => api.getRCAHistory().then(r => r.data?.data || r.data || []).catch(() => []),
+    retry: false,
+    staleTime: 60_000,
+  })
+
+  // Normalize backend RCA history records into incident shape
+  const backendIncidents = useMemo(() => {
+    const raw = Array.isArray(rcaHistoryData) ? rcaHistoryData : []
+    return raw.map(r => ({
+      id: r.id || r.incident_id || `rca_${r.period || Date.now()}`,
+      name: r.name || r.incident_name || r.primary_cause || 'Supply Chain Disruption',
+      type: r.type || r.entity_type || 'Supplier',
+      period: r.period || r.date?.slice(0, 7) || '',
+      periodLabel: r.period_label || r.period || '',
+      risk: r.risk_score != null ? `${(r.risk_score * 100).toFixed(1)}%` : r.risk || '—',
+      riskVal: (r.risk_score ?? (parseFloat(r.risk) / 100)) || 0.5,
+      severity: r.severity || (r.risk_score >= 0.8 ? 'Critical' : r.risk_score >= 0.6 ? 'High' : 'Medium'),
+      impact: r.impact || 'Medium',
+      confidence: r.confidence != null ? `${(r.confidence * 100).toFixed(0)}%` : '—',
+      financialLoss: r.financial_loss || r.financialLoss || 0,
+      affectedOrders: r.affected_orders || r.affectedOrders || 0,
+      expectedDelay: r.expected_delay || r.delay_days || 1.0,
+      region: r.region || 'Global',
+      warehouse: r.warehouse || 'Zone 1',
+      bu: r.business_unit || 'Operations',
+      status: r.status || 'Open RCA',
+      customers: r.affected_customers || 0,
+      products: r.affected_products || 1,
+      forecastDrop: r.forecast_drop || 0,
+      startedTime: r.started_time || r.created_at || r.date || '',
+      affectedSupplier: r.affected_supplier || r.root_cause_entity || 'Unknown Supplier',
+      affectedWarehouse: r.affected_warehouse || 'Warehouse Zone 1',
+      businessCriticality: r.business_criticality || 'Medium Priority',
+      graphConfidence: r.graph_confidence != null ? `${(r.graph_confidence * 100).toFixed(0)}%` : '—',
+      predictionSource: r.prediction_source || 'RCA Engine',
+      timeSinceDetection: r.time_since_detection || r.created_at || '',
+    }))
+  }, [rcaHistoryData])
+
   const ALL_INCIDENTS_LIVE = useMemo(() => {
-    const staticIds = new Set(ALL_INCIDENTS.map(i => i.id))
-    const fresh = forecastIncidents.filter(i => !staticIds.has(i.id))
-    return [...fresh, ...ALL_INCIDENTS]
-  }, [forecastIncidents])
+    // Prefer backend incidents; fall back to static only when backend returns nothing
+    const base = backendIncidents.length > 0 ? backendIncidents : FALLBACK_INCIDENTS
+    const baseIds = new Set(base.map(i => i.id))
+    const fresh = forecastIncidents.filter(i => !baseIds.has(i.id))
+    return [...fresh, ...base]
+  }, [forecastIncidents, backendIncidents])
 
   // Search & filters in queue
   const [searchQ, setSearchQ] = useState('')
@@ -456,69 +501,8 @@ export default function RiskPage() {
       } else if (forecastIncidents.some(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))) {
         list = forecastIncidents.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       } else {
-        // Dynamically map historical incidents for selected 2015-2017 year
-        const seed = (parseInt(filterYear, 10) * 17) % 100
-
-        list = [
-          {
-            id: `supplier_delay_${filterYear}`,
-            name: `Supplier Port Congestion & Lead-Time Delay (${filterYear})`,
-            type: 'Supplier',
-            period: `${filterYear}-06`,
-            periodLabel: `Year ${filterYear}`,
-            risk: `${(84 + (seed % 10)).toFixed(1)}%`,
-            riskVal: (84 + (seed % 10)) / 100,
-            severity: 'Critical',
-            impact: 'High',
-            confidence: `${(91 + (seed % 7))}%`,
-            financialLoss: 120000 + (seed * 3400),
-            affectedOrders: 1400 + (seed * 22),
-            expectedDelay: 2.2 + (seed % 3) * 0.5,
-            region: 'Western Europe',
-            warehouse: 'Zone 1',
-            bu: 'Sourcing',
-            status: 'Open RCA',
-            customers: 1350 + seed * 12,
-            products: 14,
-            forecastDrop: 5.2,
-            startedTime: `${filterYear}-06-15 08:30`,
-            affectedSupplier: 'Supplier Air Cargo',
-            affectedWarehouse: 'Warehouse Zone 1',
-            businessCriticality: 'Tier 1 Critical',
-            graphConfidence: '95%',
-            predictionSource: 'Historical Year Ingestion Engine',
-            timeSinceDetection: `Year ${filterYear} Grounded Record`
-          },
-          {
-            id: `warehouse_capacity_${filterYear}`,
-            name: `Regional Warehouse Capacity Queue (${filterYear})`,
-            type: 'Warehouse',
-            period: `${filterYear}-09`,
-            periodLabel: `Year ${filterYear}`,
-            risk: `${(79 + (seed % 12)).toFixed(1)}%`,
-            riskVal: (79 + (seed % 12)) / 100,
-            severity: 'High',
-            impact: 'High',
-            confidence: `${(89 + (seed % 6))}%`,
-            financialLoss: 58000 + (seed * 1800),
-            affectedOrders: 780 + (seed * 15),
-            expectedDelay: 1.5 + (seed % 2) * 0.4,
-            region: 'Pacific Asia',
-            warehouse: 'Zone 2',
-            bu: 'Distribution',
-            status: 'Investigating',
-            customers: 620 + seed * 8,
-            products: 9,
-            forecastDrop: 3.4,
-            startedTime: `${filterYear}-09-20 10:15`,
-            affectedSupplier: 'Regional Freight Carrier',
-            affectedWarehouse: 'Warehouse Zone 2',
-            businessCriticality: 'High Priority',
-            graphConfidence: '93%',
-            predictionSource: 'Capacity Stress Model',
-            timeSinceDetection: `Year ${filterYear} Grounded Record`
-          }
-        ]
+        // No incidents found for this year — show empty state, not fabricated data
+        list = []
       }
     }
 
@@ -615,9 +599,13 @@ export default function RiskPage() {
             <button
               className={s.hdrBtn}
               style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
-              onClick={() => { localStorage.removeItem('amasci_rca_focus'); setRcaFocus(null); navigateToPage('/forecast') }}
+              onClick={() => {
+                localStorage.removeItem('amasci_rca_focus')
+                setRcaFocus(null)
+                navigateToPage('/forecast')
+              }}
             >
-              ← Return to Forecast Lifecycle (Step 5)
+              ← Return to Forecast Lifecycle (Step {rcaFocus.returnStep || 5})
             </button>
           )}
           <button className={s.hdrBtn} onClick={() => setPipelineDrawerOpen(v => !v)}>

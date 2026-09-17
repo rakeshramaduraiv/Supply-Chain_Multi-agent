@@ -12,11 +12,11 @@ Executes a 12-Stage Automated Continuous Learning Pipeline upon actual CSV inges
 5. GCRCE Counterfactual Analysis
 6. Knowledge Graph Mutation (No Rebuild: Node properties, Edge weights, TPKE edges)
 7. Incremental GraphRAG Re-indexing (Embeddings & Retrieval Cache)
-8. Historical Dataset Expansion (2015-2018 -> 2015-Jan 2019 v2)
+8. Historical Dataset Expansion (cumulative)
 9. Model Retraining (Cumulative Expanded Dataset)
 10. Multi-Agent & RWDAA Refresh (Memory & Dynamic Confidence Weights)
-11. Next Planning Period Prediction (Auto-generate February 2019 Forecast)
-12. Workspace Cycle Status Transition ("Waiting for February 2019 Actual Dataset")
+11. Next Planning Period Prediction (Auto-generate next period Forecast)
+12. Workspace Cycle Status Transition
 """
 
 import logging
@@ -203,7 +203,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
         t0 = time.perf_counter()
         df_old = self._load_ground_truth_dataset()
         old_rows = len(df_old)
-        matched_records = min(new_rows, 2018)
+        matched_records = min(new_rows, old_rows) if old_rows > 0 else new_rows
         stages_output.append(EnterpriseLearningStageResult(
             stage=2, name="Record Matching", status="Completed",
             execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
@@ -448,7 +448,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
         # ── Stage 11: Next Planning Period Prediction (February 2019 Forecast) ───────────────
         t0 = time.perf_counter()
         next_forecast_data = _compute_auto_forecast()
-        next_period_str = "February 2019"
+        next_period_str = next_forecast_data.get("forecast_period") or "next period"
         stages_output.append(EnterpriseLearningStageResult(
             stage=11, name="Next Planning Period Prediction", status="Completed",
             execution_time=f"{(time.perf_counter() - t0)*1000:.1f}ms", confidence=None,
@@ -482,7 +482,7 @@ class EnterpriseContinuousLearningEngine(BaseService):
             timestamp=ts,
             period=period,
             filename=filename,
-            old_dataset_version="2015-2018_v1",
+            old_dataset_version="2015-2017_v1",
             new_dataset_version=new_version_tag,
             old_row_count=old_rows,
             new_rows_ingested=new_rows,

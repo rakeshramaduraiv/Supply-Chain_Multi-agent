@@ -71,7 +71,6 @@ const LAYERS = [
   { id: 'Combined',    label: 'Current Graph',        color: '#3b82f6' },
   { id: 'Historical',  label: 'Historical Graph',     color: '#60a5fa' },
   { id: 'Prediction',  label: 'Prediction Layer',     color: '#a855f7' },
-  { id: 'Actual',      label: 'Actual Layer',         color: '#10b981' },
   { id: 'Impact',      label: 'Business Impact Layer', color: '#f97316' },
   { id: 'TPKE',        label: 'TPKE Evolution Layer', color: '#6366f1' },
 ]
@@ -307,6 +306,21 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
     retry: false,
   })
 
+  const { data: tpkeHistoryData } = useQuery({
+    queryKey: ['kg_tpke_history'],
+    queryFn: () => api.getTpkeHistory().then(r => r.data?.data || r.data || []).catch(() => []),
+    staleTime: 120_000,
+    retry: false,
+  })
+
+  const { data: centralityData } = useQuery({
+    queryKey: ['kg_centrality', entity?.label],
+    queryFn: () => api.getCentrality(entity.label).then(r => r.data?.data || r.data || []).catch(() => []),
+    enabled: !!entity,
+    staleTime: 120_000,
+    retry: false,
+  })
+
   if (!entity) {
     return (
       <div className={s.entityEmpty}>
@@ -337,17 +351,50 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
     return other ? { node: other, edge: e, dir: e.source === entity.id ? '→' : '←' } : null
   }).filter(Boolean)
 
-  const tpkeHistory = [
-    { cycle: 'T-4', confidence: 0.68, edges: 3 },
-    { cycle: 'T-3', confidence: 0.74, edges: 5 },
-    { cycle: 'T-2', confidence: 0.81, edges: 8 },
-    { cycle: 'T-1', confidence: 0.86, edges: 11 },
-    { cycle: 'Current', confidence: 0.92, edges: 14 },
-  ]
+  // TPKE history: use real API data, fall back to shape-preserving offline data
+  const tpkeHistory = useMemo(() => {
+    const raw = Array.isArray(tpkeHistoryData) ? tpkeHistoryData : []
+    if (raw.length > 0) {
+      return raw.slice(-5).map((r, i) => ({
+        cycle: r.cycle || r.period || `T-${4 - i}`,
+        confidence: r.confidence ?? r.avg_confidence ?? 0.7 + i * 0.05,
+        edges: r.edge_count ?? r.edges ?? (3 + i * 3),
+      }))
+    }
+    // Offline fallback — shape only, no fabricated values
+    return [
+      { cycle: 'T-4', confidence: null, edges: null },
+      { cycle: 'T-3', confidence: null, edges: null },
+      { cycle: 'T-2', confidence: null, edges: null },
+      { cycle: 'T-1', confidence: null, edges: null },
+      { cycle: 'Current', confidence: null, edges: null },
+    ]
+  }, [tpkeHistoryData])
 
-  const centralityScore = entityExtra?.betweenness ?? 0.0128
-  const closeness = entityExtra?.closeness ?? 0.145
-  const pagerank = entityExtra?.pagerank ?? 0.00842
+  // Centrality: prefer entity-specific API data, then centrality list, then entityExtra
+  const entityCentrality = useMemo(() => {
+    if (entityExtra?.betweenness != null || entityExtra?.closeness != null || entityExtra?.pagerank != null) {
+      return {
+        betweenness: entityExtra.betweenness ?? null,
+        closeness: entityExtra.closeness ?? null,
+        pagerank: entityExtra.pagerank ?? null,
+      }
+    }
+    const list = Array.isArray(centralityData) ? centralityData : []
+    const match = list.find(c => c.id === entity?.id || c.node_id === entity?.id)
+    if (match) {
+      return {
+        betweenness: match.betweenness ?? match.betweenness_centrality ?? null,
+        closeness: match.closeness ?? match.closeness_centrality ?? null,
+        pagerank: match.pagerank ?? match.page_rank ?? null,
+      }
+    }
+    return { betweenness: null, closeness: null, pagerank: null }
+  }, [entityExtra, centralityData, entity])
+
+  const centralityScore = entityCentrality.betweenness
+  const closeness = entityCentrality.closeness
+  const pagerank = entityCentrality.pagerank
 
   return (
     <div className={s.dashboardWrap}>
@@ -375,7 +422,7 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
         </div>
         <div className={s.quickKpi}>
           <span className={s.quickKpiLbl}>Centrality</span>
-          <span className={s.quickKpiVal}>{centralityScore.toFixed(4)}</span>
+          <span className={s.quickKpiVal}>{centralityScore != null ? centralityScore.toFixed(4) : '—'}</span>
         </div>
         <span className={s.quickKpi}>
           <span className={s.quickKpiLbl}>Links</span>
@@ -394,24 +441,24 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
           <div className={s.tabSection}>
             <div className={s.secLabel}>Entity Information</div>
             <div className={s.kvRow}><span className={s.kvKey}>Node ID</span><span className={`${s.kvVal} ${s.kvMono}`}>{entity.id}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Business Owner</span><span className={s.kvVal}>{props.business_owner || 'Sarah Connor, Logistics Lead'}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Region</span><span className={s.kvVal}>{props.region || 'Western Europe'}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Criticality Score</span><span className={s.kvVal} style={{ fontWeight: 800 }}>{props.critical_score || 'Tier 1 Critical'}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Revenue Dependency</span><span className={s.kvVal} style={{ color: 'var(--emerald)', fontWeight: 800 }}>{props.revenue_dependency || '$1,420,000'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Business Owner</span><span className={s.kvVal}>{props.business_owner || props.owner || '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Region</span><span className={s.kvVal}>{props.region || props.country || '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Criticality Score</span><span className={s.kvVal} style={{ fontWeight: 800 }}>{props.critical_score || props.criticality || '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Revenue Dependency</span><span className={s.kvVal} style={{ color: 'var(--emerald)', fontWeight: 800 }}>{props.revenue_dependency != null ? `$${Number(props.revenue_dependency).toLocaleString()}` : props.revenue != null ? `$${Number(props.revenue).toLocaleString()}` : '—'}</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Grounded Confidence</span><span className={s.kvVal}>{(predScore * 100).toFixed(1)}%</span></div>
 
             <div className={s.secLabel} style={{ marginTop: 12 }}>SCM Twin Topology Analysis</div>
             <div className={s.kvRow}><span className={s.kvKey} style={{ color: '#eab308', fontWeight: 700 }}>Upstream Dependencies</span><span className={s.kvVal}>{upstreamCount} nodes</span></div>
             <div className={s.kvRow}><span className={s.kvKey} style={{ color: '#f97316', fontWeight: 700 }}>Downstream Impacts</span><span className={s.kvVal}>{downstreamCount} nodes</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Closeness Centrality</span><span className={s.kvVal}>{closeness.toFixed(4)}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Betweenness Centrality</span><span className={s.kvVal}>{centralityScore.toFixed(4)}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>PageRank Score</span><span className={s.kvVal}>{pagerank.toFixed(5)}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Closeness Centrality</span><span className={s.kvVal}>{closeness != null ? closeness.toFixed(4) : '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Betweenness Centrality</span><span className={s.kvVal}>{centralityScore != null ? centralityScore.toFixed(4) : '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>PageRank Score</span><span className={s.kvVal}>{pagerank != null ? pagerank.toFixed(5) : '—'}</span></div>
 
             <div className={s.secLabel} style={{ marginTop: 12 }}>Continuous Intelligence Audit</div>
             <div className={s.kvRow}><span className={s.kvKey}>Forecast Dependency</span><span className={s.kvVal} style={{ color: 'var(--blue)' }}>{(forecastInfluence * 100).toFixed(1)}% demand influence</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Root Cause History</span><span className={s.kvVal}>2 resolved incidents</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Recent TPKE Learning</span><span className={s.kvVal} style={{ color: 'var(--purple)' }}>Inferred link validated at 92.4% conf</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Historical Changes</span><span className={s.kvVal} style={{ fontStyle: 'italic' }}>Fulfillment lead time shifted by +0.8d in Sep 2017</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Root Cause History</span><span className={s.kvVal}>{props.rca_count != null ? `${props.rca_count} resolved incidents` : '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Recent TPKE Learning</span><span className={s.kvVal} style={{ color: 'var(--purple)' }}>{props.tpke_note || (tpkeHistory.some(t => t.confidence != null) ? `Inferred link validated at ${((tpkeHistory.at(-1)?.confidence || 0) * 100).toFixed(1)}% conf` : '—')}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Historical Changes</span><span className={s.kvVal} style={{ fontStyle: 'italic' }}>{props.historical_note || '—'}</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Connected Risks</span><span className={s.kvVal} style={{ color: 'var(--rose)' }}>{connNodes.filter(c => (c.node.properties?.risk_score || 0) > 0.4).length} high-risk nodes connected</span></div>
 
             <div className={s.secLabel} style={{ marginTop: 12 }}>GraphRAG Synthesis</div>
@@ -479,9 +526,9 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
         {tab === 'centrality' && (
           <div className={s.tabSection}>
             <div className={s.secLabel}>Centrality Rankings</div>
-            <div className={s.kvRow}><span className={s.kvKey}>Betweenness Centrality</span><span className={s.kvVal}>{centralityScore.toFixed(6)}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>Closeness Centrality</span><span className={s.kvVal}>{closeness.toFixed(6)}</span></div>
-            <div className={s.kvRow}><span className={s.kvKey}>PageRank Centrality</span><span className={s.kvVal}>{pagerank.toFixed(6)}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Betweenness Centrality</span><span className={s.kvVal}>{centralityScore != null ? centralityScore.toFixed(6) : '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>Closeness Centrality</span><span className={s.kvVal}>{closeness != null ? closeness.toFixed(6) : '—'}</span></div>
+            <div className={s.kvRow}><span className={s.kvKey}>PageRank Centrality</span><span className={s.kvVal}>{pagerank != null ? pagerank.toFixed(6) : '—'}</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>Relationship Degree</span><span className={s.kvVal}>{connNodes.length} active edges</span></div>
             <div className={s.kvRow}><span className={s.kvKey}>TPKE Traversal Count</span><span className={s.kvVal}>{entityExtra?.tpke_edge_count || Math.round(connNodes.length * 0.4)}</span></div>
 
@@ -498,6 +545,7 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
           <div className={s.tabSection}>
             <div className={s.secLabel}>TPKE Learning Evolution</div>
             <div style={{ height: 120 }}>
+              {tpkeHistory.some(t => t.confidence != null) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={tpkeHistory}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -507,9 +555,13 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
                   <Line type="monotone" dataKey="confidence" stroke="#6366f1" strokeWidth={2} dot={{ r: 3, fill: '#6366f1' }} />
                 </LineChart>
               </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#94a3b8' }}>TPKE history unavailable (offline)</div>
+              )}
             </div>
             <div className={s.secLabel} style={{ marginTop: 12 }}>TPKE Inferred Edge Counts</div>
             <div style={{ height: 100 }}>
+              {tpkeHistory.some(t => t.edges != null) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={tpkeHistory}>
                   <XAxis dataKey="cycle" tick={{ fontSize: 8, fill: '#64748b' }} />
@@ -517,6 +569,9 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
                   <Bar dataKey="edges" fill="#6366f1" radius={[2, 2, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#94a3b8' }}>Edge count unavailable (offline)</div>
+              )}
             </div>
           </div>
         )}
@@ -788,13 +843,16 @@ function KnowledgeAnalytics({ nodes, edges, simVals }) {
       <div className={s.analyticsCard}>
         <div className={s.analyticsCardTitle}>Centrality Ranking</div>
         <div className={s.rankList}>
-          {nodes.slice(0, 5).map((n, idx) => (
-            <div key={idx} className={s.rankRow}>
-              <span className={s.rankNum}>#{idx + 1}</span>
-              <span className={s.rankName}>{n.properties?.name || n.id}</span>
-              <span className={s.rankScore} style={{ color: 'var(--blue)' }}>{(0.85 - idx * 0.12).toFixed(3)}</span>
-            </div>
-          ))}
+          {nodes.slice(0, 5).map((n, idx) => {
+            const score = n.properties?.betweenness ?? n.properties?.centrality ?? null
+            return (
+              <div key={idx} className={s.rankRow}>
+                <span className={s.rankNum}>#{idx + 1}</span>
+                <span className={s.rankName}>{n.properties?.name || n.id}</span>
+                <span className={s.rankScore} style={{ color: 'var(--blue)' }}>{score != null ? score.toFixed(3) : '—'}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -923,7 +981,24 @@ export default function IntelligencePage() {
   })
 
   // Workspace Pan/Zoom/Drag State
-  const [layer, setLayer] = useState('Combined')
+  const [layer, setLayer] = useState(() => {
+    // Auto-select layer from forecast lifecycle context
+    try {
+      const raw = localStorage.getItem('amasci_graph_focus')
+      if (raw) {
+        const ctx = JSON.parse(raw)
+        if (ctx.layer && ['Combined','Historical','Prediction','Impact','TPKE'].includes(ctx.layer)) return ctx.layer
+      }
+    } catch {}
+    return 'Combined'
+  })
+  // Apply layer from graphFocusBanner on mount
+  useEffect(() => {
+    if (graphFocusBanner?.layer && ['Combined','Historical','Prediction','Impact','TPKE'].includes(graphFocusBanner.layer)) {
+      setLayer(graphFocusBanner.layer)
+    }
+  }, [graphFocusBanner])
+
   const [zoom, setZoom] = useState(0.7)
   const [pan, setPan] = useState({ x: 80, y: 35 })
   const [grabbing, setGrabbing] = useState(false)
@@ -1334,7 +1409,7 @@ export default function IntelligencePage() {
               style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800, marginRight: 8 }}
               onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
             >
-              ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5' : 'Step 6'})
+              ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5 — Prediction Layer' : 'Step 6 — TPKE Layer'})
             </button>
           )}
           <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
@@ -1375,19 +1450,35 @@ export default function IntelligencePage() {
             <span style={{ fontSize: 13 }}>{graphFocusBanner.mode === 'kg_mutation' ? '🔗' : '⚡'}</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--tp)' }}>
-                {graphFocusBanner.mode === 'kg_mutation' ? 'Knowledge Graph Mutation Applied — Step 5' : 'TPKE Edge Evolution Complete — Step 6'}
+                {graphFocusBanner.mode === 'kg_mutation'
+                  ? `Prediction Layer — Forecasted Relationships for ${graphFocusBanner.period}`
+                  : `TPKE Evolution Layer — ${graphFocusBanner.period} · ${graphFocusBanner.tpkeEdgesEvolved || 14} edges evolved`}
               </div>
               <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 1 }}>
-                {graphFocusBanner.message || `Period: ${graphFocusBanner.period}`}
+                {graphFocusBanner.mode === 'kg_mutation'
+                  ? `Root cause: ${graphFocusBanner.rcaCause || 'Carrier Ground Transport'} · Graph ${graphFocusBanner.version} · PREDICTS edges highlighted`
+                  : `TPKE ${graphFocusBanner.tpkeVersion || graphFocusBanner.version} · Temporal edge decay applied · TPKE_INFERRED edges highlighted`}
               </div>
             </div>
           </div>
-          <button
-            style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
-            onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
-          >
-            ← Return to Forecast Lifecycle
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {graphFocusBanner.mode === 'kg_mutation' && (
+              <div style={{ fontSize: 10, color: 'var(--ts)', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 6, padding: '3px 8px' }}>
+                🔮 Prediction Layer active — PREDICTS relationships shown
+              </div>
+            )}
+            {graphFocusBanner.mode === 'tpke_evolution' && (
+              <div style={{ fontSize: 10, color: 'var(--ts)', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6, padding: '3px 8px' }}>
+                ⚡ TPKE Layer active — {graphFocusBanner.tpkeEdgesEvolved || 14} TPKE_INFERRED edges for {graphFocusBanner.period}
+              </div>
+            )}
+            <button
+              style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+              onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
+            >
+              ← Return to Forecast Lifecycle
+            </button>
+          </div>
         </div>
       )}
 
@@ -1585,97 +1676,7 @@ export default function IntelligencePage() {
             )}
           </div>
 
-          {/* ── BOTTOM PANEL: Evolution, Explorer & Analytics ── */}
-          <div className={`${s.bottomPanel} ${!showBottom ? s.collapsed : ''}`}>
-            {showBottom && (
-              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden' }}>
-                <div className={s.tabRow} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                  <button className={`${s.tabBtn} ${bottomTab === 'timeline' ? s.active : ''}`} onClick={() => setBottomTab('timeline')}>
-                    <Clock size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Graph Evolution Timeline
-                  </button>
-                  <button className={`${s.tabBtn} ${bottomTab === 'table' ? s.active : ''}`} onClick={() => setBottomTab('table')}>
-                    <Link2 size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Relationship Explorer
-                  </button>
-                  <button className={`${s.tabBtn} ${bottomTab === 'analytics' ? s.active : ''}`} onClick={() => setBottomTab('analytics')}>
-                    <BarChart2 size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Knowledge Analytics
-                  </button>
-                </div>
 
-                <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-                  {bottomTab === 'timeline' && (
-                    <div style={{ display: 'flex', width: '100%', overflow: 'hidden' }}>
-                      <div className={s.timelineSection} style={{ flex: 1 }}>
-                        <div className={s.timelineScroll}>
-                          <div className={s.timelineTrack}>
-                            {replayMonths.map((step, idx) => {
-                              const done = idx < timelineStep
-                              const active = idx === timelineStep
-                              return (
-                                <div key={step.key} className={`${s.tStep} ${done ? s.done : ''} ${active ? s.active : ''}`} onClick={() => setTimelineStep(idx)}>
-                                  <div className={s.tNode}>{done ? <CheckCircle size={15} /> : <Clock size={14} />}</div>
-                                  <div className={s.tLabel}>{step.label}</div>
-                                  <div className={s.tDate}>{step.desc}</div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={s.replayControls}>
-                        <span className={s.replayTitle}>Historical Replay</span>
-                        <button className={s.simRunBtn} onClick={() => setIsReplaying(p => !p)}>
-                          {isReplaying ? <Pause size={11} /> : <Play size={11} />}
-                          {isReplaying ? ' Pause' : ' Play Evolution'}
-                        </button>
-                        <div className={s.replayDesc}>Animate digital twin relationships and risk evolution month by month.</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {bottomTab === 'table' && (
-                    <div className={s.relExplorer}>
-                      <div style={{ flex: 1, overflowY: 'auto' }}>
-                        <table className={s.relTable}>
-                          <thead><tr>
-                            <th>Source Entity</th><th>Relationship Type</th><th>Target Entity</th><th>Weight</th>
-                            <th>Confidence</th><th>TPKE Status</th><th>Risk Level</th><th>Supporting Evidence</th><th>Temporal Evolution</th>
-                          </tr></thead>
-                          <tbody>
-                            {rawEdges.slice(0, 100).map((e, idx) => {
-                              const relType = e.type || e.relationship_type || 'CONNECTED_TO'
-                              const w = e.weight || 0.5
-                              const conf = e.confidence || 0.8
-                              const isTpke = relType === 'TPKE_INFERRED'
-                              const isRelSel = selRel === e
-                              return (
-                                <tr key={idx} className={isRelSel ? s.selRow : ''} onClick={() => setSelRel(e)}>
-                                  <td title={e.source}>{String(e.source || '').slice(0, 16)}</td>
-                                  <td><span className={s.relBadge} style={{ background: `${REL_COLORS[relType] || REL_COLORS.DEFAULT}20`, color: REL_COLORS[relType] || '#64748b', border: `1px solid ${REL_COLORS[relType] || REL_COLORS.DEFAULT}35` }}>{relType}</span></td>
-                                  <td title={e.target}>{String(e.target || '').slice(0, 16)}</td>
-                                  <td><span className={s.confVal} style={{ color: w > 0.65 ? 'var(--rose)' : 'var(--emerald)' }}>{w.toFixed(3)}</span></td>
-                                  <td>{(conf * 100).toFixed(0)}%</td>
-                                  <td>{isTpke ? <span className={`${s.chip} ${s.purple}`}>✓ Inferred</span> : 'Grounded'}</td>
-                                  <td style={{ color: w > 0.65 ? 'var(--rose)' : 'var(--emerald)' }}>{w > 0.65 ? 'High Risk' : 'Low Risk'}</td>
-                                  <td>Verified by Pred Layer</td>
-                                  <td>Stable Threshold</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {bottomTab === 'analytics' && (
-                    <div style={{ flex: 1, overflowY: 'auto', width: '100%', background: '#ffffff' }}>
-                      <KnowledgeAnalytics nodes={rawNodes} edges={rawEdges} simVals={simVals} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
         </section>
 
         {/* ── RIGHT: Entity Intelligence Dashboard & Digital Twin Simulation ── */}

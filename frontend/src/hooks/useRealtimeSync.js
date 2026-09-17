@@ -14,11 +14,13 @@ export function useRealtimeSync() {
     let reconnectTimeout = null
     let destroyed = false
 
+    let attempts = 0
     function connect() {
-      if (destroyed) return
+      if (destroyed || attempts >= 2) return
+      attempts++
       const ws = new WebSocket(wsUrl)
       wsRef.current = ws
-      ws.onopen = () => setIsConnected(true)
+      ws.onopen = () => { attempts = 0; setIsConnected(true) }
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data)
@@ -28,7 +30,7 @@ export function useRealtimeSync() {
       ws.onerror = () => {}
       ws.onclose = () => {
         setIsConnected(false)
-        if (!destroyed) reconnectTimeout = setTimeout(connect, 5000)
+        if (!destroyed && attempts < 2) reconnectTimeout = setTimeout(connect, 5000)
       }
     }
 

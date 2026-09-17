@@ -14,12 +14,7 @@ import {
   FileText, Zap, RefreshCw, ChevronDown, ChevronUp,
 } from 'lucide-react'
 
-const HOLDOUT_MONTHS = [
-  { period: '2017-10', label: 'October 2017',  file: 'UPLOAD_1_October_2017.csv',  rows: 2255 },
-  { period: '2017-11', label: 'November 2017', file: 'UPLOAD_2_November_2017.csv', rows: 2055 },
-  { period: '2017-12', label: 'December 2017', file: 'UPLOAD_3_December_2017.csv', rows: 2124 },
-  { period: '2018-01', label: 'January 2018',  file: 'UPLOAD_4_January_2018.csv',  rows: 2123 },
-]
+const HOLDOUT_MONTHS = []
 
 const METRIC_LABELS = {
   demand_mae:       { label: 'Demand MAE',      color: '#7c6fcd', fmt: v => v?.toFixed(4) },
@@ -179,7 +174,6 @@ export default function ActualDataPage() {
         </div>
         <p style={{ fontSize: 12, color: 'var(--tm)', margin: 0 }}>
           Upload monthly actual performance data to evaluate model predictions against real outcomes.
-          The four held-out months (Oct 2017 – Jan 2018) are pre-wired below.
         </p>
       </div>
 
@@ -190,61 +184,9 @@ export default function ActualDataPage() {
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--tp)' }}>
             Held-Out Evaluation Months
           </span>
-          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: '#eff6ff', color: 'var(--blue)', border: '1px solid #bfdbfe', fontWeight: 600 }}>
-            Real DataCo data · Never seen by models during training
-          </span>
         </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-          {HOLDOUT_MONTHS.map(month => {
-            const done = uploadedPeriods.has(month.period)
-            const loading = uploadMut.isPending && uploadMut.variables?.period === month.period
-
-            return (
-              <div key={month.period} style={{
-                padding: '14px 16px', borderRadius: 8,
-                border: `1px solid ${done ? '#00b89440' : 'var(--b)'}`,
-                background: done ? '#00b89408' : 'var(--s0)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--tp)' }}>
-                    {month.label}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--tm)', marginTop: 2 }}>
-                    {month.rows.toLocaleString()} rows · {month.file}
-                  </div>
-                </div>
-
-                {done ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#00b894', fontWeight: 700 }}>
-                    <CheckCircle size={14} /> Uploaded
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleHoldoutUpload(month)}
-                    disabled={loading || uploadMut.isPending}
-                    className="btn btn-primary btn-sm"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-                  >
-                    {loading
-                      ? <><RefreshCw size={12} className="spin" /> Uploading…</>
-                      : <><Upload size={12} /> Upload</>
-                    }
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'rgba(9,132,227,0.06)', border: '1px solid rgba(9,132,227,0.2)', fontSize: 10.5, color: 'var(--ts)', lineHeight: 1.6 }}>
-          <strong>📁 Where are these files?</strong> They are in your project at:
-          <code style={{ display: 'block', marginTop: 4, padding: '4px 8px', background: 'var(--s0)', borderRadius: 4, fontSize: 10, fontFamily: 'monospace' }}>
-            backend/data/user_uploads/
-          </code>
-          These are the last 4 months cut from the original DataCo dataset. The models were trained on everything before October 2017.
-          Upload in order (1 → 2 → 3 → 4). Cycle 1 (Oct) skips metrics — measurement begins at Cycle 2 (Nov).
+        <div style={{ padding: '12px', fontSize: 11, color: 'var(--tm)' }}>
+          No pre-wired holdout months. Upload any CSV using the section below.
         </div>
       </div>
 

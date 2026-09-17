@@ -148,9 +148,17 @@ export default function Overview() {
   const kpis = analytics.kpis || {}
   const charts = analytics.charts || {}
 
-  // ── 3. Fetch Real Graph Relationships from Neo4j for Modal ─────────────
-  const relsQuery = useLiveOpsRelationships(relModalOpen ? selectedEntityId : null)
+  // ── 3. Fetch Real Graph Relationships from Neo4j (always-on for analytics + modal) ──
+  const relsQuery = useLiveOpsRelationships(selectedEntityId || null)
   const relationships = relsQuery.data?.relationships || []
+
+  // ── 4. Node distribution derived from filtered entity list ────────────
+  const nodeDistribution = useMemo(() => {
+    const colors = { Product: '#3fb950', Supplier: '#f59e0b', Shipment: '#ec4899', Warehouse: '#d4a017', Customer: '#7c6fcd' }
+    const counts = {}
+    entities.forEach(e => { const t = e.entity_type || selectedType; counts[t] = (counts[t] || 0) + 1 })
+    return Object.entries(counts).map(([name, value]) => ({ name, value, color: colors[name] || '#5b8aff' }))
+  }, [entities, selectedType])
 
   const activeEntity = useMemo(() => {
     return entities.find(e => e.id === selectedEntityId) || {
@@ -662,6 +670,83 @@ export default function Overview() {
             </div>
 
           </div>
+
+          {/* ── KNOWLEDGE ANALYTICS ── */}
+          <div className="card" style={{ padding: '16px 20px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tp)', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Network size={16} style={{ color: 'var(--blue)' }} />
+              Knowledge Graph Analytics
+              <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--tm)' }}>
+                — {analytics.entity_name || selectedEntityId} · {selectedType} · {selectedRegion !== 'all' ? selectedRegion : 'All Regions'}{validStart ? ` · ${validStart} → ${validEnd || 'now'}` : ''}
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', alignItems: 'start' }}>
+
+              {/* Relationship Explorer — live from Neo4j, updates with entity selection */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tm)', marginBottom: '8px' }}>
+                  Graph Relationships — {analytics.entity_name || selectedEntityId}
+                  <span style={{ marginLeft: 6, fontWeight: 400 }}>({relationships.length} connections)</span>
+                </div>
+                {relsQuery.isLoading ? (
+                  <div style={{ fontSize: '11px', color: 'var(--tm)', padding: '12px 0' }}>Loading graph relationships…</div>
+                ) : relationships.length === 0 ? (
+                  <div style={{ fontSize: '11px', color: 'var(--tm)', padding: '12px 0' }}>No relationships found for this entity in the Knowledge Graph</div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--b)', textAlign: 'left', color: 'var(--tm)' }}>
+                        <th style={{ padding: '6px 8px' }}>Target Entity</th>
+                        <th style={{ padding: '6px 8px' }}>Type</th>
+                        <th style={{ padding: '6px 8px' }}>Relationship</th>
+                        <th style={{ padding: '6px 8px' }}>Strength</th>
+                        <th style={{ padding: '6px 8px' }}>Confidence</th>
+                        <th style={{ padding: '6px 8px' }}>TPKE Weight</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {relationships.map((rel, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--b)', color: 'var(--tp)' }}>
+                          <td style={{ padding: '6px 8px', fontWeight: 600 }}>{rel.target_name}</td>
+                          <td style={{ padding: '6px 8px' }}><span className="badge bdg-blue">{rel.target_label}</span></td>
+                          <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '10px', color: 'var(--ts)' }}>{rel.relationship_type}</td>
+                          <td style={{ padding: '6px 8px', fontWeight: 700, color: 'var(--blue)' }}>{rel.relationship_strength}</td>
+                          <td style={{ padding: '6px 8px', fontWeight: 700, color: '#00b894' }}>{rel.prediction_confidence}%</td>
+                          <td style={{ padding: '6px 8px', fontWeight: 700, color: '#7c6fcd' }}>{rel.tpke_weight}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* Node Distribution — derived from filtered entity list (responds to all filters) */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--tm)', marginBottom: '8px' }}>
+                  Entity Distribution ({entities.length} entities)
+                </div>
+                <div style={{ height: '220px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={nodeDistribution.length > 0 ? nodeDistribution : [{ name: selectedType, value: Math.max(entities.length, 1), color: '#5b8aff' }]}
+                        dataKey="value" nameKey="name" cx="50%" cy="50%"
+                        innerRadius={35} outerRadius={70} paddingAngle={3}
+                      >
+                        {(nodeDistribution.length > 0 ? nodeDistribution : [{ color: '#5b8aff' }]).map((d, i) => (
+                          <Cell key={i} fill={d.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<DashboardTooltip />} />
+                      <Legend iconSize={9} iconType="circle" wrapperStyle={{ fontSize: 9 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </div>
       </div>
 

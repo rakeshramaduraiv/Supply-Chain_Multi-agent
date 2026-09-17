@@ -82,8 +82,8 @@ class Settings(BaseSettings):
     # --- Holdout / Evaluation ---
     # Training is restricted to rows strictly before holdout_start_date.
     # Both settings must be set together — they are meaningless apart.
-    holdout_start_date: str | None = "2017-10-01"
-    use_real_holdout_actuals: bool = True
+    holdout_start_date: str | None = None
+    use_real_holdout_actuals: bool = False
     actuals_dir: str = "data/actuals_real"
 
     # --- Continuous Learning ---

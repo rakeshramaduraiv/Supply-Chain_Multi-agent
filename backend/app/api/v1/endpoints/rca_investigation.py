@@ -174,7 +174,7 @@ async def analyze_incident(req: IncidentAnalysisRequest):
         "recommended_actions": [
             {"action": "Shift 20% order volume from Primary Carrier to Secondary Air Carrier", "priority": "High", "cost": "$12,000", "savings": "$142,500"},
             {"action": "Increase Warehouse Zone 1 safety stock buffer by +15%", "priority": "Medium", "cost": "$5,500", "savings": "$48,000"},
-            {"action": "Update TPKE temporal decay threshold for Q1 2018 forecast cycle", "priority": "Low", "cost": "$0", "savings": "$15,000"},
+            {"action": "Update TPKE temporal decay threshold for next forecast cycle", "priority": "Low", "cost": "$0", "savings": "$15,000"},
         ],
         "decision_confidence": confidence,
         "expected_outcome": f"Implementation of recommended interventions reduces expected delay by 0.8 days and recovers SLA to 94.5%.",

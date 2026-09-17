@@ -4,11 +4,11 @@ app/core/period.py
 Single source of truth for the current data boundary and next upload period.
 
 All endpoints, response strings, and UI labels must read from here.
-No literal period string ("2019-01", "February 2019") may appear anywhere else.
+No literal period string may appear anywhere else.
 
 The data end is derived from the cumulative store's manifest, which is updated
 every time an increment is appended. On a fresh system (DataCo only), the data
-end is 2018-01-31 (last order date in DataCoSupplyChainDataset.csv).
+end is 2017-09-30 (last order date in the training window).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 _MANIFEST_PATH = pathlib.Path("data/cumulative/manifest.json")
 _BASE_PARQUET   = pathlib.Path("data/cumulative/base.parquet")
-_FALLBACK_END   = pd.Timestamp("2018-01-31")   # last real DataCo row
+_FALLBACK_END   = pd.Timestamp("2017-09-30")   # DataCo training window end
 
 
 def _read_manifest() -> dict:
@@ -67,8 +67,6 @@ def current_data_end() -> pd.Timestamp:
 def next_period() -> str:
     """
     Return the next upload period as "YYYY-MM" — the month after data_end.
-
-    Example: data_end=2018-01-31 → "2018-02"
     """
     end = current_data_end()
     first_of_next = (end + timedelta(days=1)).replace(day=1)
@@ -78,8 +76,6 @@ def next_period() -> str:
 def period_bounds(period: str) -> tuple[date, date]:
     """
     Return (first_day, last_day) for a "YYYY-MM" period string.
-
-    Example: "2018-02" → (date(2018,2,1), date(2018,2,28))
     """
     ts = pd.Timestamp(period + "-01")
     first = ts.date()

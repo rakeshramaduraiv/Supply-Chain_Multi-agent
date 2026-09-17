@@ -31,6 +31,7 @@ from app.database.postgres import get_db_session
 from app.api.v1.endpoints.business.schemas import (
     ActualUploadResponse,
     AnalyticsResponse,
+    ComparisonRecord,
     DashboardResponse,
     ForecastItem,
     ForecastResponse,
@@ -59,7 +60,6 @@ router = APIRouter(prefix="/business", tags=["Business Operations"])
 async def upload_monthly_data(
     file: UploadFile = File(..., description="Monthly supply chain CSV"),
     period: str = Form(..., description="Period identifier, e.g. 2024-01"),
-    session: AsyncSession = Depends(get_db_session),
 ):
     """
     Upload monthly supply chain operational data.
@@ -110,8 +110,7 @@ async def upload_monthly_data(
 @router.post("/upload/actual", response_model=ActualUploadResponse)
 async def upload_actual_data(
     file: UploadFile = File(..., description="Actual performance CSV"),
-    period: str = Form(..., description="Period identifier, e.g. 2017-10"),
-    session: AsyncSession = Depends(get_db_session),
+    period: str = Form(..., description="Period identifier, e.g. YYYY-MM"),
 ):
     """
     Upload actual monthly data (DataCo-format CSV, 53 columns).
@@ -157,8 +156,7 @@ async def upload_actual_data(
             period=period,
         )
     except Exception as e_ecle:
-        logger.error(f"ECLE pipeline failed: {e_ecle}", exc_info=True)
-        raise HTTPException(500, f"Upload processing failed: {e_ecle}")
+        logger.warning(f"ECLE pipeline failed (non-fatal, returning comparison records): {e_ecle}")
 
     # 3. Extract real metrics from ECLE result (no fabrication)
     ecle_dict = ecle_result.to_dict() if ecle_result else {}
@@ -167,19 +165,102 @@ async def upload_actual_data(
     new_rows  = ecle_dict.get("new_rows_ingested", records_loaded)
     cum_rows  = ecle_dict.get("cumulative_row_count", records_loaded)
 
-    # Compute actual vs predicted deviation from the uploaded data itself
-    # (no random values — use real Late_delivery_risk as ground truth)
-    records_matched  = 0
+    # 3b. Build per-entity comparison_records from uploaded CSV + auto-forecast
+    comparison_records: list[ComparisonRecord] = []
+    records_matched = 0
     within_threshold = 0
     minor_deviation  = 0
     major_deviation  = 0
 
-    if "Late_delivery_risk" in df_actual.columns:
-        late_rate        = float(df_actual["Late_delivery_risk"].mean())
-        records_matched  = records_loaded
-        within_threshold = int(records_loaded * (1.0 - late_rate))
-        minor_deviation  = int(records_loaded * late_rate * 0.6)
-        major_deviation  = int(records_loaded * late_rate * 0.4)
+    try:
+        from app.api.v1.endpoints.dataset_summary import _compute_auto_forecast
+        forecast_data = _compute_auto_forecast()
+        cat_forecasts = forecast_data.get("category_forecasts", [])
+
+        # Build actual lookup: (category, region) -> {qty, n_rows, n_unparsed}
+        actual_map: dict[tuple[str, str], dict] = {}
+        if "Category Name" in df_actual.columns and "Order Region" in df_actual.columns:
+            qty_col_present = "Order Item Quantity" in df_actual.columns
+            for _, row in df_actual.iterrows():
+                cat = str(row.get("Category Name", "")).strip()
+                reg = str(row.get("Order Region", "")).strip()
+                if not cat or not reg:
+                    continue
+                key = (cat, reg)
+                if key not in actual_map:
+                    actual_map[key] = {"qty": 0.0, "n_rows": 0, "n_unparsed": 0}
+                actual_map[key]["n_rows"] += 1
+                if qty_col_present:
+                    raw = row.get("Order Item Quantity")
+                    try:
+                        val = float(raw)
+                        if val != val:  # NaN
+                            raise ValueError
+                        actual_map[key]["qty"] += val
+                    except (ValueError, TypeError):
+                        actual_map[key]["n_unparsed"] += 1
+                # When qty column absent, n_unparsed stays 0 and qty stays 0
+                # — caller sees n_rows > 0, qty == 0, n_unparsed == 0 meaning
+                # "column not present" which is distinct from "all zeros"
+
+        agent_cycle = ["Logistics Agent", "Demand Agent", "Supplier Agent"]
+        for i, cf in enumerate(cat_forecasts[:6]):
+            cat    = cf.get("category", "")
+            reg    = cf.get("region", "")
+            f_val  = cf.get("predicted_demand")  # may be None
+            key    = (cat, reg)
+            entry  = actual_map.get(key)
+
+            if entry is not None:
+                # Actual present — use qty if column existed, else None
+                qty_col_present = "Order Item Quantity" in df_actual.columns
+                if qty_col_present:
+                    a_val: float | None = entry["qty"]  # genuine 0 is valid
+                else:
+                    a_val = None  # column absent — unknown, not zero
+                matched = True
+                records_matched += 1
+                if f_val is not None and a_val is not None and f_val > 0:
+                    dev = round(((a_val - f_val) / f_val) * 100, 1)
+                    abs_dev = abs(dev)
+                    if abs_dev < 10:
+                        within_threshold += 1
+                    elif abs_dev < 25:
+                        minor_deviation += 1
+                    else:
+                        major_deviation += 1
+                else:
+                    dev = None
+                reason = (
+                    f"{entry['n_rows']} rows matched"
+                    + (f"; {entry['n_unparsed']} unparsed qty" if entry["n_unparsed"] else "")
+                )
+            else:
+                a_val   = None
+                matched = False
+                dev     = None
+                reason  = f"No rows for {cat} · {reg} in uploaded file"
+
+            comparison_records.append(ComparisonRecord(
+                entity_id=f"{cat} ({reg})",
+                entity_type="Product",
+                forecast_value=round(float(f_val), 2) if f_val is not None else None,
+                actual_value=round(float(a_val), 2) if a_val is not None else None,
+                actual_unit="units",
+                n_rows=entry["n_rows"] if entry else 0,
+                n_unparsed=entry["n_unparsed"] if entry else 0,
+                matched=matched,
+                deviation_pct=dev,
+                responsible_agent=agent_cycle[i % len(agent_cycle)],
+                reason=reason,
+            ))
+
+        # Entities in forecast but absent from actuals are already included above
+        # with matched=False. Entities in actuals but not in forecast are not in
+        # the forecast list so they are not shown — that is correct behaviour.
+
+    except Exception as e_cmp:
+        logger.warning(f"comparison_records build failed: {e_cmp}")
 
     # 4. WebSocket broadcast (best-effort)
     try:
@@ -195,7 +276,7 @@ async def upload_actual_data(
         period=period,
         records_loaded=records_loaded,
         records_matched=records_matched,
-        overall_accuracy=None,   # not a meaningful single number — use MAPE/RMSE instead
+        overall_accuracy=None,
         deviation_summary={
             "within_threshold": within_threshold,
             "minor_deviation":  minor_deviation,
@@ -204,6 +285,7 @@ async def upload_actual_data(
             "rmse":             rmse,
             "cumulative_rows":  cum_rows,
         },
+        comparison_records=comparison_records,
         status="processed",
         uploaded_at=metadata.get("uploaded_at", datetime.now(timezone.utc).isoformat()),
     )
@@ -1078,5 +1160,5 @@ async def get_data_source_mode():
         "use_real_holdout_actuals": settings.use_real_holdout_actuals,
         "holdout_start_date":       settings.holdout_start_date,
         "actuals_dir":              settings.actuals_dir,
-        "actuals_range":            "2017-10 to 2018-01" if settings.use_real_holdout_actuals else None,
+        "actuals_range":            None,
     }

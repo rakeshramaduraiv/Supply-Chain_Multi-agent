@@ -167,17 +167,47 @@ async def get_status(session: AsyncSession = Depends(get_db_session)):
         }
 
 
-@router.get("/history", response_model=list[TPKEHistoryResponse])
+@router.get("/history")
 async def get_history(
     days: int = 30,
     limit: int = 100,
     session: AsyncSession = Depends(get_db_session),
 ):
-    """Get TPKE mutation history."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
-    service = TPKELogService(session)
-    mutations = await service.get_recent_mutations(since, limit)
-    return mutations
+    """Get TPKE mutation history — falls back to result_store CSV when DB is offline."""
+    # Try DB first
+    try:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        service = TPKELogService(session)
+        mutations = await service.get_recent_mutations(since, limit)
+        if mutations:
+            return mutations
+    except Exception as e:
+        logger.warning(f"TPKE history DB unavailable ({e}), falling back to result_store")
+
+    # Fallback: read from result_store CSV
+    try:
+        df = result_store.read("tpke_evolutions.csv")
+        if df is None or len(df) == 0:
+            return []
+        df = df.tail(limit)
+        rows = []
+        for _, row in df.iterrows():
+            rows.append({
+                "id": str(_),
+                "timestamp": str(row.get("saved_at", "")),
+                "triggered_by": str(row.get("triggered_by", "system")),
+                "edges_created": int(row.get("edges_created", 0)),
+                "edges_strengthened": int(row.get("edges_strengthened", 0)),
+                "edges_decayed": int(row.get("edges_decayed", 0)),
+                "edges_removed": int(row.get("edges_removed", 0)),
+                "patterns_detected": int(row.get("patterns_detected", 0)),
+                "graph_version": str(row.get("graph_version", "v1.0")),
+                "duration_ms": float(row.get("duration_ms", 0)),
+            })
+        return rows
+    except Exception as e2:
+        logger.warning(f"TPKE history result_store fallback failed ({e2})")
+        return []
 
 
 @router.get("/edges")

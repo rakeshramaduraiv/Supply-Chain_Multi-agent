@@ -39,6 +39,7 @@ from app.ingestion.schema_adapter import adapt
 from app.ingestion.continuity import validate_continuity, ContinuityError
 from app.ml.training import TrainingOrchestrator
 from app.store.cumulative import CumulativeStore
+from app.services.cycle_state_store import record_stage as _record_stage
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,7 @@ def _stage1_ingest_validate(
 def _stage2_match_forecast(
     df_actual: pd.DataFrame,
     session: Any,
+    period: str = "",
 ) -> tuple[StageResult, pd.DataFrame, pd.DataFrame]:
     """
     Stage 2: Match uploaded rows against stored forecast results.
@@ -203,6 +205,9 @@ def _stage2_match_forecast(
       Supplier  → Department Name
       Product   → Product Card Id
       Route     → Shipping Mode | Order Region
+
+    Asserts that the actuals period equals the forecast's target_period.
+    Raises HTTPException(409) on period mismatch.
 
     Unmatched rows are EXCLUDED from metric computation and counted.
     Returns (stage_result, df_matched, df_unmatched).
@@ -232,19 +237,39 @@ def _stage2_match_forecast(
             result_repo = ForecastResultRepository(session)
             latest_run  = await run_repo.get_latest()
             if not latest_run:
-                return []
-            return await result_repo.get_by_run(latest_run.id)
+                return [], None
+            results = await result_repo.get_by_run(latest_run.id)
+            return results, latest_run
 
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(1) as pool:
-                    results = pool.submit(asyncio.run, _fetch()).result()
+                    results, latest_run = pool.submit(asyncio.run, _fetch()).result()
             else:
-                results = loop.run_until_complete(_fetch())
+                results, latest_run = loop.run_until_complete(_fetch())
         except RuntimeError:
-            results = asyncio.run(_fetch())
+            results, latest_run = asyncio.run(_fetch())
+
+        # Period alignment assertion: actuals period must match forecast target_period
+        if period and latest_run and hasattr(latest_run, 'parameters_json'):
+            run_params = latest_run.parameters_json or {}
+            forecast_target = run_params.get("target_period", "")
+            if forecast_target and forecast_target != period:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "period_mismatch",
+                        "actuals_period": period,
+                        "forecast_target_period": forecast_target,
+                        "message": (
+                            f"Actuals period {period!r} does not match "
+                            f"forecast target_period {forecast_target!r}. "
+                            f"A forecast for {period!r} must be issued first."
+                        ),
+                    },
+                )
 
         if results:
             total_forecast_entities = len([r for r in results if r.predicted_value is not None])
@@ -681,12 +706,14 @@ async def run_upload_cycle(
     s1, df_clean, continuity_warnings = _stage1_ingest_validate(df_actual, period, filename, store)
     stages.append(s1)
     await _emit(s1)
+    _record_stage(period, 1, s1.status, s1.duration_ms, s1.detail, s1.error)
 
     # Stage 2
     await _running(2, "Match Forecast vs Actual")
-    s2, df_matched, df_unmatched = _stage2_match_forecast(df_clean, session)
+    s2, df_matched, df_unmatched = _stage2_match_forecast(df_clean, session, period=period)
     stages.append(s2)
     await _emit(s2)
+    _record_stage(period, 2, s2.status, s2.duration_ms, s2.detail, s2.error)
 
     # Stage 3
     await _running(3, "Compute Metrics")
@@ -694,24 +721,32 @@ async def run_upload_cycle(
     s3, metrics = _stage3_compute_metrics(df_matched, forecast_exists, period)
     stages.append(s3)
     await _emit(s3)
+    _record_stage(period, 3, s3.status, s3.duration_ms, s3.detail, s3.error)
 
     # Stage 4
     await _running(4, "TPKE Evolution")
     s4 = _stage4_tpke(df_matched, metrics, session)
     stages.append(s4)
     await _emit(s4)
+    _record_stage(period, 4, s4.status, s4.duration_ms, s4.detail, s4.error)
 
     # Stage 5
     await _running(5, "Store & Retrain")
     s5, cumulative_rows = _stage5_store_and_retrain(df_clean, period, store)
     stages.append(s5)
     await _emit(s5)
+    _record_stage(period, 5, s5.status, s5.duration_ms, s5.detail, s5.error)
 
     # Stage 6
     await _running(6, "Forecast Next Period")
     s6 = _stage6_forecast_next(store)
     stages.append(s6)
     await _emit(s6)
+    _record_stage(period, 6, s6.status, s6.duration_ms, s6.detail, s6.error)
+    # Stage 6 of cycle N is Stage 0 of cycle N+1 — record it in the next period's slot
+    _next_period = next_period()
+    if s6.status == "COMPLETED" and _next_period != period:
+        _record_stage(_next_period, 0, "COMPLETED", s6.duration_ms, s6.detail, None)
 
     total_ms = (time.perf_counter() - wall_start) * 1000
 

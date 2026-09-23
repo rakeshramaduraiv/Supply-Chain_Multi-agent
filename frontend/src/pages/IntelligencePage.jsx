@@ -321,36 +321,6 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
     retry: false,
   })
 
-  if (!entity) {
-    return (
-      <div className={s.entityEmpty}>
-        <div className={s.entityEmptyIcon}><Network size={22} /></div>
-        <div className={s.entityEmptyT}>Select an Entity</div>
-        <div className={s.entityEmptyD}>
-          Double-click or select any business entity card on the Model View canvas to query live dependencies, centrality metrics, PageRank score, and forecast influence.
-        </div>
-      </div>
-    )
-  }
-
-  const m = ENTITY_META[entity.label] || ENTITY_META[entity.type] || { color: '#7878a0', Icon: Box }
-  const { Icon } = m
-  const color = m.color
-  const props = entity.properties || {}
-  const name = props.name || props.supplier_name || entity.id
-  const risk = typeof (props.risk_score ?? props.risk) === 'number' ? (props.risk_score ?? props.risk) : 0.25
-  const predScore = props.prediction_score ?? props.pred_score ?? (1 - risk)
-  const businessImpact = props.business_impact ?? 0.45
-  const actualPerf = props.actual_performance ?? (0.95 - risk * 0.2)
-  const forecastInfluence = props.forecast_influence ?? (businessImpact * 0.85)
-
-  const connEdges = allEdges.filter(e => e.source === entity.id || e.target === entity.id)
-  const connNodes = connEdges.map(e => {
-    const otherId = e.source === entity.id ? e.target : e.source
-    const other = allNodes.find(n => n.id === otherId)
-    return other ? { node: other, edge: e, dir: e.source === entity.id ? '→' : '←' } : null
-  }).filter(Boolean)
-
   // TPKE history: use real API data, fall back to shape-preserving offline data
   const tpkeHistory = useMemo(() => {
     const raw = Array.isArray(tpkeHistoryData) ? tpkeHistoryData : []
@@ -361,7 +331,6 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
         edges: r.edge_count ?? r.edges ?? (3 + i * 3),
       }))
     }
-    // Offline fallback — shape only, no fabricated values
     return [
       { cycle: 'T-4', confidence: null, edges: null },
       { cycle: 'T-3', confidence: null, edges: null },
@@ -391,6 +360,36 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
     }
     return { betweenness: null, closeness: null, pagerank: null }
   }, [entityExtra, centralityData, entity])
+
+  if (!entity) {
+    return (
+      <div className={s.entityEmpty}>
+        <div className={s.entityEmptyIcon}><Network size={22} /></div>
+        <div className={s.entityEmptyT}>Select an Entity</div>
+        <div className={s.entityEmptyD}>
+          Double-click or select any business entity card on the Model View canvas to query live dependencies, centrality metrics, PageRank score, and forecast influence.
+        </div>
+      </div>
+    )
+  }
+
+  const m = ENTITY_META[entity.label] || ENTITY_META[entity.type] || { color: '#7878a0', Icon: Box }
+  const { Icon } = m
+  const color = m.color
+  const props = entity.properties || {}
+  const name = props.name || props.supplier_name || entity.id
+  const risk = typeof (props.risk_score ?? props.risk) === 'number' ? (props.risk_score ?? props.risk) : 0.25
+  const predScore = props.prediction_score ?? props.pred_score ?? (1 - risk)
+  const businessImpact = props.business_impact ?? 0.45
+  const actualPerf = props.actual_performance ?? (0.95 - risk * 0.2)
+  const forecastInfluence = props.forecast_influence ?? (businessImpact * 0.85)
+
+  const connEdges = allEdges.filter(e => e.source === entity.id || e.target === entity.id)
+  const connNodes = connEdges.map(e => {
+    const otherId = e.source === entity.id ? e.target : e.source
+    const other = allNodes.find(n => n.id === otherId)
+    return other ? { node: other, edge: e, dir: e.source === entity.id ? '→' : '←' } : null
+  }).filter(Boolean)
 
   const centralityScore = entityCentrality.betweenness
   const closeness = entityCentrality.closeness

@@ -278,6 +278,36 @@ class BaseTrainer:
             coverage = 0.0
             hyperparams["enrichment_source"] = "tier1_pandas_fallback"
 
+        # Compute trained_through: last month of the training partition
+        trained_through = ""
+        date_col = "order date (DateOrders)"
+        if date_col in train_df.columns:
+            _train_dates = pd.to_datetime(train_df[date_col], errors="coerce").dropna()
+            if len(_train_dates) > 0:
+                trained_through = _train_dates.max().strftime("%Y-%m")
+
+        # Compute feature medians on training set for imputation at inference time
+        feature_medians: dict[str, float] = {}
+        for col in features_used:
+            if col in X_train.columns:
+                med = float(X_train[col].median())
+                if not (med != med):  # exclude NaN
+                    feature_medians[col] = med
+
+        # Compute scaling_map: (category|region) -> mean rows per month
+        # Fixed on the training partition only so uploads cannot shift it.
+        scaling_map: dict[str, float] = {}
+        if date_col in train_df.columns and "Category Name" in train_df.columns and "Order Region" in train_df.columns:
+            _dates_s = pd.to_datetime(train_df[date_col], errors="coerce")
+            _period_s = _dates_s.dt.strftime("%Y-%m")
+            _train_copy = train_df.copy()
+            _train_copy["_period_str"] = _period_s
+            _recent_periods = sorted(_train_copy["_period_str"].dropna().unique())[-3:]
+            _recent_df = _train_copy[_train_copy["_period_str"].isin(_recent_periods)]
+            for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
+                rows_per_period = g.groupby("_period_str").size().mean()
+                scaling_map[f"{c}|{r}"] = float(rows_per_period)
+
         # Save to registry
         version = self.registry.save_model(
             model=model,
@@ -292,6 +322,9 @@ class BaseTrainer:
             graph_enriched=graph_enriched,
             graph_enrichment_coverage=coverage,
             training_path=training_path,
+            trained_through=trained_through,
+            feature_medians=feature_medians,
+            scaling_map=scaling_map,
         )
 
         result = TrainingResult(

@@ -422,10 +422,13 @@ def _load_training_metrics() -> dict:
         return {}
 
 
-def _compute_auto_forecast() -> dict:
+def _compute_auto_forecast(target_period: str | None = None) -> dict:
     """
     Generate automatic forecast for the next period after training data ends.
-    Uses trained models to predict on the last month's feature distribution.
+
+    target_period: explicit "YYYY-MM" to forecast. When None, derives it as
+    the month immediately after the model's training cutoff from the registry.
+    Never uses the last month in the dataframe (which may include uploaded actuals).
     """
     df = _load_parquet()
     if df is None:
@@ -441,11 +444,66 @@ def _compute_auto_forecast() -> dict:
 
         registry_data = json.loads(registry_path.read_text())
 
-        # Get the last month of data as template
+        # ── Defect 1 fix: derive target_period from model training cutoff ──────
+        # Read trained_through from the active demand model registry entry.
+        # Never use df["_month"].max() — that includes uploaded actuals.
+        trained_through = ""
+        for intel_type in IntelligenceType:
+            versions = registry_data.get(intel_type.value, [])
+            active = [v for v in versions if v.get("is_active")]
+            if active:
+                tt = active[-1].get("trained_through", "")
+                if tt:
+                    trained_through = tt
+                    break
+
+        # Fallback: derive from created_at of the active demand model
+        if not trained_through:
+            demand_versions = registry_data.get("demand", [])
+            active_demand = [v for v in demand_versions if v.get("is_active")]
+            if active_demand:
+                trained_through = active_demand[-1].get("created_at", "")[:7]
+
+        # Derive target_period: month after training cutoff
+        if target_period is None:
+            if trained_through:
+                _cutoff_ts = pd.Timestamp(trained_through + "-01")
+                target_period = (_cutoff_ts + pd.offsets.MonthBegin(1)).strftime("%Y-%m")
+            else:
+                # Last resort: use summary next_forecast_start
+                summary = _compute_summary()
+                target_period = summary.get("next_forecast_start", "")[:7] or ""
+
+        # Guard: if target_period is more than 1 period beyond training cutoff, refuse
+        if trained_through and target_period:
+            _cutoff_ts = pd.Timestamp(trained_through + "-01")
+            _target_ts = pd.Timestamp(target_period + "-01")
+            _max_allowed = (_cutoff_ts + pd.offsets.MonthBegin(1))
+            if _target_ts > _max_allowed + pd.offsets.MonthBegin(1):
+                return {
+                    "ready": False,
+                    "message": (
+                        f"target_period {target_period!r} is more than one period beyond "
+                        f"training cutoff {trained_through!r}. Retrain the model first."
+                    ),
+                    "target_period": target_period,
+                    "trained_through": trained_through,
+                }
+
+        # ── Template: last COMPLETE period at or before training cutoff ────────
         dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
         df["_month"] = dates.dt.to_period("M")
-        last_month = df["_month"].max()
-        template = df[df["_month"] == last_month].copy()
+
+        if trained_through:
+            _cutoff_period = pd.Period(trained_through, freq="M")
+            # Only consider months at or before the training cutoff
+            valid_months = df[df["_month"] <= _cutoff_period]["_month"]
+            template_period_pd = valid_months.max() if len(valid_months) > 0 else df["_month"].min()
+        else:
+            template_period_pd = df["_month"].max()
+
+        template_period = str(template_period_pd)
+        template = df[df["_month"] == template_period_pd].copy()
 
         if len(template) == 0:
             return {"ready": False, "message": "No template data"}
@@ -460,46 +518,91 @@ def _compute_auto_forecast() -> dict:
             model_info = active[-1]
             model_path = Path(settings.model_dir).parent / model_info["model_path"]
             if not model_path.exists():
-                # Try relative to model_dir
                 model_path = Path(model_info["model_path"])
                 if not model_path.exists():
                     continue
 
             model = joblib.load(model_path)
             feature_config = FEATURE_CONFIGS[intel_type]
-            available_features = [f for f in feature_config.features if f in template.columns]
 
-            if not available_features:
-                continue
+            # ── Defect 3 fix: raise if any expected feature is absent ────────────
+            expected_features = model_info.get("features_used") or feature_config.features
+            missing = [f for f in expected_features if f not in template.columns]
+            if missing:
+                raise ValueError(
+                    f"Model {intel_type.value!r} expects features absent from template: "
+                    f"{missing}. Cannot predict on a partial feature set."
+                )
 
-            X = template[available_features].fillna(0)
+            # ── Defect 2 fix: impute with training-set median, not 0 ────────────
+            feature_medians: dict = model_info.get("feature_medians") or {}
+            is_lgbm = "lightgbm" in str(type(model)).lower() or "lgbm" in str(type(model)).lower()
+
+            X_raw = template[expected_features].copy()
+            imputation_counts: dict[str, int] = {}
+            imputation_strategy: str
+
+            if is_lgbm:
+                # LightGBM handles NaN natively — pass through
+                X = X_raw
+                imputation_strategy = "lgbm_native_nan"
+                for col in expected_features:
+                    n_null = int(X[col].isna().sum())
+                    if n_null > 0:
+                        imputation_counts[col] = n_null
+            else:
+                # Non-LightGBM: impute with training median
+                X = X_raw.copy()
+                imputation_strategy = "training_median"
+                for col in expected_features:
+                    n_null = int(X[col].isna().sum())
+                    if n_null > 0:
+                        med = feature_medians.get(col)
+                        if med is not None:
+                            X[col] = X[col].fillna(med)
+                        else:
+                            X[col] = X[col].fillna(X[col].median())
+                        imputation_counts[col] = n_null
+
+            # Low-confidence flag: >20% rows imputed for any feature
+            low_confidence_features = [
+                col for col, cnt in imputation_counts.items()
+                if cnt / max(len(X), 1) > 0.20
+            ]
+
             preds = model.predict(X)
 
             mean_pred = float(np.mean(preds))
-            std_pred = float(np.std(preds))
 
             if feature_config.task == ModelTask.CLASSIFICATION:
-                # For classifiers, mean_pred is probability of late delivery
+                # ── Defect 4 fix: classifier confidence = mean decisiveness ──────
+                if hasattr(model, "predict_proba"):
+                    proba = model.predict_proba(X)[:, 1]
+                    mean_decisiveness = float(np.mean(np.abs(proba - 0.5) * 2))
+                else:
+                    mean_decisiveness = None
                 forecast_results[intel_type.value] = {
                     "predicted_risk": round(mean_pred, 4),
                     "risk_level": "high" if mean_pred >= 0.65 else "medium" if mean_pred >= 0.35 else "low",
-                    "confidence": round(max(0, 1 - std_pred), 4),
+                    "mean_decisiveness": round(mean_decisiveness, 4) if mean_decisiveness is not None else None,
                     "n_predictions": len(preds),
-                    "std": round(std_pred, 4),
+                    "imputation_counts": imputation_counts,
+                    "imputation_strategy": imputation_strategy,
+                    "low_confidence_features": low_confidence_features,
                 }
             else:
-                # For regression (demand), mean_pred is predicted quantity
-                # Volatility-adjusted CI bounds: wider bands for high volatility
-                vol = float(np.std(preds) / (abs(mean_pred) + 1e-6))
-                ci_pct = max(0.10, vol * 0.5)
-                ci_width = mean_pred * ci_pct
+                # ── Defect 4 fix: regressor reports prediction interval, not 1-std ──
+                # Use residual_std from registry metrics if available
+                residual_std = float(model_info.get("metrics", {}).get("rmse", float(np.std(preds))))
                 forecast_results[intel_type.value] = {
                     "predicted_value": round(mean_pred, 4),
-                    "lower_bound": round(max(0, mean_pred - ci_width), 4),
-                    "upper_bound": round(mean_pred + ci_width, 4),
-                    "confidence": round(max(0, min(1, 1 - ci_pct)), 4),
+                    "prediction_interval_lower": round(max(0, mean_pred - 1.96 * residual_std), 4),
+                    "prediction_interval_upper": round(mean_pred + 1.96 * residual_std, 4),
+                    "residual_std": round(residual_std, 4),
                     "n_predictions": len(preds),
-                    "std": round(std_pred, 4),
+                    "imputation_counts": imputation_counts,
+                    "imputation_strategy": imputation_strategy,
+                    "low_confidence_features": low_confidence_features,
                 }
 
         # Aggregate by category × region for detailed forecast
@@ -508,6 +611,8 @@ def _compute_auto_forecast() -> dict:
         # Pre-load all active models once
         active_models: dict = {}
         active_features: dict = {}
+        active_medians: dict = {}
+        active_is_lgbm: dict = {}
         for intel_type in IntelligenceType:
             versions = registry_data.get(intel_type.value, [])
             active = [v for v in versions if v.get("is_active")]
@@ -520,25 +625,43 @@ def _compute_auto_forecast() -> dict:
             if not model_path.exists():
                 continue
             m = joblib.load(model_path)
-            feat_cfg = FEATURE_CONFIGS[intel_type]
-            avail_feats = [f for f in feat_cfg.features if f in template.columns]
+            expected_feats = model_info.get("features_used") or FEATURE_CONFIGS[intel_type].features
+            avail_feats = [f for f in expected_feats if f in template.columns]
             if avail_feats:
                 active_models[intel_type] = m
                 active_features[intel_type] = avail_feats
+                active_medians[intel_type] = model_info.get("feature_medians") or {}
+                active_is_lgbm[intel_type] = (
+                    "lightgbm" in str(type(m)).lower() or "lgbm" in str(type(m)).lower()
+                )
 
-        # Build a scaling map: (cat, region) -> expected_rows_next_period
-        # Use the mean monthly row count from the last 3 months of training data
-        # so the forecast scales to realistic order volumes, not template density.
-        _dates_col = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
-        df["_period_str"] = _dates_col.dt.strftime("%Y-%m")
-        _recent_periods = sorted(df["_period_str"].dropna().unique())[-3:]
-        _recent_df = df[df["_period_str"].isin(_recent_periods)]
+        # ── Defect 5 fix: scaling map from registry (fixed at training time) ────
+        # Use the scaling_map stored in the demand model registry entry.
+        # Falls back to computing from training-only rows if not stored.
         _expected_rows: dict[tuple, float] = {}
-        if len(_recent_periods) > 0:
-            for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
-                # Mean rows per period across the recent window
-                rows_per_period = g.groupby("_period_str").size().mean()
-                _expected_rows[(c, r)] = float(rows_per_period)
+        demand_versions = registry_data.get("demand", [])
+        active_demand = [v for v in demand_versions if v.get("is_active")]
+        if active_demand:
+            stored_scaling = active_demand[-1].get("scaling_map") or {}
+            for key_str, val in stored_scaling.items():
+                if "|" in key_str:
+                    parts = key_str.split("|", 1)
+                    _expected_rows[(parts[0], parts[1])] = float(val)
+
+        # If registry has no scaling_map (old model), compute from training partition only
+        if not _expected_rows and trained_through:
+            _dates_col = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
+            _period_s = _dates_col.dt.strftime("%Y-%m")
+            _cutoff_str = trained_through
+            _train_mask = _period_s <= _cutoff_str
+            _train_df = df[_train_mask].copy()
+            _train_df["_period_str"] = _period_s[_train_mask]
+            _recent_periods = sorted(_train_df["_period_str"].dropna().unique())[-3:]
+            _recent_df = _train_df[_train_df["_period_str"].isin(_recent_periods)]
+            if "Category Name" in _recent_df.columns and "Order Region" in _recent_df.columns:
+                for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
+                    rows_per_period = g.groupby("_period_str").size().mean()
+                    _expected_rows[(c, r)] = float(rows_per_period)
 
         for (cat, region), grp in template.groupby(["Category Name", "Order Region"]):
             if len(grp) < 3:
@@ -553,18 +676,29 @@ def _compute_auto_forecast() -> dict:
             demand_feats = active_features.get(IntelligenceType.DEMAND, [])
             if demand_model is not None and demand_feats:
                 try:
-                    X_grp = grp[demand_feats].fillna(0)
+                    X_grp = grp[demand_feats].copy()
+                    _is_lgbm_d = active_is_lgbm.get(IntelligenceType.DEMAND, False)
+                    if not _is_lgbm_d:
+                        _meds = active_medians.get(IntelligenceType.DEMAND, {})
+                        for col in demand_feats:
+                            if X_grp[col].isna().any():
+                                med = _meds.get(col)
+                                X_grp[col] = X_grp[col].fillna(med if med is not None else X_grp[col].median())
                     preds_demand = demand_model.predict(X_grp)
-                    mean_per_row = float(np.mean(preds_demand))  # avg qty per order row
-                    expected_rows = _expected_rows.get((cat, region), float(len(grp)))
-                    predicted_demand_val = mean_per_row * expected_rows
-                    # Clip to [0, 5x historical mean * expected_rows] to avoid runaway
-                    hist_mean = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
-                    predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * expected_rows * 5))
+                    mean_per_row = float(np.mean(preds_demand))
+                    expected_rows = _expected_rows.get((cat, region))
+                    if expected_rows is not None:
+                        predicted_demand_val = mean_per_row * expected_rows
+                        hist_mean = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
+                        predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * expected_rows * 5))
+                    else:
+                        # No scaling map entry — return per-row prediction, mark expected_rows null
+                        predicted_demand_val = mean_per_row
+                        row_result["expected_rows"] = None
                 except Exception:
-                    predicted_demand_val = float(grp["Order Item Quantity"].mean() * _expected_rows.get((cat, region), len(grp))) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
+                    predicted_demand_val = None
             else:
-                predicted_demand_val = float(grp["Order Item Quantity"].mean() * _expected_rows.get((cat, region), len(grp))) if "Order Item Quantity" in grp.columns else float(len(grp)) * 2.0
+                predicted_demand_val = None
 
             avg_price = float(grp["Product Price"].mean()) if "Product Price" in grp.columns else 50.0
             row_result["predicted_demand"] = round(predicted_demand_val, 2)
@@ -576,7 +710,14 @@ def _compute_auto_forecast() -> dict:
                 feats = active_features.get(intel_type, [])
                 if m is not None and feats:
                     try:
-                        X_grp = grp[feats].fillna(0)
+                        X_grp = grp[feats].copy()
+                        _is_lgbm_c = active_is_lgbm.get(intel_type, False)
+                        if not _is_lgbm_c:
+                            _meds = active_medians.get(intel_type, {})
+                            for col in feats:
+                                if X_grp[col].isna().any():
+                                    med = _meds.get(col)
+                                    X_grp[col] = X_grp[col].fillna(med if med is not None else X_grp[col].median())
                         if hasattr(m, "predict_proba"):
                             risk_val = float(np.mean(m.predict_proba(X_grp)[:, 1]))
                         else:
@@ -612,19 +753,15 @@ def _compute_auto_forecast() -> dict:
                 conf_values.append(max(0.0, min(1.0, auc)))
         overall_confidence = round(sum(conf_values) / len(conf_values) if conf_values else 0.0, 4)
 
-        # Derive forecast period dynamically from training data end
-        summary = _compute_summary()
-        forecast_period_start = summary.get("next_forecast_start", "")
-        forecast_period_end   = summary.get("next_forecast_end", "")
-        training_data_end     = summary.get("training_data_end_date", "")
-        forecast_period_label = forecast_period_start[:7] if forecast_period_start else ""
-
         return {
             "ready": True,
-            "forecast_period": forecast_period_label,
-            "forecast_period_start": forecast_period_start,
-            "forecast_period_end": forecast_period_end,
-            "training_data_end": training_data_end,
+            "target_period": target_period,
+            "template_period": template_period,
+            "trained_through": trained_through,
+            "forecast_period": target_period,
+            "forecast_period_start": (target_period + "-01") if target_period else "",
+            "forecast_period_end": "",
+            "training_data_end": trained_through,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "status": "completed",
             "overall_confidence": overall_confidence,

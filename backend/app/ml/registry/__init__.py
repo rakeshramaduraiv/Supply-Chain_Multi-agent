@@ -41,6 +41,9 @@ class ModelVersion:
     graph_enrichment_coverage: float = 0.0
     training_path: str = "unknown"  # "initialization" | "other" | "unknown"
     holidays_available: bool = False  # True iff holidays pkg was installed at train time
+    trained_through: str = ""        # "YYYY-MM" — last month of training data (chronological split)
+    feature_medians: dict = None      # {feature: median} computed on training set — used for imputation
+    scaling_map: dict = None          # {"cat|region": expected_rows} fixed at training time
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -112,6 +115,9 @@ class ModelRegistry:
         graph_enrichment_coverage: float = 0.0,
         training_path: str = "unknown",
         holidays_available: bool = False,
+        trained_through: str = "",
+        feature_medians: dict | None = None,
+        scaling_map: dict | None = None,
     ) -> ModelVersion:
         """
         Save a trained model to the registry.
@@ -143,6 +149,9 @@ class ModelRegistry:
             graph_enrichment_coverage=graph_enrichment_coverage,
             training_path=training_path,
             holidays_available=holidays_available,
+            trained_through=trained_through,
+            feature_medians=feature_medians or {},
+            scaling_map=scaling_map or {},
         )
 
         # Deactivate previous versions

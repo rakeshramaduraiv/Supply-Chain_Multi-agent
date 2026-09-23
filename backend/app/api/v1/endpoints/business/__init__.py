@@ -115,18 +115,28 @@ async def upload_actual_data(
     """
     Upload actual monthly data (DataCo-format CSV, 53 columns).
 
-    Flow:
-      1. Save CSV to disk via UploadService
-      2. Pass raw DataFrame through the full 12-stage ECLE pipeline:
-           - Data engineering (clean + validate)
-           - Feature engineering anchored on cumulative history
-           - KG mutation, GraphRAG re-index
-           - Append engineered rows to in-memory CumulativeStore
-           - Optional model retrain on cumulative dataset
-           - Next-period forecast generation
-      3. Return real metrics from ECLE (MAPE, RMSE, matched records).
-         No random values. No fabricated accuracy.
+    Ordering guard: rejects any period that is not next_expected_period (409).
+    Stage 1 of the canonical lifecycle is recorded in cycle_state after ECLE.
     """
+    # Ordering guard — must be next_expected_period
+    from app.services.cycle_state_store import get_cycle_state_response
+    _cs = get_cycle_state_response()
+    _next = _cs.get("next_expected_period")
+    if _next and period != _next:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "period_out_of_order",
+                "submitted": period,
+                "expected": _next,
+                "message": (
+                    f"Cannot upload actuals for {period!r}: "
+                    f"next expected period is {_next!r}. "
+                    f"Upload {_next!r} first."
+                ),
+            },
+        )
+
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are accepted")
 
@@ -262,7 +272,19 @@ async def upload_actual_data(
     except Exception as e_cmp:
         logger.warning(f"comparison_records build failed: {e_cmp}")
 
-    # 4. WebSocket broadcast (best-effort)
+    # 4. Record Stage 1 in cycle state machine
+    try:
+        from app.services.cycle_state_store import record_stage as _record_stage
+        _record_stage(
+            period=period, stage=1,
+            status="COMPLETED",
+            duration_ms=0.0,
+            detail={"rows": records_loaded, "records_matched": records_matched},
+        )
+    except Exception as _rs_err:
+        logger.warning(f"cycle_state record_stage(1) failed: {_rs_err}")
+
+    # 5. WebSocket broadcast (best-effort)
     try:
         from app.api.v1.endpoints.ws import broadcast_event
         await broadcast_event("Actual Uploaded",         {"period": period, "rows": new_rows})

@@ -165,6 +165,11 @@ export const api = {
   getCycleHistory:      () => http.get('/api/v1/business/cycle-history'),
   getDataSourceMode:    () => http.get('/api/v1/business/data-source-mode'),
 
+  // Cycle state machine (backend-authoritative lifecycle)
+  getCycleState:        () => http.get('/api/v1/cycle/state'),
+  issueForecast:        (period) => http.post(`/api/v1/cycle/forecast/${period}`),
+  resetCycle:           () => http.post('/api/v1/cycle/reset?confirm=true'),
+
   // Enterprise AI Supply Chain Investigator
   investigateIncident:    (b) => http.post('/api/v1/rca/investigation/analyze-incident', b),
   simulateCounterfactual: (b) => http.post('/api/v1/rca/investigation/simulate-counterfactual', b),

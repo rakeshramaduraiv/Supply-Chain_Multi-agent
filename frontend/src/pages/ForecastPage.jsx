@@ -740,13 +740,19 @@ export default function ForecastPage() {
           handleBackendResult(res)
         })
         .catch(err => {
-          appendLog(2, `⚠️ Upload failed: ${err?.message || 'unknown error'}`, true)
+          const detail = err?.message || 'unknown error'
+          const is409 = err?.status === 409
+          appendLog(2, `⚠️ Upload failed: ${detail}`, true)
           setIsIngestingActuals(false)
-          toast.error(`Upload failed: ${err?.message || 'check backend logs'}`)
+          if (is409) {
+            toast.error(`Upload blocked: ${detail}`)
+          } else {
+            toast.error(`Upload failed: ${detail}`)
+          }
         })
     } else {
-      // Synthetic ingest: no file — call backend with empty period marker
-      // so ECLE still runs; comparison_records will have matched=false for all
+      // Synthetic ingest: no file — build result locally, do NOT call backend
+      // (backend requires a real file; calling it without one returns 400/409)
       appendLog(2, '⚠️ No file selected — running synthetic ingest (no actuals matched)', true)
       setTimeout(() => {
         const syntheticResult = {
@@ -1635,7 +1641,11 @@ export default function ForecastPage() {
                         )}
                       </div>
                       <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: step2File ? 4 : 0 }}
-                        onClick={() => { handleIngestSyntheticMonth(cycleMonth, step2File || null); setStep2File(null) }}>
+                        onClick={() => {
+                          if (!step2File) { handleIngestSyntheticMonth(cycleMonth, null); return }
+                          handleIngestSyntheticMonth(cycleMonth, step2File)
+                          setStep2File(null)
+                        }}>
                         {step2File
                           ? <><Upload size={11} /> Upload &amp; Ingest {step2File.name}</>
                           : <><CheckCircle size={11} /> Ingest Synthetic Actuals for {cycleMonth}</>}

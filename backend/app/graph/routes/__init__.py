@@ -387,8 +387,11 @@ async def get_centrality(
             message=f"{algorithm} centrality computed for {label}",
         )
     except Exception as e:
-        logger.error(f"Centrality failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Centrality unavailable (Neo4j offline?): {e}")
+        return BaseResponse(
+            data=CentralitySchema(label=label, algorithm=algorithm, results=[]),
+            message=f"Centrality unavailable — Neo4j offline",
+        )
 
 
 @router.get("/shortest-path", response_model=BaseResponse[list[dict[str, Any]]])

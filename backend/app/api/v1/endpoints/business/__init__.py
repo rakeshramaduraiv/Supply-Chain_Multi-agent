@@ -118,8 +118,8 @@ async def upload_actual_data(
     Ordering guard: rejects any period that is not next_expected_period (409).
     Stage 1 of the canonical lifecycle is recorded in cycle_state after ECLE.
     """
-    # Ordering guard — must be next_expected_period
-    from app.services.cycle_state_store import get_cycle_state_response
+    # Ordering guard — must be next_expected_period (skip if no expected period set)
+    from app.services.cycle_state_store import get_cycle_state_response, get_period_state
     _cs = get_cycle_state_response()
     _next = _cs.get("next_expected_period")
     if _next and period != _next:
@@ -133,6 +133,23 @@ async def upload_actual_data(
                     f"Cannot upload actuals for {period!r}: "
                     f"next expected period is {_next!r}. "
                     f"Upload {_next!r} first."
+                ),
+            },
+        )
+
+    # Stage 0 guard — forecast must be issued before actuals can be uploaded
+    _ps = get_period_state(period)
+    _stage0 = (_ps or {}).get("stage_statuses", {}).get("0", {}).get("status")
+    if _stage0 != "COMPLETED":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "forecast_not_issued",
+                "period": period,
+                "message": (
+                    f"Cannot upload actuals for {period!r}: "
+                    f"Stage 0 (Forecast Issued) must be completed first. "
+                    f"Click 'Generate Forecast' in the lifecycle stepper."
                 ),
             },
         )

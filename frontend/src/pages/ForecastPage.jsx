@@ -1573,13 +1573,18 @@ export default function ForecastPage() {
 
                           clearInterval(forecastTimerRef.current)
 
-                          setForecastAnimating(false)
-
-                          setForecastTick(100)
-
-                          appendLog(1, `✅ ${categoryForecasts.length || 6} category forecasts generated`, true)
-
-                          setCycleStep(2)
+                          // Record Stage 0 on backend so upload/actual guard passes
+                          api.issueForecast(cycleMonth).catch(err => {
+                            // 409 already_issued is fine (idempotent)
+                            if (err?.status !== 409) {
+                              appendLog(1, `⚠️ Stage 0 record failed: ${err?.message || 'unknown'}`, false)
+                            }
+                          }).finally(() => {
+                            setForecastAnimating(false)
+                            setForecastTick(100)
+                            appendLog(1, `✅ ${categoryForecasts.length || 6} category forecasts generated`, true)
+                            setCycleStep(2)
+                          })
 
                         }
 

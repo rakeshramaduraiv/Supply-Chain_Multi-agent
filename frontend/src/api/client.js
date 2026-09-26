@@ -179,10 +179,10 @@ export const api = {
   queryCopilot:           (b) => http.post('/api/v1/graphrag/copilot/query', b),
 }
 
-// WebSocket: ws.router mounted with prefix="" under /api/v1, so full path is /ws
+// WebSocket: mounted at /api/v1/ws
 const WS_BASE = BASE.replace(/^http/, 'ws').replace(/\/api\/v1$/, '')
 export function createWebSocket(onMessage, onClose) {
-  const ws = new WebSocket(`${WS_BASE}/ws`)
+  const ws = new WebSocket(`${WS_BASE}/api/v1/ws`)
   ws.onmessage = (e) => { try { onMessage(JSON.parse(e.data)) } catch {} }
   ws.onclose   = onClose || (() => {})
   ws.onerror   = () => ws.close()

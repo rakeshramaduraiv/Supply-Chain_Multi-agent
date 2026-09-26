@@ -301,11 +301,26 @@ async def upload_actual_data(
     except Exception as _rs_err:
         logger.warning(f"cycle_state record_stage(1) failed: {_rs_err}")
 
-    # 5. WebSocket broadcast (best-effort)
+    # 5. Run full cycle pipeline (stages 1-6) via cycle_service
+    try:
+        from app.services.cycle_service import run_upload_cycle
+        from app.database.postgres import async_session_factory
+        async with async_session_factory() as db_session:
+            await run_upload_cycle(
+                df_actual=df_actual,
+                period=period,
+                filename=file.filename,
+                session=db_session,
+            )
+    except Exception as e_cycle:
+        logger.warning(f"cycle_service pipeline failed (non-fatal): {e_cycle}")
+
+    # 6. WebSocket broadcast (best-effort)
     try:
         from app.api.v1.endpoints.ws import broadcast_event
         await broadcast_event("Actual Uploaded",         {"period": period, "rows": new_rows})
         await broadcast_event("Knowledge Graph Updated", {"period": period})
+        await broadcast_event("cycle_complete",          {"period": period})
     except Exception as ws_err:
         logger.warning(f"WS broadcast skipped: {ws_err}")
 

@@ -35,18 +35,19 @@ services:
       - ./backend/data/processed:/app/data/processed
       - ./backend/data/actuals_real:/app/data/actuals_real
       - ./backend/data/user_uploads:/app/data/user_uploads
+      - ./backend/data/cycle_state.json:/app/data/cycle_state.json
     depends_on:
       postgres:
         condition: service_healthy
       neo4j:
         condition: service_healthy
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --log-level info
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 180s
     restart: unless-stopped
     networks:
       - amasci-net

@@ -54,7 +54,7 @@ import {
 
 } from 'recharts'
 
-import { api } from '../api/client'
+import { api, createWebSocket } from '../api/client'
 
 import Spinner from '../components/ui/Spinner'
 
@@ -259,6 +259,21 @@ export default function ForecastPage() {
   // ── WebSocket cycle stream ────────────────────────────────────────────────
   const [activeCycleId, setActiveCycleId] = useState(null)
 
+  // Real-time cycle state updates via WebSocket
+  useEffect(() => {
+    let ws
+    try {
+      ws = createWebSocket((msg) => {
+        const ev = msg?.event || ''
+        if (ev === 'stage_update' || ev === 'Actual Uploaded' || ev === 'Knowledge Graph Updated' || ev === 'cycle_complete') {
+          refetchCycle()
+          qc.invalidateQueries(['supplyChain', 'autoForecast'])
+        }
+      })
+    } catch {}
+    return () => { try { ws?.close() } catch {} }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Per-step live status messages
 
   // On mount: reconcile navigational state against backend coverage signature.
@@ -460,6 +475,41 @@ export default function ForecastPage() {
   })
 
   // ── Mutations ─────────────────────────────────────────────────────────────
+
+  // -- Cycle state (backend-authoritative lifecycle) --
+  const { data: cycleState, isLoading: isCycleLoading, refetch: refetchCycle } = useQuery({
+    queryKey: ['supplyChain', 'cycleState'],
+    queryFn:  () => api.getCycleState().then(r => r.data),
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+  })
+
+  const [isIssuingForecast, setIsIssuingForecast] = useState(false)
+
+  const handleIssueForecast = async (period) => {
+    setIsIssuingForecast(true)
+    try {
+      await api.issueForecast(period)
+      await refetchCycle()
+      qc.invalidateQueries(['supplyChain', 'autoForecast'])
+      toast.success('Forecast issued for ' + period)
+    } catch (e) {
+      toast.error(e?.response?.data?.detail?.message || e?.response?.data?.detail || 'Forecast failed: ' + e.message)
+    } finally {
+      setIsIssuingForecast(false)
+    }
+  }
+
+  const handleResetCycle = async () => {
+    try {
+      await api.resetCycle()
+      await refetchCycle()
+      qc.invalidateQueries(['supplyChain'])
+      toast.success('Cycle reset')
+    } catch (e) {
+      toast.error('Reset failed: ' + e.message)
+    }
+  }
 
   const cycleRcaMut = useMutation({
 
@@ -730,6 +780,7 @@ export default function ForecastPage() {
 
       toast.success(`Actuals for ${periodStr} ingested — ${matchedRecs.length} categories matched`)
       qc.invalidateQueries({ queryKey: ['supplyChain'] })
+      refetchCycle()
       setCycleStep(3)
     }
 
@@ -789,6 +840,7 @@ export default function ForecastPage() {
         appendLog(2, '✅ Synthetic ingest complete — 0 actuals matched', true)
         toast.info(`Synthetic ingest for ${periodStr} — no actuals matched`)
         qc.invalidateQueries({ queryKey: ['supplyChain'] })
+        refetchCycle()
         setCycleStep(3)
       }, 1400)
     }
@@ -1452,542 +1504,24 @@ export default function ForecastPage() {
 
       </div>
 
-      {/* ── CONTINUOUS FORECAST LIFECYCLE TIMELINE ── */}
-
-      <div id="lifecycle-anchor" className={styles.timelineCard}>
-
-        {/* Return banner — shown when user comes back from /risk or /graph mid-cycle */}
-        {returnFromStep && (
-          <div style={{ margin: '0 0 10px 0', padding: '8px 14px', background: 'rgba(0,184,148,0.08)', border: '1.5px solid #00b894', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: '11px', color: '#00b894', fontWeight: 700 }}>
-              ✓ Step {returnFromStep} completed — you’re back on the Forecast page
-            </span>
-            <span style={{ fontSize: '10px', color: 'var(--tm)', marginLeft: 'auto' }}>
-              Continue with Step {cycleStep} below
-            </span>
-          </div>
-        )}
-
-        <div className={styles.timelineHead}>
-
-          <div>
-
-            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--tp)' }}>
-
-              Continuous Decision-Support Forecasting Lifecycle
-
-            </div>
-
-            <div style={{ fontSize: '11px', color: 'var(--tm)' }}>
-
-              Historical Data ➔ Pre-Event Forecast ➔ Validation ➔ Root Cause ➔ Graph Mutation ➔ TPKE Learning ➔ Next Period
-
-            </div>
-
-          </div>
-
-          <span className="badge bdg-blue">Step {cycleStep} of 8</span>
-
-        </div>
-
-        <div className={styles.timelineGrid}>
-
-          {timelineSteps.map(st => (
-
-            <div
-
-              key={st.step}
-              className={`${styles.stepItem} ${cycleStep === st.step ? styles.stepItemActive : ''}`}
-
-            >
-
-              <div className={styles.stepHeader}>
-
-                <span style={{ color: 'var(--tm)' }}>STEP {st.step}</span>
-
-                <span className={`badge ${st.status === 'Completed' ? 'bdg-low' : st.status === 'Active' ? 'bdg-blue' : 'bdg-med'}`}>
-
-                  {st.status}
-
-                </span>
-
-              </div>
-
-              <div className={styles.stepTitle}>{st.name}</div>
-
-              <div className={styles.stepMeta}>
-
-                <span>Exec: {st.exec}</span>
-
-                <span>Conf: {st.conf}</span>
-
-              </div>
-
-              <div className={styles.progressBar}>
-
-                <div className={styles.progressFill} style={{ width: st.comp }} />
-
-              </div>
-
-              <div className={styles.stepSummary}>{st.summary}</div>
-
-              {/* Step 1: Generate Forecast — advances to Step 2 */}
-
-              {st.step === 1 && cycleStep === 1 && (
-
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
-                  <button
-
-                    className="btn btn-primary btn-sm"
-
-                    style={{ width: '100%' }}
-
-                    onClick={() => {
-
-                      clearLog(1)
-
-                      appendLog(1, `🤖 Running multi-agent forecast for ${cycleMonth}…`)
-
-                      appendLog(1, `📊 LightGBM trained on data through ${cycleTrainedUntil}…`)
-
-                      // Start real-time animation — tick 0→100 over 900ms
-
-                      setForecastAnimating(true)
-
-                      setForecastTick(0)
-
-                      setActiveTab('intelligence')
-
-                      setTimeout(() => document.getElementById('agent-grid-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-
-                      let t = 0
-
-                      forecastTimerRef.current = setInterval(() => {
-
-                        t += 5
-
-                        setForecastTick(t)
-
-                        if (t >= 100) {
-
-                          clearInterval(forecastTimerRef.current)
-
-                          // Record Stage 0 on backend so upload/actual guard passes
-                          api.issueForecast(cycleMonth).catch(err => {
-                            // 409 already_issued is fine (idempotent)
-                            if (err?.status !== 409) {
-                              appendLog(1, `⚠️ Stage 0 record failed: ${err?.message || 'unknown'}`, false)
-                            }
-                          }).finally(() => {
-                            setForecastAnimating(false)
-                            setForecastTick(100)
-                            appendLog(1, `✅ ${categoryForecasts.length || 6} category forecasts generated`, true)
-                            setCycleStep(2)
-                          })
-
-                        }
-
-                      }, 45)
-
-                    }}
-
-                  >
-
-                    <Play size={11} /> Generate Forecast for {cycleMonth}
-
-                  </button>
-
-                  <StepLogPanel log={stepLogs[1]} />
-
-                </div>
-
-              )}
-
-              {/* Step 2: CSV upload or synthetic ingest */}
-              {st.step === 2 && cycleStep === 2 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <div style={{ fontSize: '9px', color: 'var(--blue)', marginBottom: 4 }}>
-                    Forecast period: <strong>{cycleMonth}</strong>
-                  </div>
-                  {cycleActualsUploaded ? (
-                    <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, padding: '4px 0' }}>
-                      ✅ Actuals ingested — proceed to Step 3
-                    </div>
-                  ) : isIngestingActuals ? (
-                    <div style={{ fontSize: '9px', color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Loader size={11} className={styles.spin} /> Ingesting actuals…
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        onDragOver={e => { e.preventDefault(); setStep2DragOver(true) }}
-                        onDragLeave={() => setStep2DragOver(false)}
-                        onDrop={e => { e.preventDefault(); setStep2DragOver(false); const f = e.dataTransfer.files?.[0]; if (f) setStep2File(f) }}
-                        onClick={() => step2InputRef.current?.click()}
-                        style={{
-                          border: `1.5px dashed ${step2DragOver ? 'var(--blue)' : step2File ? '#00b894' : 'var(--b)'}`,
-                          borderRadius: 6, padding: '8px 6px', textAlign: 'center',
-                          cursor: 'pointer', marginBottom: 6,
-                          background: step2DragOver ? 'rgba(91,138,255,0.06)' : 'transparent',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <input ref={step2InputRef} type="file" accept=".csv" style={{ display: 'none' }}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) setStep2File(f) }} />
-                        {step2File ? (
-                          <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700 }}>
-                            <FileUp size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />{step2File.name}
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '9px', color: 'var(--tm)' }}>
-                            <Upload size={11} style={{ verticalAlign: 'middle', marginRight: 3 }} />Drop CSV or click to browse
-                          </div>
-                        )}
-                      </div>
-                      <button className="btn btn-primary btn-sm" style={{ width: '100%', marginBottom: step2File ? 4 : 0 }}
-                        onClick={() => {
-                          if (!step2File) { handleIngestSyntheticMonth(cycleMonth, null); return }
-                          handleIngestSyntheticMonth(cycleMonth, step2File)
-                          setStep2File(null)
-                        }}>
-                        {step2File
-                          ? <><Upload size={11} /> Upload &amp; Ingest {step2File.name}</>
-                          : <><CheckCircle size={11} /> Ingest Synthetic Actuals for {cycleMonth}</>}
-                      </button>
-                      {step2File && (
-                        <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 9 }}
-                          onClick={() => setStep2File(null)}>✕ Clear file</button>
-                      )}
-                    </>
-                  )}
-                  <StepLogPanel log={stepLogs[2]} />
-                </div>
-              )}
-
-              {/* Step 3: Validate deviation */}
-
-              {st.step === 3 && cycleStep === 3 && (
-
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
-                  <button
-
-                    className="btn btn-primary btn-sm"
-
-                    style={{ width: '100%' }}
-
-                    onClick={() => {
-
-                      clearLog(3)
-
-                      appendLog(3, '🔢 Computing MAPE, MAE, RMSE from matched records…')
-
-                      const mape = cycleUploadResult?.mape_val != null ? cycleUploadResult.mape_val.toFixed(2) : '—'
-
-                      setTimeout(() => {
-
-                        appendLog(3, `📊 MAPE: ${mape}%`)
-
-                        appendLog(3, '✅ Deviation analysis complete', true)
-
-                        setCycleStep(4)
-
-                        setActiveTab('validation')
-
-                        setTimeout(() => document.getElementById('error-diagnostics-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-
-                      }, 900)
-
-                    }}
-
-                  >
-
-                    <CheckCircle size={11} /> Run Validation
-
-                  </button>
-
-                  <StepLogPanel log={stepLogs[3]} />
-
-                </div>
-
-              )}
-
-              {/* Step 4: RCA — runs analysis inline, shows result + link to Risk Center */}
-              {st.step === 4 && cycleStep === 4 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    style={{ width: '100%' }}
-                    disabled={cycleRcaMut.isPending}
-                    onClick={() => {
-                      const incidents = JSON.parse(localStorage.getItem('amasci_forecast_incidents') || '[]')
-                      const periodIncident = incidents.find(i => i.period === cycleMonth)
-                      localStorage.setItem('amasci_rca_focus', JSON.stringify({
-                        period: cycleMonth,
-                        incidentId: periodIncident?.id || null,
-                        filterYear: cycleMonth.slice(0, 4),
-                        returnStep: 5,
-                      }))
-                      cycleRcaMut.mutate()
-                    }}
-                  >
-                    {cycleRcaMut.isPending
-                      ? <><Loader size={11} className={styles.spin} /> Analyzing…</>
-                      : <><GitBranch size={11} /> Run Root Cause Analysis</>}
-                  </button>
-                  <StepLogPanel log={stepLogs[4]} />
-                </div>
-              )}
-              {/* After step 4 done — show RCA result inline + optional link to Risk Center */}
-              {st.step === 4 && cycleStep > 4 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
-                    ✅ RCA complete — {cycleRcaResult?.root_causes?.[0]?.cause || cycleRcaResult?.primary_cause || 'Carrier Ground Transport'}
-                  </div>
-                  {cycleRcaResult && (
-                    <div style={{ fontSize: '9px', color: 'var(--ts)', marginBottom: 4, lineHeight: 1.4 }}>
-                      Period: <strong>{cycleMonth}</strong> · Confidence: <strong style={{ color: 'var(--blue)' }}>{cycleRcaResult.confidence ? `${(cycleRcaResult.confidence * 100).toFixed(0)}%` : '93%'}</strong>
-                      {cycleRcaResult.root_causes?.slice(0, 2).map((rc, i) => (
-                        <div key={i}>#{i + 1} {rc.cause} ({rc.confidence ? `${(rc.confidence * 100).toFixed(0)}%` : '—'})</div>
-                      ))}
-                    </div>
-                  )}
-                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
-                    onClick={() => {
-                      const incidents = JSON.parse(localStorage.getItem('amasci_forecast_incidents') || '[]')
-                      const periodIncident = incidents.find(i => i.period === cycleMonth)
-                      localStorage.setItem('amasci_rca_focus', JSON.stringify({
-                        period: cycleMonth,
-                        incidentId: periodIncident?.id || null,
-                        filterYear: cycleMonth.slice(0, 4),
-                        returnStep: 5,
-                      }))
-                      navigateToPage('/risk')
-                    }}>
-                    <GitBranch size={10} /> Deep-dive in Root Cause Center →
-                  </button>
-                </div>
-              )}
-
-              {/* Step 5: KG Mutation — runs mutation here, shows link to Graph page (Prediction Layer) */}
-              {st.step === 5 && cycleStep === 5 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    style={{ width: '100%' }}
-                    onClick={() => {
-                      clearLog(5)
-                      appendLog(5, '🔗 Propagating RCA findings to Neo4j nodes…')
-                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
-                        mode: 'kg_mutation', version: activeGraphVersion,
-                        layer: 'Prediction', highlightNode: 'carrier_ground',
-                        period: cycleMonth,
-                        rcaCause: cycleRcaResult?.root_causes?.[0]?.cause || cycleRcaResult?.primary_cause || 'Carrier Ground Transport',
-                        message: `KG Mutation — ${cycleMonth} · Prediction Layer · ${activeGraphVersion}`,
-                      }))
-                      setTimeout(() => {
-                        appendLog(5, `📌 Risk scores updated — ${activeGraphVersion}`)
-                        appendLog(5, '✅ Knowledge Graph mutation applied', true)
-                        qc.invalidateQueries({ queryKey: ['supplyChain'] })
-                        setCycleStep(6)
-                      }, 700)
-                    }}
-                  >
-                    <Network size={11} /> Apply Graph Mutation
-                  </button>
-                  <StepLogPanel log={stepLogs[5]} />
-                </div>
-              )}
-              {/* After step 5 done — inline summary + link to KG Prediction Layer */}
-              {st.step === 5 && cycleStep > 5 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
-                    ✅ KG mutation applied — {activeGraphVersion}
-                  </div>
-                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
-                    onClick={() => {
-                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
-                        mode: 'kg_mutation', version: activeGraphVersion,
-                        layer: 'Prediction', highlightNode: 'carrier_ground',
-                        period: cycleMonth,
-                        rcaCause: cycleRcaResult?.root_causes?.[0]?.cause || cycleRcaResult?.primary_cause || 'Carrier Ground Transport',
-                        message: `KG Mutation — ${cycleMonth} · Prediction Layer · ${activeGraphVersion}`,
-                      }))
-                      navigateToPage('/graph')
-                    }}>
-                    <Network size={10} /> View Prediction Layer in Knowledge Graph →
-                  </button>
-                </div>
-              )}
-
-              {/* Step 6: TPKE Evolution — evolves edges here, shows link to TPKE Layer */}
-              {st.step === 6 && cycleStep === 6 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    style={{ width: '100%' }}
-                    onClick={() => {
-                      clearLog(6)
-                      appendLog(6, '⚡ Running temporal edge decay pass…')
-                      appendLog(6, '🔄 Strengthening pattern edges from deviation events…')
-                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
-                        mode: 'tpke_evolution', version: activeTpkeVersion,
-                        layer: 'TPKE', highlightNode: 'supplier_main',
-                        period: cycleMonth,
-                        tpkeVersion: activeTpkeVersion,
-                        tpkeEdgesEvolved: tpkeStatus.edges_evolved ?? null,
-                        message: `TPKE evolved — ${activeTpkeVersion || '—'} · ${cycleMonth}`,
-                      }))
-                      setTimeout(() => {
-                        appendLog(6, `✅ TPKE edges evolved — ${activeTpkeVersion || '—'}`, true)
-                        setCycleStep(7)
-                      }, 800)
-                    }}
-                  >
-                    <Layers size={11} /> Evolve TPKE Edges
-                  </button>
-                  <StepLogPanel log={stepLogs[6]} />
-                </div>
-              )}
-              {/* After step 6 done — inline summary + link to TPKE Evolution Layer */}
-              {st.step === 6 && cycleStep > 6 && (
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-                  <div style={{ fontSize: '9px', color: '#00b894', fontWeight: 700, marginBottom: 4 }}>
-                    ✅ TPKE evolved — {activeTpkeVersion}
-                  </div>
-                  <button className="btn btn-secondary btn-sm" style={{ width: '100%', fontSize: 10 }}
-                    onClick={() => {
-                      localStorage.setItem('amasci_graph_focus', JSON.stringify({
-                        mode: 'tpke_evolution', version: activeTpkeVersion,
-                        layer: 'TPKE', highlightNode: 'supplier_main',
-                        period: cycleMonth,
-                        tpkeVersion: activeTpkeVersion,
-                        tpkeEdgesEvolved: tpkeStatus.edges_evolved ?? null,
-                        message: `TPKE evolved — ${activeTpkeVersion || '—'} · ${cycleMonth}`,
-                      }))
-                      navigateToPage('/graph')
-                    }}>
-                    <Layers size={10} /> View TPKE Evolution Layer in Knowledge Graph →
-                  </button>
-                </div>
-              )}
-
-              {/* Step 7: Retrain */}
-
-              {st.step === 7 && cycleStep === 7 && (
-
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
-                  <button
-
-                    className="btn btn-primary btn-sm"
-
-                    style={{ width: '100%' }}
-
-                    disabled={cycleRetrainMut.isPending}
-
-                    onClick={() => cycleRetrainMut.mutate()}
-
-                  >
-
-                    {cycleRetrainMut.isPending
-
-                      ? <><Loader size={11} className={styles.spin} /> Retraining…</>
-
-                      : <><RefreshCw size={11} /> Retrain Agent Memory</>}
-
-                  </button>
-
-                  <StepLogPanel log={stepLogs[7]} />
-
-                </div>
-
-              )}
-
-              {/* Step 8: Advance */}
-
-              {st.step === 8 && cycleStep === 8 && (
-
-                <div className={styles.stepAction} onClick={e => e.stopPropagation()}>
-
-                  <button
-
-                    className="btn btn-primary btn-sm"
-
-                    style={{ width: '100%' }}
-
-                    onClick={() => {
-
-                      const nextIdx = FORECAST_MONTHS.findIndex(m => m.period === cycleMonth) + 1
-
-                      const next = FORECAST_MONTHS[nextIdx]
-
-                      if (next) {
-
-                        setCycleTrainedUntil(cycleMonth)
-
-                        setCycleMonth(next.period)
-
-                        setCycleActualsUploaded(false)
-
-                        setCycleModelRetrained(false)
-
-                        setCycleUploadResult(null)
-
-                        setCycleRcaResult(null)
-
-                        setCycleRetrainResult(null)
-
-                        setStepLogs({})
-
-                        setIsIngestingActuals(false)
-
-                        setActualsFile(null)
-
-                        // Write step=1 directly to avoid session-wipe race on next mount
-                        writeLS('amasci_cycle_step', 1)
-                        _setCycleStep(1)
-
-                        // Clear per-cycle localStorage keys so next cycle starts fresh
-                        localStorage.removeItem('amasci_rca_focus')
-                        localStorage.removeItem('amasci_step4_navigated')
-                        localStorage.removeItem('amasci_step5_navigated')
-                        localStorage.removeItem('amasci_step6_navigated')
-                        localStorage.removeItem('amasci_cycle_actuals_uploaded')
-                        localStorage.removeItem('amasci_cycle_upload_result')
-
-                        toast.success(`Cycle advanced → forecasting ${next.label}`)
-
-                        setActiveTab('intelligence')
-
-                        setTimeout(() => document.getElementById('lifecycle-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
-
-                      } else {
-
-                        toast.info('All 2018 forecast months completed — cycle finished')
-
-                      }
-
-                    }}
-
-                  >
-
-                    <ArrowRightCircle size={11} /> Advance to Next Month
-
-                  </button>
-
-                </div>
-
-              )}
-
-            </div>
-
-          ))}
-
-        </div>
-
-      </div>
+      {/* CONTINUOUS FORECAST LIFECYCLE -- backend-authoritative */}
+      <CycleStepper
+        cycleState={cycleState}
+        isCycleLoading={isCycleLoading}
+        onIssueForecast={handleIssueForecast}
+        onUploadActuals={(period, file) => {
+          setCycleMonth(period)
+          if (file) {
+            handleIngestSyntheticMonth(period, file)
+          } else {
+            document.getElementById('upload-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        }}
+        onReset={handleResetCycle}
+        isIssuingForecast={isIssuingForecast}
+        isUploadingActuals={isIngestingActuals}
+        currentPeriod={cycleState?.current_period || cycleMonth}
+      />
 
       {/* Step 2 ingest trigger — fires when validation tab upload completes */}
 

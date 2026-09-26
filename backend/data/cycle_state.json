@@ -1,0 +1,729 @@
+{
+  "periods": {
+    "2017-10": {
+      "period": "2017-10",
+      "stage_reached": 6,
+      "stage_statuses": {
+        "0": {
+          "stage": 0,
+          "name": "Forecast Issued",
+          "status": "COMPLETED",
+          "duration_ms": 212925.6,
+          "detail": {
+            "target_period": "2017-10",
+            "template_period": "2017-09",
+            "trained_through": "2026-09",
+            "total_forecasts": 58,
+            "overall_confidence": 0.6242
+          },
+          "error": null
+        },
+        "1": {
+          "stage": 1,
+          "name": "Ingest & Validate",
+          "status": "COMPLETED",
+          "duration_ms": 93.4,
+          "detail": {
+            "rows": 2255,
+            "columns": 65,
+            "period": "2017-10",
+            "duplicates_dropped": 0,
+            "schema_resolved": 12,
+            "continuity_warnings": 0
+          },
+          "error": null
+        },
+        "2": {
+          "stage": 2,
+          "name": "Match",
+          "status": "SKIPPED",
+          "duration_ms": 42.1,
+          "detail": {
+            "reason": "no standing forecast for this period",
+            "match_rate": null
+          },
+          "error": null
+        },
+        "3": {
+          "stage": 3,
+          "name": "Evaluate",
+          "status": "SKIPPED",
+          "duration_ms": 0.0,
+          "detail": {
+            "reason": "no standing forecast for 2017-10"
+          },
+          "error": null
+        },
+        "4": {
+          "stage": 4,
+          "name": "TPKE Evolve",
+          "status": "SKIPPED",
+          "duration_ms": 0.0,
+          "detail": {
+            "reason": "No metrics from stage 3 \u2014 TPKE skipped"
+          },
+          "error": null
+        },
+        "5": {
+          "stage": 5,
+          "name": "Store & Retrain",
+          "status": "FAILED",
+          "duration_ms": 33.3,
+          "detail": {
+            "period": "2017-10",
+            "cumulative_rows": 0,
+            "retrained_models": []
+          },
+          "error": "'CumulativeStore' object has no attribute 'load_cumulative'"
+        },
+        "6": {
+          "stage": 6,
+          "name": "Forecast Next",
+          "status": "COMPLETED",
+          "duration_ms": 16605.4,
+          "detail": {
+            "ready": true,
+            "target_period": "2026-10",
+            "template_period": "2017-09",
+            "trained_through": "2026-09",
+            "forecast_period": "2026-10",
+            "forecast_period_start": "2026-10-01",
+            "forecast_period_end": "",
+            "training_data_end": "2026-09",
+            "generated_at": "2026-09-26T15:12:22.794170+00:00",
+            "status": "completed",
+            "overall_confidence": 0.6242,
+            "agent_results": {
+              "demand": {
+                "predicted_value": 2.0302,
+                "prediction_interval_lower": 0,
+                "prediction_interval_upper": 4.1681,
+                "residual_std": 1.0907,
+                "n_predictions": 5189,
+                "imputation_counts": {
+                  "qty_roll_7": 3,
+                  "qty_roll_30": 3
+                },
+                "imputation_strategy": "lgbm_native_nan",
+                "low_confidence_features": []
+              },
+              "supplier": {
+                "predicted_risk": 0.3504,
+                "risk_level": "medium",
+                "mean_decisiveness": 0.4195,
+                "n_predictions": 5189,
+                "imputation_counts": {
+                  "qty_roll_7": 3
+                },
+                "imputation_strategy": "training_median",
+                "low_confidence_features": []
+              },
+              "logistics": {
+                "predicted_risk": 0.6049,
+                "risk_level": "medium",
+                "mean_decisiveness": 0.3869,
+                "n_predictions": 5189,
+                "imputation_counts": {
+                  "qty_roll_7": 3
+                },
+                "imputation_strategy": "lgbm_native_nan",
+                "low_confidence_features": []
+              }
+            },
+            "category_forecasts": [
+              {
+                "category": "Baseball & Softball",
+                "region": "Western Europe",
+                "order_count": 4,
+                "predicted_demand": 9.57,
+                "predicted_revenue": 1531.6,
+                "supplier_risk": 0.6497,
+                "logistics_risk": 0.582,
+                "combined_risk": 0.6159
+              },
+              {
+                "category": "Fitness Accessories",
+                "region": "Western Europe",
+                "order_count": 3,
+                "predicted_demand": 8.92,
+                "predicted_revenue": 5349.06,
+                "supplier_risk": 0.4848,
+                "logistics_risk": 0.7242,
+                "combined_risk": 0.6045
+              },
+              {
+                "category": "Lacrosse",
+                "region": "Western Europe",
+                "order_count": 3,
+                "predicted_demand": 14.58,
+                "predicted_revenue": 1457.38,
+                "supplier_risk": 0.5251,
+                "logistics_risk": 0.6748,
+                "combined_risk": 0.5999
+              },
+              {
+                "category": "Basketball",
+                "region": "Western Europe",
+                "order_count": 38,
+                "predicted_demand": 37.72,
+                "predicted_revenue": 12706.95,
+                "supplier_risk": 0.5514,
+                "logistics_risk": 0.6178,
+                "combined_risk": 0.5846
+              },
+              {
+                "category": "Golf Shoes",
+                "region": "Western Europe",
+                "order_count": 5,
+                "predicted_demand": 64.51,
+                "predicted_revenue": 6295.72,
+                "supplier_risk": 0.5011,
+                "logistics_risk": 0.5712,
+                "combined_risk": 0.5362
+              },
+              {
+                "category": "Hockey",
+                "region": "Western Europe",
+                "order_count": 20,
+                "predicted_demand": 40.66,
+                "predicted_revenue": 13416.23,
+                "supplier_risk": 0.483,
+                "logistics_risk": 0.5838,
+                "combined_risk": 0.5334
+              },
+              {
+                "category": "Water Sports",
+                "region": "Western Europe",
+                "order_count": 304,
+                "predicted_demand": 300.42,
+                "predicted_revenue": 63637.72,
+                "supplier_risk": 0.497,
+                "logistics_risk": 0.5684,
+                "combined_risk": 0.5327
+              },
+              {
+                "category": "Fishing",
+                "region": "Western Europe",
+                "order_count": 320,
+                "predicted_demand": 315.15,
+                "predicted_revenue": 126054.68,
+                "supplier_risk": 0.4885,
+                "logistics_risk": 0.5676,
+                "combined_risk": 0.5281
+              },
+              {
+                "category": "Cleats",
+                "region": "Western Europe",
+                "order_count": 446,
+                "predicted_demand": 1332.07,
+                "predicted_revenue": 96397.46,
+                "supplier_risk": 0.4969,
+                "logistics_risk": 0.5558,
+                "combined_risk": 0.5263
+              },
+              {
+                "category": "Camping & Hiking",
+                "region": "Western Europe",
+                "order_count": 250,
+                "predicted_demand": 238.61,
+                "predicted_revenue": 71576.89,
+                "supplier_risk": 0.5057,
+                "logistics_risk": 0.5426,
+                "combined_risk": 0.5242
+              },
+              {
+                "category": "Shop By Sport",
+                "region": "Western Europe",
+                "order_count": 198,
+                "predicted_demand": 591.11,
+                "predicted_revenue": 24593.92,
+                "supplier_risk": 0.4907,
+                "logistics_risk": 0.556,
+                "combined_risk": 0.5233
+              },
+              {
+                "category": "Golf Apparel",
+                "region": "Western Europe",
+                "order_count": 5,
+                "predicted_demand": 10.49,
+                "predicted_revenue": 1342.65,
+                "supplier_risk": 0.447,
+                "logistics_risk": 0.5957,
+                "combined_risk": 0.5213
+              },
+              {
+                "category": "Women's Apparel",
+                "region": "Western Europe",
+                "order_count": 351,
+                "predicted_demand": 1089.6,
+                "predicted_revenue": 54480.22,
+                "supplier_risk": 0.4891,
+                "logistics_risk": 0.5437,
+                "combined_risk": 0.5164
+              },
+              {
+                "category": "Cardio Equipment",
+                "region": "Western Europe",
+                "order_count": 227,
+                "predicted_demand": 658.07,
+                "predicted_revenue": 65800.55,
+                "supplier_risk": 0.4966,
+                "logistics_risk": 0.5332,
+                "combined_risk": 0.5149
+              },
+              {
+                "category": "Women's Golf Clubs",
+                "region": "Western Europe",
+                "order_count": 5,
+                "predicted_demand": 57.8,
+                "predicted_revenue": 7050.78,
+                "supplier_risk": 0.5349,
+                "logistics_risk": 0.4873,
+                "combined_risk": 0.5111
+              },
+              {
+                "category": "Men's Footwear",
+                "region": "Western Europe",
+                "order_count": 383,
+                "predicted_demand": 393.49,
+                "predicted_revenue": 51149.97,
+                "supplier_risk": 0.4815,
+                "logistics_risk": 0.539,
+                "combined_risk": 0.5102
+              },
+              {
+                "category": "Men's Golf Clubs",
+                "region": "Southern Europe",
+                "order_count": 3,
+                "predicted_demand": 15.01,
+                "predicted_revenue": 1775.75,
+                "supplier_risk": 0.4561,
+                "logistics_risk": 0.5586,
+                "combined_risk": 0.5073
+              },
+              {
+                "category": "Indoor/Outdoor Games",
+                "region": "Western Europe",
+                "order_count": 316,
+                "predicted_demand": 953.54,
+                "predicted_revenue": 47657.8,
+                "supplier_risk": 0.4949,
+                "logistics_risk": 0.5192,
+                "combined_risk": 0.5071
+              },
+              {
+                "category": "Boxing & MMA",
+                "region": "Western Europe",
+                "order_count": 8,
+                "predicted_demand": 41.52,
+                "predicted_revenue": 3814.56,
+                "supplier_risk": 0.5949,
+                "logistics_risk": 0.4163,
+                "combined_risk": 0.5056
+              },
+              {
+                "category": "Water Sports",
+                "region": "Northern Europe",
+                "order_count": 108,
+                "predicted_demand": 100.14,
+                "predicted_revenue": 21000.26,
+                "supplier_risk": 0.5068,
+                "logistics_risk": 0.502,
+                "combined_risk": 0.5044
+              },
+              {
+                "category": "Hockey",
+                "region": "Northern Europe",
+                "order_count": 4,
+                "predicted_demand": 11.56,
+                "predicted_revenue": 3815.79,
+                "supplier_risk": 0.519,
+                "logistics_risk": 0.4839,
+                "combined_risk": 0.5014
+              },
+              {
+                "category": "Golf Gloves",
+                "region": "Southern Europe",
+                "order_count": 8,
+                "predicted_demand": 25.5,
+                "predicted_revenue": 6628.77,
+                "supplier_risk": 0.5225,
+                "logistics_risk": 0.4764,
+                "combined_risk": 0.4994
+              },
+              {
+                "category": "Kids' Golf Clubs",
+                "region": "Western Europe",
+                "order_count": 59,
+                "predicted_demand": 76.98,
+                "predicted_revenue": 24002.77,
+                "supplier_risk": 0.5164,
+                "logistics_risk": 0.4803,
+                "combined_risk": 0.4983
+              },
+              {
+                "category": "Golf Gloves",
+                "region": "Western Europe",
+                "order_count": 30,
+                "predicted_demand": 35.44,
+                "predicted_revenue": 9071.36,
+                "supplier_risk": 0.5124,
+                "logistics_risk": 0.4785,
+                "combined_risk": 0.4954
+              },
+              {
+                "category": "Hunting & Shooting",
+                "region": "Western Europe",
+                "order_count": 6,
+                "predicted_demand": 26.38,
+                "predicted_revenue": 3060.21,
+                "supplier_risk": 0.4493,
+                "logistics_risk": 0.5394,
+                "combined_risk": 0.4943
+              },
+              {
+                "category": "Fishing",
+                "region": "Southern Europe",
+                "order_count": 129,
+                "predicted_demand": 123.45,
+                "predicted_revenue": 49379.24,
+                "supplier_risk": 0.4858,
+                "logistics_risk": 0.5015,
+                "combined_risk": 0.4936
+              },
+              {
+                "category": "Camping & Hiking",
+                "region": "Southern Europe",
+                "order_count": 96,
+                "predicted_demand": 86.79,
+                "predicted_revenue": 26036.0,
+                "supplier_risk": 0.4917,
+                "logistics_risk": 0.4936,
+                "combined_risk": 0.4927
+              },
+              {
+                "category": "Cleats",
+                "region": "Southern Europe",
+                "order_count": 137,
+                "predicted_demand": 427.72,
+                "predicted_revenue": 31653.51,
+                "supplier_risk": 0.5114,
+                "logistics_risk": 0.4655,
+                "combined_risk": 0.4884
+              },
+              {
+                "category": "Hockey",
+                "region": "Southern Europe",
+                "order_count": 3,
+                "predicted_demand": 9.54,
+                "predicted_revenue": 3148.87,
+                "supplier_risk": 0.4483,
+                "logistics_risk": 0.5274,
+                "combined_risk": 0.4879
+              },
+              {
+                "category": "Water Sports",
+                "region": "Southern Europe",
+                "order_count": 100,
+                "predicted_demand": 100.1,
+                "predicted_revenue": 21370.93,
+                "supplier_risk": 0.5081,
+                "logistics_risk": 0.4675,
+                "combined_risk": 0.4878
+              },
+              {
+                "category": "Indoor/Outdoor Games",
+                "region": "Southern Europe",
+                "order_count": 132,
+                "predicted_demand": 361.39,
+                "predicted_revenue": 18062.15,
+                "supplier_risk": 0.4574,
+                "logistics_risk": 0.5122,
+                "combined_risk": 0.4848
+              },
+              {
+                "category": "Strength Training",
+                "region": "Western Europe",
+                "order_count": 26,
+                "predicted_demand": 16.29,
+                "predicted_revenue": 8258.16,
+                "supplier_risk": 0.4537,
+                "logistics_risk": 0.5097,
+                "combined_risk": 0.4817
+              },
+              {
+                "category": "Cardio Equipment",
+                "region": "Southern Europe",
+                "order_count": 70,
+                "predicted_demand": 211.18,
+                "predicted_revenue": 21115.82,
+                "supplier_risk": 0.5228,
+                "logistics_risk": 0.4369,
+                "combined_risk": 0.4798
+              },
+              {
+                "category": "Indoor/Outdoor Games",
+                "region": "Northern Europe",
+                "order_count": 105,
+                "predicted_demand": 330.45,
+                "predicted_revenue": 16516.13,
+                "supplier_risk": 0.489,
+                "logistics_risk": 0.4661,
+                "combined_risk": 0.4776
+              },
+              {
+                "category": "Cleats",
+                "region": "Northern Europe",
+                "order_count": 147,
+                "predicted_demand": 439.14,
+                "predicted_revenue": 29928.64,
+                "supplier_risk": 0.4247,
+                "logistics_risk": 0.5188,
+                "combined_risk": 0.4718
+              },
+              {
+                "category": "Cardio Equipment",
+                "region": "Northern Europe",
+                "order_count": 83,
+                "predicted_demand": 237.6,
+                "predicted_revenue": 23757.29,
+                "supplier_risk": 0.4632,
+                "logistics_risk": 0.4793,
+                "combined_risk": 0.4713
+              },
+              {
+                "category": "Women's Apparel",
+                "region": "Southern Europe",
+                "order_count": 134,
+                "predicted_demand": 373.91,
+                "predicted_revenue": 18695.64,
+                "supplier_risk": 0.4552,
+                "logistics_risk": 0.4856,
+                "combined_risk": 0.4704
+              },
+              {
+                "category": "Men's Footwear",
+                "region": "Southern Europe",
+                "order_count": 124,
+                "predicted_demand": 140.55,
+                "predicted_revenue": 18270.32,
+                "supplier_risk": 0.4721,
+                "logistics_risk": 0.4682,
+                "combined_risk": 0.4702
+              },
+              {
+                "category": "Golf Shoes",
+                "region": "Northern Europe",
+                "order_count": 5,
+                "predicted_demand": 22.63,
+                "predicted_revenue": 2118.13,
+                "supplier_risk": 0.3967,
+                "logistics_risk": 0.5321,
+                "combined_risk": 0.4644
+              },
+              {
+                "category": "Strength Training",
+                "region": "Southern Europe",
+                "order_count": 5,
+                "predicted_demand": 3.0,
+                "predicted_revenue": 2161.22,
+                "supplier_risk": 0.482,
+                "logistics_risk": 0.442,
+                "combined_risk": 0.462
+              },
+              {
+                "category": "Men's Golf Clubs",
+                "region": "Western Europe",
+                "order_count": 11,
+                "predicted_demand": 55.93,
+                "predicted_revenue": 6126.43,
+                "supplier_risk": 0.5364,
+                "logistics_risk": 0.3835,
+                "combined_risk": 0.4599
+              },
+              {
+                "category": "Shop By Sport",
+                "region": "Northern Europe",
+                "order_count": 57,
+                "predicted_demand": 174.68,
+                "predicted_revenue": 6985.37,
+                "supplier_risk": 0.4527,
+                "logistics_risk": 0.4621,
+                "combined_risk": 0.4574
+              },
+              {
+                "category": "Shop By Sport",
+                "region": "Southern Europe",
+                "order_count": 73,
+                "predicted_demand": 213.14,
+                "predicted_revenue": 8523.64,
+                "supplier_risk": 0.437,
+                "logistics_risk": 0.4774,
+                "combined_risk": 0.4572
+              },
+              {
+                "category": "Fishing",
+                "region": "Northern Europe",
+                "order_count": 117,
+                "predicted_demand": 115.63,
+                "predicted_revenue": 46249.81,
+                "supplier_risk": 0.4704,
+                "logistics_risk": 0.4416,
+                "combined_risk": 0.456
+              },
+              {
+                "category": "Golf Gloves",
+                "region": "Northern Europe",
+                "order_count": 13,
+                "predicted_demand": 17.48,
+                "predicted_revenue": 4651.34,
+                "supplier_risk": 0.5551,
+                "logistics_risk": 0.3493,
+                "combined_risk": 0.4522
+              },
+              {
+                "category": "Basketball",
+                "region": "Northern Europe",
+                "order_count": 9,
+                "predicted_demand": 9.0,
+                "predicted_revenue": 2700.25,
+                "supplier_risk": 0.5539,
+                "logistics_risk": 0.3437,
+                "combined_risk": 0.4488
+              },
+              {
+                "category": "Men's Footwear",
+                "region": "Northern Europe",
+                "order_count": 155,
+                "predicted_demand": 150.13,
+                "predicted_revenue": 19515.84,
+                "supplier_risk": 0.4374,
+                "logistics_risk": 0.4585,
+                "combined_risk": 0.448
+              },
+              {
+                "category": "Kids' Golf Clubs",
+                "region": "Southern Europe",
+                "order_count": 20,
+                "predicted_demand": 30.81,
+                "predicted_revenue": 8748.14,
+                "supplier_risk": 0.4281,
+                "logistics_risk": 0.4663,
+                "combined_risk": 0.4472
+              },
+              {
+                "category": "Camping & Hiking",
+                "region": "Northern Europe",
+                "order_count": 90,
+                "predicted_demand": 94.98,
+                "predicted_revenue": 28491.95,
+                "supplier_risk": 0.4318,
+                "logistics_risk": 0.4611,
+                "combined_risk": 0.4465
+              },
+              {
+                "category": "Strength Training",
+                "region": "Northern Europe",
+                "order_count": 11,
+                "predicted_demand": 6.67,
+                "predicted_revenue": 5320.3,
+                "supplier_risk": 0.4798,
+                "logistics_risk": 0.412,
+                "combined_risk": 0.4459
+              },
+              {
+                "category": "Women's Apparel",
+                "region": "Northern Europe",
+                "order_count": 156,
+                "predicted_demand": 420.14,
+                "predicted_revenue": 21007.19,
+                "supplier_risk": 0.4317,
+                "logistics_risk": 0.4591,
+                "combined_risk": 0.4454
+              },
+              {
+                "category": "Soccer",
+                "region": "Western Europe",
+                "order_count": 4,
+                "predicted_demand": 28.09,
+                "predicted_revenue": 3194.89,
+                "supplier_risk": 0.4389,
+                "logistics_risk": 0.4406,
+                "combined_risk": 0.4397
+              },
+              {
+                "category": "Trade-In",
+                "region": "Western Europe",
+                "order_count": 3,
+                "predicted_demand": 6.92,
+                "predicted_revenue": 1730.94,
+                "supplier_risk": 0.6277,
+                "logistics_risk": 0.2486,
+                "combined_risk": 0.4382
+              },
+              {
+                "category": "Basketball",
+                "region": "Southern Europe",
+                "order_count": 12,
+                "predicted_demand": 11.9,
+                "predicted_revenue": 3569.04,
+                "supplier_risk": 0.352,
+                "logistics_risk": 0.5108,
+                "combined_risk": 0.4314
+              },
+              {
+                "category": "Boxing & MMA",
+                "region": "Southern Europe",
+                "order_count": 3,
+                "predicted_demand": 16.91,
+                "predicted_revenue": 1577.76,
+                "supplier_risk": 0.6053,
+                "logistics_risk": 0.2341,
+                "combined_risk": 0.4197
+              },
+              {
+                "category": "Golf Shoes",
+                "region": "Southern Europe",
+                "order_count": 3,
+                "predicted_demand": 13.87,
+                "predicted_revenue": 1109.38,
+                "supplier_risk": 0.3527,
+                "logistics_risk": 0.486,
+                "combined_risk": 0.4194
+              },
+              {
+                "category": "Kids' Golf Clubs",
+                "region": "Northern Europe",
+                "order_count": 24,
+                "predicted_demand": 26.86,
+                "predicted_revenue": 7719.54,
+                "supplier_risk": 0.4259,
+                "logistics_risk": 0.404,
+                "combined_risk": 0.415
+              },
+              {
+                "category": "Men's Golf Clubs",
+                "region": "Northern Europe",
+                "order_count": 7,
+                "predicted_demand": 13.74,
+                "predicted_revenue": 1589.84,
+                "supplier_risk": 0.3467,
+                "logistics_risk": 0.3955,
+                "combined_risk": 0.3711
+              }
+            ],
+            "total_forecasts": 58,
+            "high_risk_count": 0,
+            "medium_risk_count": 58,
+            "low_risk_count": 0,
+            "next_period": "2017-10"
+          },
+          "error": null
+        }
+      },
+      "forecast_run_id": null,
+      "actuals_uploaded_at": "2026-09-26T15:12:06.186157+00:00",
+      "updated_at": "2026-09-26T15:12:22.970533+00:00"
+    }
+  }
+}

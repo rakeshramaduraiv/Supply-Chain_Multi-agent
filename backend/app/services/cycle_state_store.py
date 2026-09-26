@@ -253,11 +253,42 @@ def get_cycle_state_response() -> dict:
     if current_period is None and available:
         current_period = available[-1]["period"]
 
+    # all_complete: every available period has reached terminal stage
+    all_complete = (
+        len(available) > 0
+        and all(
+            all_ps.get(ap["period"], {}).get("stage_reached", -1) >= _TERMINAL_STAGE
+            for ap in available
+        )
+    )
+
+    # standing_forecast_period: the period the current standing forecast covers
+    # = the period whose Stage 0 is COMPLETED but Stage 6 is not yet COMPLETED
+    standing_forecast_period = None
+    for ap in available:
+        p = ap["period"]
+        ps = all_ps.get(p, {})
+        ss = ps.get("stage_statuses", {})
+        stage0_done = ss.get("0", {}).get("status") == "COMPLETED"
+        stage6_done = ss.get("6", {}).get("status") == "COMPLETED"
+        if stage0_done and not stage6_done:
+            standing_forecast_period = p
+            break
+
+    # awaiting_actuals_for: the period whose actuals upload is expected next
+    # = next_expected (the earliest incomplete period)
+    awaiting_actuals_for = next_expected
+
     return {
         "current_period": current_period,
         "next_expected_period": next_expected,
         "trained_through": trained_through,
         "available_periods": period_entries,
         "stage_names": _STAGE_NAMES,
+        "all_complete": all_complete,
+        "standing_forecast_period": standing_forecast_period,
+        "awaiting_actuals_for": awaiting_actuals_for,
+        "total_available": len(available),
+        "total_complete": len(completed_periods),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }

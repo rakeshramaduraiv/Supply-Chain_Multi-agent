@@ -36,6 +36,7 @@ export const api = {
   getDatasetAnalytics:  () => http.get('/api/v1/dataset/analytics'),
   getDatasetCoverage:   () => http.get('/api/v1/dataset/coverage'),
   getNextForecastPeriod:() => http.get('/api/v1/dataset/next-forecast-period'),
+  getAvailablePeriods:  () => http.get('/api/v1/dataset/available-periods'),
   getAutoForecast:      () => http.get('/api/v1/dataset/auto-forecast'),
   getErrorDiagnostics:  (period) => http.get('/api/v1/dataset/error-diagnostics', { params: { period_start: period } }),
 

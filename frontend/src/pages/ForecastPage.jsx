@@ -69,45 +69,9 @@ import AgentMetricsPanel from '../components/forecast/AgentMetricsPanel'
 import ForecastCharts from '../components/forecast/ForecastCharts'
 import ValidationPanel from '../components/forecast/ValidationPanel'
 
-// The DataCo dataset training window ends 2017-09-30.
-
-// The model is trained on Jan 2015 through Sep 2017.
-
-// The lifecycle starts by forecasting Oct 2017, then ingesting Oct 2017 actuals, then forecasting Nov 2017, etc.
-
-const FORECAST_MONTHS = [
-
-  { period: '2017-10', label: 'Oct 2017' },
-
-  { period: '2017-11', label: 'Nov 2017' },
-
-  { period: '2017-12', label: 'Dec 2017' },
-
-  { period: '2018-01', label: 'Jan 2018' },
-
-  { period: '2018-02', label: 'Feb 2018' },
-
-  { period: '2018-03', label: 'Mar 2018' },
-
-  { period: '2018-04', label: 'Apr 2018' },
-
-  { period: '2018-05', label: 'May 2018' },
-
-  { period: '2018-06', label: 'Jun 2018' },
-
-  { period: '2018-07', label: 'Jul 2018' },
-
-  { period: '2018-08', label: 'Aug 2018' },
-
-  { period: '2018-09', label: 'Sep 2018' },
-
-  { period: '2018-10', label: 'Oct 2018' },
-
-  { period: '2018-11', label: 'Nov 2018' },
-
-  { period: '2018-12', label: 'Dec 2018' },
-
-]
+// FORECAST_MONTHS removed — period list is now driven exclusively from
+// GET /api/v1/dataset/available-periods (backend scans actuals_real/ on disk).
+// The UI must never present a period the backend cannot serve.
 
 const CustomTooltip = ({ active, payload, label, fmt }) => {
 
@@ -213,11 +177,7 @@ export default function ForecastPage() {
 
   const [cycleMonth, _setCycleMonth] = useState(() => {
     const stored = readLS('amasci_cycle_month', '')
-    // If stored month is not in the valid FORECAST_MONTHS list, discard it
-    if (stored && !FORECAST_MONTHS.some(m => m.period === stored)) {
-      try { localStorage.removeItem('amasci_cycle_month') } catch {}
-      return ''
-    }
+    // Validation against FORECAST_MONTHS removed — backend is source of truth
     return stored
   })
 
@@ -484,6 +444,15 @@ export default function ForecastPage() {
     refetchInterval: 10_000,
   })
 
+  // Available periods from backend (drives period selector — never hardcoded)
+  const { data: availablePeriodsRaw } = useQuery({
+    queryKey: ['supplyChain', 'availablePeriods'],
+    queryFn:  () => api.getAvailablePeriods().then(r => r.data),
+    staleTime: 60_000,
+  })
+  // availablePeriods: [{ period, label, filename, row_count, uploaded, upload_timestamp }]
+  const availablePeriods = availablePeriodsRaw?.periods || []
+
   const [isIssuingForecast, setIsIssuingForecast] = useState(false)
 
   const handleIssueForecast = async (period) => {
@@ -577,7 +546,7 @@ export default function ForecastPage() {
 
     onSuccess: (data) => {
 
-      appendLog(7, `✅ Retraining complete — ${data?.model_version || 'LGBM v3.2'} updated`, true)
+      appendLog(7, `✅ Retraining complete — ${data?.model_version || 'unknown'} updated`, true)
 
       setCycleRetrainResult(data)
 
@@ -615,18 +584,17 @@ export default function ForecastPage() {
 
   })
 
-  // DEV assertion: warn if >50% of rendered forecast rows share the same predicted value
   // Sync cycleMonth from backend once forecastRaw loads (only if not already set)
   useEffect(() => {
     if (forecastRaw?.forecast_period && !cycleMonth) {
       setCycleMonth(forecastRaw.forecast_period)
     }
-    // If backend period is valid and stored month is not in FORECAST_MONTHS, reset
-    if (forecastRaw?.forecast_period && cycleMonth &&
-        !FORECAST_MONTHS.some(m => m.period === cycleMonth)) {
+    // If stored month is not in available periods from backend, reset to backend period
+    if (forecastRaw?.forecast_period && cycleMonth && availablePeriods.length > 0 &&
+        !availablePeriods.some(m => m.period === cycleMonth)) {
       setCycleMonth(forecastRaw.forecast_period)
     }
-  }, [forecastRaw?.forecast_period])
+  }, [forecastRaw?.forecast_period, availablePeriods.length])
 
   const assertNoBroadcastConstant = (records) => {
     if (!import.meta.env.DEV || !records?.length) return
@@ -731,7 +699,7 @@ export default function ForecastPage() {
           name: `Forecast Deviation: ${r.entity_id}`,
           type: 'Product',
           period: periodStr,
-          periodLabel: FORECAST_MONTHS.find(m => m.period === periodStr)?.label || periodStr,
+          periodLabel: availablePeriods.find(m => m.period === periodStr)?.label || periodStr,
           risk: r.deviation_pct != null && !isNaN(parseFloat(r.deviation_pct))
             ? `${Math.abs(parseFloat(r.deviation_pct)).toFixed(1)}%`
             : '—',
@@ -1480,7 +1448,7 @@ export default function ForecastPage() {
 
             <span className={styles.execLabel}>Agent Status</span>
 
-            <span className={styles.execVal} style={{ color: '#00b894' }}>3/4 Active (1 excluded)</span>
+            <span className={styles.execVal} style={{ color: '#00b894' }}>Active</span>
 
           </div>
 
@@ -1488,7 +1456,7 @@ export default function ForecastPage() {
 
             <span className={styles.execLabel}>Model Version</span>
 
-            <span className={styles.execVal}>LGBM v3.2</span>
+            <span className={styles.execVal}>{modelsRaw?.model_version || chr(8212)}</span>
 
           </div>
 
@@ -1518,9 +1486,9 @@ export default function ForecastPage() {
           }
         }}
         onReset={handleResetCycle}
+        onRefetch={refetchCycle}
         isIssuingForecast={isIssuingForecast}
         isUploadingActuals={isIngestingActuals}
-        currentPeriod={cycleState?.current_period || cycleMonth}
       />
 
       {/* Step 2 ingest trigger — fires when validation tab upload completes */}
@@ -1601,7 +1569,7 @@ export default function ForecastPage() {
                 <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #e67e22', boxShadow: '0 0 0 2px rgba(230,126,34,0.12)' } : {}}>
                   <div className={styles.agentHead}>
                     <div className={styles.agentName}><Factory size={15} style={{ color: '#e67e22' }} /> Supplier Agent</div>
-                    <span className="badge bdg-med">{overallConf != null ? `${round(overallConf * 96.8, 1)}% Conf` : '—'}</span>
+                    <span className="badge bdg-med">{overallConf != null ? `${round(overallConf * 100, 1)}% Conf` : '—'}</span>
                   </div>
                   <div className={styles.agentPredVal} style={{ color: '#e67e22', fontSize: 17 }}>
                     {avgLateRisk != null ? `${(forecastAnimating ? avgLateRisk * p * 100 : avgLateRisk * 100).toFixed(1)}% Late Risk` : '—'}
@@ -1627,7 +1595,7 @@ export default function ForecastPage() {
                 <div className={styles.agentCard} style={forecastAnimating ? { border: '1.5px solid #d63031', boxShadow: '0 0 0 2px rgba(214,48,49,0.12)' } : {}}>
                   <div className={styles.agentHead}>
                     <div className={styles.agentName}><Truck size={15} style={{ color: '#d63031' }} /> Logistics Agent</div>
-                    <span className="badge bdg-high">{overallConf != null ? `${round(overallConf * 94.4, 1)}% Conf` : '—'}</span>
+                    <span className="badge bdg-high">{overallConf != null ? `${round(overallConf * 100, 1)}% Conf` : '—'}</span>
                   </div>
                   <div className={styles.agentPredVal} style={{ color: '#d63031', fontSize: 17 }}>
                     {avgShipDays != null ? `${(forecastAnimating ? avgShipDays * p : avgShipDays).toFixed(2)}d Delay` : '—'}

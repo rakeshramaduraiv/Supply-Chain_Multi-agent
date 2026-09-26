@@ -886,6 +886,56 @@ def get_auto_forecast():
     return _forecast_cache
 
 
+@router.get("/available-periods")
+def get_available_periods():
+    """
+    Return the periods for which an actuals file is present on disk.
+    This is the authoritative list the UI must use for its period selector.
+    Never returns periods beyond the last file in actuals_real/.
+
+    Each entry:
+      period, label, filename, row_count, uploaded (bool), upload_timestamp
+    """
+    from app.services.cycle_state_store import _available_periods, get_all_periods
+    from datetime import datetime
+
+    available = _available_periods()
+    all_ps = get_all_periods()
+
+    MONTH_LABELS = {
+        "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr",
+        "05": "May", "06": "Jun", "07": "Jul", "08": "Aug",
+        "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec",
+    }
+
+    result = []
+    for ap in available:
+        period = ap["period"]  # "YYYY-MM"
+        parts = period.split("-")
+        month_abbr = MONTH_LABELS.get(parts[1], parts[1]) if len(parts) == 2 else period
+        label = f"{month_abbr} {parts[0]}" if len(parts) == 2 else period
+
+        ps = all_ps.get(period, {})
+        stage1 = ps.get("stage_statuses", {}).get("1", {})
+        uploaded = stage1.get("status") == "COMPLETED"
+        upload_ts = ps.get("actuals_uploaded_at")
+
+        result.append({
+            "period":           period,
+            "label":            label,
+            "filename":         ap["filename"],
+            "row_count":        ap["rows"],
+            "uploaded":         uploaded,
+            "upload_timestamp": upload_ts,
+        })
+
+    return {
+        "periods": result,
+        "total": len(result),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.get("/error-diagnostics")
 def get_error_diagnostics(period_start: str = None):
     """

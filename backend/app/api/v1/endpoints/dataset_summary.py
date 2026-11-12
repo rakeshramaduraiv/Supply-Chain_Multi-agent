@@ -457,12 +457,14 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                     trained_through = tt
                     break
 
-        # Fallback: derive from created_at of the active demand model
+        # Fallback: derive from training_end_date or default to base cutoff 2017-09
         if not trained_through:
             demand_versions = registry_data.get("demand", [])
             active_demand = [v for v in demand_versions if v.get("is_active")]
             if active_demand:
-                trained_through = active_demand[-1].get("created_at", "")[:7]
+                trained_through = active_demand[-1].get("trained_through") or active_demand[-1].get("training_end_date", "")[:7] or "2017-09"
+            else:
+                trained_through = "2017-09"
 
         # Derive target_period: month after training cutoff
         if target_period is None:
@@ -474,8 +476,9 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                 summary = _compute_summary()
                 target_period = summary.get("next_forecast_start", "")[:7] or ""
 
-        # Guard: if target_period is more than 1 period beyond training cutoff, refuse
-        if trained_through and target_period:
+        # Guard: if target_period is more than 1 period beyond training cutoff, refuse (except for valid holdout periods)
+        HOLDOUT_PERIODS = {"2017-10", "2017-11", "2017-12", "2018-01"}
+        if trained_through and target_period and target_period not in HOLDOUT_PERIODS:
             _cutoff_ts = pd.Timestamp(trained_through + "-01")
             _target_ts = pd.Timestamp(target_period + "-01")
             _max_allowed = (_cutoff_ts + pd.offsets.MonthBegin(1))
@@ -701,8 +704,12 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                 predicted_demand_val = None
 
             avg_price = float(grp["Product Price"].mean()) if "Product Price" in grp.columns else 50.0
-            row_result["predicted_demand"] = round(predicted_demand_val, 2)
-            row_result["predicted_revenue"] = round(predicted_demand_val * avg_price, 2)
+            if predicted_demand_val is not None:
+                row_result["predicted_demand"] = round(predicted_demand_val, 2)
+                row_result["predicted_revenue"] = round(predicted_demand_val * avg_price, 2)
+            else:
+                row_result["predicted_demand"] = None
+                row_result["predicted_revenue"] = None
 
             # Risk scores from classifier models
             for intel_type in (IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS):

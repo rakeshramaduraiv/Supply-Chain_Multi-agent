@@ -1,5 +1,13 @@
 {
-  "periods": [],
-  "checksums": {},
+  "periods": [
+    {
+      "period": "2017-10",
+      "rows": 2255,
+      "appended_at": "2026-11-12T08:13:47.098187+00:00"
+    }
+  ],
+  "checksums": {
+    "2017-10": "13e7e5c45694fa9831e74971b5ce54d2eaffbb51150fcefe6d83e9c1460a01c6"
+  },
   "row_counts": {}
 }

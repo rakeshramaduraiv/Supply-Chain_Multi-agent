@@ -267,8 +267,13 @@ export default function CycleStepper({
   })()
 
   // Stages to render: keys present in stageStatuses UNION [0..6] for pending display
-  // Always show all 7 stages (0-6) — pending ones show as Pending
-  const stageKeys = [0, 1, 2, 3, 4, 5, 6]
+  const lastUploadedPeriod = availablePeriods.filter(p => p.actuals_uploaded_at || p.stage_statuses?.['1']?.status === 'COMPLETED').at(-1)?.period || '—'
+  const standingPeriodDisplay = standingForecastPeriod || '—'
+
+  // Stage keys driven from backend stage_names if available
+  const stageKeys = Object.keys(stageNames).length > 0
+    ? Object.keys(stageNames).map(Number).sort((a, b) => a - b)
+    : [0, 1, 2, 3, 4, 5, 6]
 
   return (
     <div id="lifecycle-anchor" className={styles.timelineCard}>
@@ -289,18 +294,9 @@ export default function CycleStepper({
           </div>
           {/* Defect 3b: show three periods explicitly */}
           <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>
-            {awaitingActualsFor && standingForecastPeriod && awaitingActualsFor !== standingForecastPeriod ? (
-              <>
-                Actuals uploaded: <strong>{awaitingActualsFor}</strong>
-                {' · '}Standing forecast: <strong>{standingForecastPeriod}</strong>
-                {' · '}Model trained through: <strong>{trainedThrough}</strong>
-              </>
-            ) : (
-              <>
-                Current period: <strong>{activePeriodEntry.period}</strong>
-                {' · '}Model trained through: <strong>{trainedThrough}</strong>
-              </>
-            )}
+            Actuals uploaded: <strong>{lastUploadedPeriod}</strong>
+            {' · '}Standing forecast: <strong>{standingPeriodDisplay}</strong>
+            {' · '}Model trained through: <strong>{trainedThrough}</strong>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -132,6 +132,12 @@ def reset_all() -> None:
     path = _state_path()
     if path.exists():
         path.unlink()
+    try:
+        from app.store.cumulative import CumulativeStore
+        store = CumulativeStore()
+        store.reset_increments(confirm=True)
+    except Exception as e:
+        logger.warning(f"[CycleState] store.reset_increments failed: {e}")
     logger.info("[CycleState] All cycle state cleared.")
 
 
@@ -143,10 +149,15 @@ def _available_periods() -> list[dict]:
     Derived from holdout_manifest.csv — never hardcoded.
     """
     settings = get_settings()
-    manifest_path = Path(settings.raw_data_dir).parent / "actuals_real" / "holdout_manifest.csv"
-    if not manifest_path.exists():
-        # Fallback: scan for CSV files
+    actuals_dir = Path(settings.actuals_dir)
+    if not actuals_dir.exists():
         actuals_dir = Path(settings.raw_data_dir).parent / "actuals_real"
+    if not actuals_dir.exists():
+        backend_dir = Path(__file__).resolve().parent.parent.parent
+        actuals_dir = backend_dir / "data" / "actuals_real"
+
+    manifest_path = actuals_dir / "holdout_manifest.csv"
+    if not manifest_path.exists():
         if not actuals_dir.exists():
             return []
         periods = []
@@ -165,11 +176,9 @@ def _available_periods() -> list[dict]:
             split = str(row.get("split", ""))
             if split == "train" or not split:
                 continue
-            # split is "YYYY-MM"
             period = split
             rows = int(row["rows"]) if "rows" in row and pd.notna(row["rows"]) else None
             filename = f"{period.replace('-', '_')}_actual.csv"
-            actuals_dir = Path(settings.raw_data_dir).parent / "actuals_real"
             if (actuals_dir / filename).exists():
                 periods.append({"period": period, "filename": filename, "rows": rows})
         return periods

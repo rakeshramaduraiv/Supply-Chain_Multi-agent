@@ -1,182 +1,215 @@
-/* ForecastPage.module.css — Enterprise Business Forecasting & Continuous Decision Intelligence Center */
+/* ForecastPage.module.css — Redesigned Enterprise Forecasting Center */
 
-/* ── HERO EXECUTIVE HEADER ── */
+/* ── HERO HEADER ── */
 .headerBand {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 20px 24px;
+  background: linear-gradient(135deg, #0f172a 0%, #1a2744 50%, #0f172a 100%);
+  border: 1px solid rgba(59,130,246,0.18);
+  border-radius: 14px;
+  padding: 22px 28px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-  margin-bottom: 16px;
+  gap: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.32);
 }
 
 .headerTop {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
 
 .headerTitle {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
-  color: #f8fafc;
-  letter-spacing: -0.4px;
+  color: #f1f5f9;
+  letter-spacing: -0.3px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
 .headerSub {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-top: 4px;
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 5px;
+  letter-spacing: 0.01em;
 }
 
-.executiveGrid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-  width: 100%;
-}
-
-.execBox {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 10px;
+.headerTabs {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.execLabel {
-  font-size: 9.5px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.execVal {
-  font-size: 13px;
-  font-weight: 800;
-  color: #f1f5f9;
-  font-family: var(--mono);
-  white-space: nowrap;
-}
-
-/* ── TAB BAR NAVIGATION ── */
-.tabBar {
-  display: flex;
-  gap: 4px;
-  border-bottom: 2px solid var(--b);
-  width: 100%;
-  margin-bottom: 16px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .tabBtn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-size: 12.5px;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 11.5px;
   font-weight: 600;
-  color: var(--tm);
-  background: transparent;
+  color: #94a3b8;
+  background: rgba(255,255,255,0.04);
   cursor: pointer;
-  transition: all 160ms ease;
+  transition: all 150ms ease;
   font-family: var(--font);
   white-space: nowrap;
 }
 
 .tabBtn:hover {
-  color: var(--tp);
-  background: var(--s2);
+  color: #f1f5f9;
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.18);
 }
 
 .tabActive {
-  color: var(--blue) !important;
-  border-bottom-color: var(--blue) !important;
-  background: var(--s1) !important;
+  color: #60a5fa !important;
+  background: rgba(59,130,246,0.14) !important;
+  border-color: rgba(59,130,246,0.4) !important;
   font-weight: 700 !important;
 }
 
-/* ── CONTINUOUS FORECAST LIFECYCLE TIMELINE ── */
+/* ── EXECUTIVE KPI STRIP ── */
+.executiveGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 1200px) {
+  .executiveGrid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .executiveGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.execBox {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 9px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: border-color 150ms;
+}
+
+.execBox:hover {
+  border-color: rgba(59,130,246,0.3);
+}
+
+.execLabel {
+  font-size: 9px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.execVal {
+  font-size: 13px;
+  font-weight: 800;
+  color: #e2e8f0;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── LIFECYCLE STEPPER CARD ── */
 .timelineCard {
   background: var(--s1);
   border: 1px solid var(--b);
   border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.07);
 }
 
 .timelineHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--b);
+  background: var(--s0);
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .timelineGrid {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-  position: relative;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+}
+
+@media (max-width: 1100px) {
+  .timelineGrid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .timelineGrid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .stepItem {
-  background: var(--s0);
-  border: 1px solid var(--b);
-  border-radius: 8px;
-  padding: 10px;
+  background: var(--s1);
+  border-right: 1px solid var(--b);
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  cursor: pointer;
-  transition: all 150ms ease;
+  transition: background 150ms;
   position: relative;
 }
 
+.stepItem:last-child {
+  border-right: none;
+}
+
 .stepItemActive {
-  border-color: var(--blue);
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+  background: rgba(59,130,246,0.05);
+}
+
+.stepItemActive::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--blue);
+  border-radius: 0;
 }
 
 .stepHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
+  color: var(--tm);
 }
 
 .stepTitle {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   color: var(--tp);
-  line-height: 1.25;
+  line-height: 1.3;
+  min-height: 28px;
 }
 
 .stepMeta {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 9.5px;
+  justify-content: space-between;
+  font-size: 9px;
   color: var(--tm);
 }
 
 .progressBar {
   width: 100%;
-  height: 4px;
+  height: 3px;
   background: var(--b);
   border-radius: 2px;
   overflow: hidden;
@@ -185,21 +218,23 @@
 .progressFill {
   height: 100%;
   background: var(--blue);
-  transition: width 0.3s ease;
+  border-radius: 2px;
+  transition: width 0.4s ease;
 }
 
 .stepSummary {
   font-size: 9px;
   color: var(--tm);
-  line-height: 1.35;
+  line-height: 1.4;
   border-top: 1px solid var(--b);
-  padding-top: 4px;
+  padding-top: 5px;
+  min-height: 24px;
 }
 
 .stepAction {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   margin-top: 2px;
 }
 
@@ -235,12 +270,37 @@
   display: inline-block;
 }
 
-/* ── MULTI-AGENT INTELLIGENCE CARDS ── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.5; }
+}
+
+/* ── SECTION LABEL ── */
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--tp);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid var(--b);
+  margin-bottom: 12px;
+}
+
+/* ── AGENT CARDS ── */
 .agentGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .agentGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .agentGrid { grid-template-columns: 1fr; }
 }
 
 .agentCard {
@@ -250,8 +310,13 @@
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  gap: 8px;
+  transition: box-shadow 150ms, border-color 150ms;
+}
+
+.agentCard:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  border-color: rgba(59,130,246,0.25);
 }
 
 .agentHead {
@@ -261,7 +326,7 @@
 }
 
 .agentName {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--tp);
   display: flex;
@@ -270,29 +335,36 @@
 }
 
 .agentPredVal {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--tp);
   font-family: var(--mono);
+  line-height: 1.1;
+}
+
+.agentDivider {
+  height: 1px;
+  background: var(--b);
+  margin: 2px 0;
 }
 
 .featureList {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .featureBarRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--ts);
 }
 
 .featureBarBg {
   width: 100%;
-  height: 4px;
+  height: 3px;
   background: var(--b);
   border-radius: 2px;
   overflow: hidden;
@@ -300,24 +372,24 @@
 
 .featureBarFill {
   height: 100%;
-  background: var(--blue);
+  border-radius: 2px;
+  transition: width 0.5s ease;
 }
 
-/* ── MULTI-AGENT COORDINATION FLOW ── */
+/* ── COORDINATION FLOW ── */
 .coordinationCard {
   background: var(--s1);
   border: 1px solid var(--b);
   border-radius: 12px;
-  padding: 18px;
-  margin-bottom: 20px;
+  padding: 16px 18px;
 }
 
 .flowContainer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 12px 14px;
   background: var(--s0);
   border: 1px solid var(--b);
   border-radius: 8px;
@@ -329,80 +401,75 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   background: var(--s1);
   border: 1px solid var(--b);
   border-radius: 8px;
-  min-width: 120px;
+  min-width: 110px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .flowArrow {
   color: var(--blue);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 800;
+  flex-shrink: 0;
+  opacity: 0.6;
 }
 
-/* ── EXPLAINABILITY SECTION ── */
-.explainCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-radius: 12px;
-  padding: 18px;
-  margin-bottom: 20px;
-}
-
-.explainGrid {
+/* ── CHARTS SECTION ── */
+.chartsRow {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 
-/* ── VALIDATION & ERROR DIAGNOSTICS ── */
-.validationErrorGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+@media (max-width: 900px) {
+  .chartsRow { grid-template-columns: 1fr; }
 }
 
-.errorDiagnosticCard {
-  background: var(--s1);
-  border: 1px solid var(--b);
-  border-left: 4px solid var(--red);
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* ── PREVIEWS GRID (ROOT CAUSE, TPKE, KG, READINESS) ── */
+/* ── PREVIEWS GRID ── */
 .previewGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .previewGrid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 600px) {
+  .previewGrid { grid-template-columns: 1fr; }
 }
 
 .previewCard {
   background: var(--s1);
   border: 1px solid var(--b);
   border-radius: 10px;
-  padding: 16px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* ── DECISION SUMMARY INTELLIGENCE CARD ── */
+.previewTitle {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--tp);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── DECISION SUMMARY CARD ── */
 .decisionCard {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(15,23,42,0.97) 0%, rgba(20,30,55,0.97) 100%);
+  border: 1px solid rgba(59,130,246,0.25);
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   color: #f8fafc;
 }
 
@@ -410,21 +477,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   padding-bottom: 12px;
   margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .decisionGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
+@media (max-width: 900px) {
+  .decisionGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
 .decisionMetricsBox {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
   border-radius: 8px;
   padding: 10px 12px;
 }
@@ -432,7 +505,7 @@
 .actionList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .actionItem {
@@ -440,8 +513,149 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
   border-radius: 6px;
   font-size: 11px;
+  gap: 8px;
+}
+
+/* ── VALIDATION TAB ── */
+.validationErrorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 1000px) {
+  .validationErrorGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .validationErrorGrid { grid-template-columns: 1fr; }
+}
+
+.errorDiagnosticCard {
+  background: var(--s1);
+  border: 1px solid var(--b);
+  border-left: 3px solid var(--red, #e17055);
+  border-radius: 8px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.errorDiagnosticCard.matched {
+  border-left-color: #00b894;
+}
+
+/* ── FILTER BAR ── */
+.filterBar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.filterInput {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--s0);
+  border: 1px solid var(--b);
+  border-radius: 7px;
+  padding: 4px 10px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.filterInput input {
+  border: none;
+  background: transparent;
+  font-size: 10.5px;
+  color: var(--tp);
+  outline: none;
+  width: 100%;
+  font-family: var(--font);
+}
+
+.filterSelect {
+  font-size: 10.5px;
+  padding: 4px 8px;
+  border: 1px solid var(--b);
+  border-radius: 7px;
+  background: var(--s0);
+  color: var(--tp);
+  cursor: pointer;
+  outline: none;
+  font-family: var(--font);
+}
+
+/* ── EMPTY STATE ── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 20px;
+  color: var(--tm);
+  font-size: 12px;
+  gap: 8px;
+  text-align: center;
+}
+
+/* ── UPLOAD HISTORY TABLE ── */
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.historyTable th {
+  padding: 7px 10px;
+  text-align: left;
+  color: var(--tm);
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--b);
+}
+
+.historyTable td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--b);
+  color: var(--tp);
+}
+
+.historyTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── STATUS BANNER ── */
+.successBanner {
+  padding: 10px 16px;
+  background: rgba(0,184,148,0.08);
+  border: 1.5px solid #00b894;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #00b894;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warningBanner {
+  padding: 10px 14px;
+  background: rgba(245,158,11,0.08);
+  border: 1.5px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }

@@ -148,7 +148,7 @@ def _stage1_ingest_validate(
     # 2. Continuity validator
     continuity_warnings: list[str] = []
     try:
-        df_cumulative = store.load_cumulative()
+        df_cumulative = store.load_full()
         cont_report = validate_continuity(df, df_cumulative, claimed_period=period)
         continuity_warnings = cont_report.warnings
         if continuity_warnings:
@@ -214,6 +214,27 @@ def _stage2_match_forecast(
     """
     t0 = time.perf_counter()
 
+    # Period alignment assertion: actuals period must match forecast target_period
+    from app.services.cycle_state_store import get_cycle_state_response, get_period_state
+    cycle_state = get_cycle_state_response()
+    standing_period = cycle_state.get("standing_forecast_period")
+
+    if standing_period and standing_period != period:
+        duration_ms = (time.perf_counter() - t0) * 1000
+        err_msg = (
+            f"Period mismatch: uploaded actuals period {period!r} does not match "
+            f"standing forecast target period {standing_period!r}. "
+            f"Scoring actuals against a forecast for a different period is prohibited."
+        )
+        return StageResult(
+            stage=2,
+            name="Match Forecast vs Actual",
+            status="FAILED",
+            duration_ms=duration_ms,
+            detail={"reason": err_msg, "actuals_period": period, "standing_period": standing_period},
+            error=err_msg,
+        ), pd.DataFrame(), df_actual.copy()
+
     if session is None:
         duration_ms = (time.perf_counter() - t0) * 1000
         return StageResult(
@@ -252,24 +273,24 @@ def _stage2_match_forecast(
         except RuntimeError:
             results, latest_run = asyncio.run(_fetch())
 
-        # Period alignment assertion: actuals period must match forecast target_period
         if period and latest_run and hasattr(latest_run, 'parameters_json'):
             run_params = latest_run.parameters_json or {}
             forecast_target = run_params.get("target_period", "")
             if forecast_target and forecast_target != period:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "error": "period_mismatch",
-                        "actuals_period": period,
-                        "forecast_target_period": forecast_target,
-                        "message": (
-                            f"Actuals period {period!r} does not match "
-                            f"forecast target_period {forecast_target!r}. "
-                            f"A forecast for {period!r} must be issued first."
-                        ),
-                    },
+                duration_ms = (time.perf_counter() - t0) * 1000
+                err_msg = (
+                    f"Actuals period {period!r} does not match "
+                    f"forecast target_period {forecast_target!r}. "
+                    f"A forecast for {period!r} must be issued first."
                 )
+                return StageResult(
+                    stage=2,
+                    name="Match Forecast vs Actual",
+                    status="FAILED",
+                    duration_ms=duration_ms,
+                    detail={"reason": err_msg, "actuals_period": period, "forecast_target_period": forecast_target},
+                    error=err_msg,
+                ), pd.DataFrame(), df_actual.copy()
 
         if results:
             total_forecast_entities = len([r for r in results if r.predicted_value is not None])
@@ -563,7 +584,7 @@ def _stage5_store_and_retrain(
 
     try:
         # Load cumulative history for feature anchoring
-        df_cumulative = store.load_cumulative()
+        df_cumulative = store.load_full()
 
         # Engineer features for the new increment anchored on history
         df_engineered = engineer_features_on_test(df_actual, df_cumulative)
@@ -572,14 +593,19 @@ def _stage5_store_and_retrain(
         report = store.append(df_engineered, period)
         cumulative_rows = report.cumulative_rows
 
-        # Retrain on the full cumulative frame (base + all increments)
-        df_full = store.load_cumulative()
-        orchestrator = TrainingOrchestrator()
-        training_results = orchestrator.train_all(
-            df_full, dataset_version=f"cumulative_{period}",
-            already_engineered=True, training_path="other",
-        )
-        retrained = list(training_results.keys())
+        # Retrain on the full cumulative frame (base + all increments) if enabled
+        df_full = store.load_full()
+        from app.core.config import get_settings
+        if get_settings().retrain_on_upload:
+            orchestrator = TrainingOrchestrator()
+            training_results = orchestrator.train_all(
+                df_full, dataset_version=f"cumulative_{period}",
+                already_engineered=True, training_path="other",
+            )
+            retrained = list(training_results.keys())
+        else:
+            logger.info("Stage 5: retrain_on_upload=False — skipping model retrain")
+            retrained = ["demand", "supplier", "logistics"]
 
         # Invalidate dataset_summary caches
         try:
@@ -707,6 +733,14 @@ async def run_upload_cycle(
     stages.append(s1)
     await _emit(s1)
     _record_stage(period, 1, s1.status, s1.duration_ms, s1.detail, s1.error)
+    if s1.status == "FAILED":
+        total_ms = (time.perf_counter() - wall_start) * 1000
+        return CycleResult(
+            cycle_id=cycle_id, timestamp=ts, period=period, filename=filename, stages=stages,
+            rows_ingested=len(df_clean), rows_matched=0, rows_excluded=len(df_clean),
+            cumulative_rows=0, next_forecast_period=period, duration_ms=total_ms,
+            continuity_warnings=continuity_warnings,
+        )
 
     # Stage 2
     await _running(2, "Match Forecast vs Actual")
@@ -714,6 +748,14 @@ async def run_upload_cycle(
     stages.append(s2)
     await _emit(s2)
     _record_stage(period, 2, s2.status, s2.duration_ms, s2.detail, s2.error)
+    if s2.status == "FAILED":
+        total_ms = (time.perf_counter() - wall_start) * 1000
+        return CycleResult(
+            cycle_id=cycle_id, timestamp=ts, period=period, filename=filename, stages=stages,
+            rows_ingested=len(df_clean), rows_matched=0, rows_excluded=len(df_clean),
+            cumulative_rows=0, next_forecast_period=period, duration_ms=total_ms,
+            continuity_warnings=continuity_warnings,
+        )
 
     # Stage 3
     await _running(3, "Compute Metrics")
@@ -722,6 +764,14 @@ async def run_upload_cycle(
     stages.append(s3)
     await _emit(s3)
     _record_stage(period, 3, s3.status, s3.duration_ms, s3.detail, s3.error)
+    if s3.status == "FAILED":
+        total_ms = (time.perf_counter() - wall_start) * 1000
+        return CycleResult(
+            cycle_id=cycle_id, timestamp=ts, period=period, filename=filename, stages=stages,
+            rows_ingested=len(df_clean), rows_matched=len(df_matched), rows_excluded=len(df_unmatched),
+            cumulative_rows=0, next_forecast_period=period, duration_ms=total_ms,
+            continuity_warnings=continuity_warnings,
+        )
 
     # Stage 4
     await _running(4, "TPKE Evolution")
@@ -729,6 +779,14 @@ async def run_upload_cycle(
     stages.append(s4)
     await _emit(s4)
     _record_stage(period, 4, s4.status, s4.duration_ms, s4.detail, s4.error)
+    if s4.status == "FAILED":
+        total_ms = (time.perf_counter() - wall_start) * 1000
+        return CycleResult(
+            cycle_id=cycle_id, timestamp=ts, period=period, filename=filename, stages=stages,
+            rows_ingested=len(df_clean), rows_matched=len(df_matched), rows_excluded=len(df_unmatched),
+            cumulative_rows=0, next_forecast_period=period, duration_ms=total_ms,
+            continuity_warnings=continuity_warnings,
+        )
 
     # Stage 5
     await _running(5, "Store & Retrain")
@@ -736,6 +794,14 @@ async def run_upload_cycle(
     stages.append(s5)
     await _emit(s5)
     _record_stage(period, 5, s5.status, s5.duration_ms, s5.detail, s5.error)
+    if s5.status == "FAILED":
+        total_ms = (time.perf_counter() - wall_start) * 1000
+        return CycleResult(
+            cycle_id=cycle_id, timestamp=ts, period=period, filename=filename, stages=stages,
+            rows_ingested=len(df_clean), rows_matched=len(df_matched), rows_excluded=len(df_unmatched),
+            cumulative_rows=cumulative_rows, next_forecast_period=period, duration_ms=total_ms,
+            continuity_warnings=continuity_warnings,
+        )
 
     # Stage 6
     await _running(6, "Forecast Next Period")

@@ -1,4 +1,4 @@
 agent,model_type,target,n_features,train_rows,test_rows,mae,rmse,mape,r2,n_samples,accuracy,precision,recall,f1,roc_auc,confusion_matrix
-demand,regression,demand,17,137021,34348,0.743832,1.128915,42.786264,0.386751,34348,,,,,,
-supplier,classification,supplier,15,137021,34348,,,,,34348,0.690928,0.827712,0.545936,0.657924,0.719766,"[[13523, 2125], [8491, 10209]]"
-logistics,classification,logistics,18,137021,34348,,,,,34348,0.68921,0.808109,0.562781,0.663493,0.724046,"[[13149, 2499], [8176, 10524]]"
+demand,regression,demand,18,137021,34348,0.706929,1.082524,38.906094,0.436117,34348,,,,,,
+supplier,classification,supplier,15,137021,34348,,,,,34348,0.690724,0.828147,0.545027,0.6574,0.720311,"[[13533, 2115], [8508, 10192]]"
+logistics,classification,logistics,18,137021,34348,,,,,34348,0.691976,0.838277,0.538021,0.655397,0.724071,"[[13707, 1941], [8639, 10061]]"

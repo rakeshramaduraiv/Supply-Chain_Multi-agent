@@ -242,7 +242,8 @@ export default function CycleStepper({
 
   const stage0Done    = stageStatuses['0']?.status === 'COMPLETED'
   const stage1Status  = stageStatuses['1']?.status
-  const stage1Pending = !stage1Status || stage1Status === 'FAILED'
+  // stage1Pending: upload button shows when Stage 1 has NOT yet COMPLETED
+  const stage1Pending = stage1Status !== 'COMPLETED'
 
   // Check if any stage is FAILED — halt the stepper
   const failedStage = Object.entries(stageStatuses).find(([, ss]) => ss.status === 'FAILED')
@@ -378,9 +379,9 @@ export default function CycleStepper({
           // Stage 0 button: show if stage 0 not done and not locked
           const showStage0Btn = stage === 0 && !stage0Done && !isLocked && !haltedByFailure
 
-          // Stage 1 button: show if stage 0 done, stage 1 pending/failed, can upload
+          // Stage 1 button: show if stage 0 done, stage 1 not yet completed, can upload
           // Defect 3c: button names the exact period
-          const showStage1Btn = stage === 1 && stage0Done && stage1Pending && canUpload && !isLocked && !haltedByFailure
+          const showStage1Btn = stage === 1 && stage0Done && stage1Pending && canUpload && !isLocked
 
           return (
             <div key={stage}

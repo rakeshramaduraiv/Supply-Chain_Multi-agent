@@ -5,6 +5,9 @@
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+bootstrap: ## Bootstrap system from raw CSV (verify data, create holdout actuals, run initialization)
+	python scripts/bootstrap.py
+
 install: ## Install dependencies
 	pip install -r requirements.txt
 

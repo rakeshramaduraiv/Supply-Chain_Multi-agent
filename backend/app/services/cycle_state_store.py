@@ -299,9 +299,10 @@ def get_cycle_state_response() -> dict:
         stage_reached = ps.get("stage_reached", -1)
         stage_statuses = ps.get("stage_statuses", {})
 
-        # can_upload: only if this is next_expected AND stage 0 is completed
-        stage0_done = "0" in stage_statuses and stage_statuses["0"]["status"] in ("COMPLETED",)
-        can_upload = (period == next_expected) and stage0_done
+        # can_upload: Stage 0 completed AND Stage 1 not yet completed
+        stage0_done = stage_statuses.get("0", {}).get("status") == "COMPLETED"
+        stage1_done = stage_statuses.get("1", {}).get("status") == "COMPLETED"
+        can_upload = (period == next_expected) and stage0_done and not stage1_done
 
         # locked_reason: why a period cannot be acted on
         locked_reason = None

@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   RefreshCw, BarChart2, CheckCircle, Zap, Cpu, Rocket, AlertTriangle, Factory,
   Warehouse, Truck, Users, ArrowUpRight, ShieldCheck, Activity,
-  Play, GitBranch, Search,
+  Play, GitBranch, Search, XCircle,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -195,6 +195,12 @@ export default function ForecastPage() {
   })
   const availablePeriods = availablePeriodsRaw?.periods || []
 
+  const { data: preflightRaw, isLoading: preflightLoading } = useQuery({
+    queryKey: ['supplyChain', 'preflight'],
+    queryFn:  () => api.getCyclePreflight().then(r => r.data),
+    staleTime: 30_000, retry: 1,
+  })
+
   const errorDiagQuery = useQuery({
     queryKey: ['supplyChain', 'errorDiagnostics', cycleMonth],
     queryFn:  () => api.getErrorDiagnostics(cycleMonth).then(r => r.data),
@@ -216,7 +222,12 @@ export default function ForecastPage() {
       qc.invalidateQueries(['supplyChain', 'autoForecast'])
       toast.success('Forecast issued for ' + period)
     } catch (e) {
-      toast.error(e?.response?.data?.detail?.message || e?.response?.data?.detail || 'Forecast failed: ' + e.message)
+      const detail = e?.response?.data?.detail || e?.response?.data
+      if (detail?.reason === 'NOT_INITIALIZED') {
+        toast.error('System not initialized. Run: make bootstrap  or  POST /api/v1/initialization/run')
+      } else {
+        toast.error(detail?.message || detail || 'Forecast failed: ' + e.message)
+      }
     } finally { setIsIssuingForecast(false) }
   }
 
@@ -481,6 +492,49 @@ export default function ForecastPage() {
 
   return (
     <div className="page active" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* PREFLIGHT BLOCKING PANEL */}
+      {!preflightLoading && preflightRaw && !preflightRaw.ready && (
+        <div style={{ background: 'rgba(214,48,49,0.07)', border: '1.5px solid #d63031', borderRadius: 12, padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <XCircle size={20} style={{ color: '#d63031', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--tp)' }}>System Not Ready &mdash; Forecast Center Unavailable</div>
+              <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>{preflightRaw.summary}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {preflightRaw.checks?.map((c, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', background: c.passed ? 'rgba(0,184,148,0.06)' : 'rgba(214,48,49,0.06)', border: `1px solid ${c.passed ? '#00b894' : '#d63031'}`, borderRadius: 8 }}>
+                {c.passed
+                  ? <CheckCircle size={14} style={{ color: '#00b894', flexShrink: 0, marginTop: 1 }} />
+                  : <XCircle size={14} style={{ color: '#d63031', flexShrink: 0, marginTop: 1 }} />}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--tp)' }}>{c.name}</div>
+                  <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 1 }}>{c.detail}</div>
+                  {!c.passed && <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 600, marginTop: 3 }}>Fix: {c.remedy}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ZERO PERIODS GUARD */}
+      {!preflightLoading && preflightRaw?.ready && cycleState && (cycleState.available_periods || []).length === 0 && (
+        <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid #f59e0b', borderRadius: 12, padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--tp)' }}>No actuals files found</div>
+              <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 3 }}>
+                No holdout periods are available. Ensure <code>backend/data/actuals_real/</code> contains the four actuals CSVs and the holdout manifest.
+              </div>
+              <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, marginTop: 6 }}>Run: <code>make bootstrap</code></div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HEADER */}
       <div className={styles.headerBand}>

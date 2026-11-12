@@ -29,6 +29,7 @@ from typing import Any
 import pandas as pd
 
 from app.core.config import get_settings
+from app.core.data_files import assert_real_file, resolve_actuals_dir, MANIFEST_REQUIRED_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -145,46 +146,114 @@ def reset_all() -> None:
 
 def _available_periods() -> list[dict]:
     """
-    Return the four holdout periods that have a CSV file in actuals_real/.
+    Return the holdout periods that have a CSV file in actuals_real/.
     Derived from holdout_manifest.csv — never hardcoded.
+
+    Raises RuntimeError if the manifest is an LFS pointer or is missing
+    required columns — a missing column must never be treated as zero rows.
+    Falls back to filesystem glob when manifest is absent.
     """
-    settings = get_settings()
-    actuals_dir = Path(settings.actuals_dir)
+    actuals_dir = resolve_actuals_dir()
+
     if not actuals_dir.exists():
-        actuals_dir = Path(settings.raw_data_dir).parent / "actuals_real"
-    if not actuals_dir.exists():
-        backend_dir = Path(__file__).resolve().parent.parent.parent
-        actuals_dir = backend_dir / "data" / "actuals_real"
+        logger.warning(
+            f"[CycleState] actuals_dir does not exist: {actuals_dir}. "
+            "Run: make bootstrap"
+        )
+        return []
 
     manifest_path = actuals_dir / "holdout_manifest.csv"
+
+    # ── No manifest: fall back to filesystem glob ─────────────────────────
     if not manifest_path.exists():
-        if not actuals_dir.exists():
-            return []
+        logger.warning(
+            f"[CycleState] holdout_manifest.csv not found in {actuals_dir}. "
+            "Falling back to filesystem glob."
+        )
         periods = []
         for f in sorted(actuals_dir.glob("????_??_actual.csv")):
+            try:
+                assert_real_file(f)
+            except RuntimeError as lfs_err:
+                logger.warning(f"[CycleState] Skipping LFS pointer: {lfs_err}")
+                continue
             stem = f.stem  # e.g. "2017_10_actual"
             parts = stem.split("_")
             if len(parts) >= 2:
                 period = f"{parts[0]}-{parts[1]}"
                 periods.append({"period": period, "filename": f.name, "rows": None})
+        logger.info(f"[CycleState] glob found {len(periods)} periods: {[p['period'] for p in periods]}")
         return periods
+
+    # ── Manifest present: validate it before parsing ──────────────────────
+    try:
+        assert_real_file(manifest_path)
+    except (FileNotFoundError, RuntimeError) as e:
+        logger.error(f"[CycleState] {e}")
+        return []
 
     try:
         df = pd.read_csv(manifest_path)
-        periods = []
-        for _, row in df.iterrows():
-            split = str(row.get("split", ""))
-            if split == "train" or not split:
-                continue
-            period = split
-            rows = int(row["rows"]) if "rows" in row and pd.notna(row["rows"]) else None
-            filename = f"{period.replace('-', '_')}_actual.csv"
-            if (actuals_dir / filename).exists():
-                periods.append({"period": period, "filename": filename, "rows": rows})
-        return periods
     except Exception as e:
         logger.warning(f"[CycleState] manifest read failed: {e}")
         return []
+
+    # Validate required columns — a DataFrame missing 'split' must RAISE,
+    # not silently return zero rows.
+    missing_cols = MANIFEST_REQUIRED_COLS - set(df.columns)
+    if missing_cols:
+        raise RuntimeError(
+            f"[CycleState] holdout_manifest.csv is missing required columns: "
+            f"{sorted(missing_cols)}. "
+            f"Columns found: {sorted(df.columns.tolist())}. "
+            f"This usually means the file is an LFS pointer or was regenerated "
+            f"with a different schema. Run: make bootstrap"
+        )
+
+    periods = []
+    skipped_train = 0
+    skipped_no_file = 0
+    skipped_lfs = 0
+
+    for _, row in df.iterrows():
+        split = str(row.get("split", "")).strip()
+        if split == "train":
+            skipped_train += 1
+            continue
+        if not split:
+            logger.warning(f"[CycleState] manifest row has empty split value — skipping: {dict(row)}")
+            continue
+
+        period = split  # e.g. "2017-10"
+        rows = int(row["rows"]) if pd.notna(row.get("rows")) else None
+        filename = f"{period.replace('-', '_')}_actual.csv"
+        csv_path = actuals_dir / filename
+
+        if not csv_path.exists():
+            skipped_no_file += 1
+            logger.warning(f"[CycleState] actuals file not found for period {period}: {csv_path}")
+            continue
+
+        try:
+            assert_real_file(csv_path)
+        except RuntimeError as lfs_err:
+            skipped_lfs += 1
+            logger.warning(f"[CycleState] {lfs_err}")
+            continue
+
+        periods.append({"period": period, "filename": filename, "rows": rows})
+
+    logger.info(
+        f"[CycleState] _available_periods: {len(periods)} valid periods "
+        f"(skipped train={skipped_train}, no_file={skipped_no_file}, lfs={skipped_lfs})"
+    )
+    if not periods:
+        logger.warning(
+            f"[CycleState] _available_periods returned empty list. "
+            f"actuals_dir={actuals_dir}, manifest rows={len(df)}. "
+            f"Check that actuals CSVs exist and are not LFS pointers."
+        )
+    return periods
 
 
 def get_cycle_state_response() -> dict:
@@ -207,10 +276,9 @@ def get_cycle_state_response() -> dict:
         if v:
             trained_through = getattr(v, "trained_through", "") or ""
             if not trained_through:
-                # Derive from created_at as fallback
                 trained_through = v.created_at[:7] if v.created_at else ""
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[CycleState] trained_through lookup failed: {e}")
 
     # next_expected_period: earliest available period with no completed cycle
     completed_periods = {

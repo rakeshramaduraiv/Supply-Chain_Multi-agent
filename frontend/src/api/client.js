@@ -168,6 +168,7 @@ export const api = {
 
   // Cycle state machine (backend-authoritative lifecycle)
   getCycleState:        () => http.get('/api/v1/cycle/state'),
+  getCyclePreflight:    () => http.get('/api/v1/cycle/preflight'),
   issueForecast:        (period) => http.post(`/api/v1/cycle/forecast/${period}`),
   resetCycle:           () => http.post('/api/v1/cycle/reset?confirm=true'),
 

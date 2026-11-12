@@ -31,6 +31,152 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cycle", tags=["Cycle"])
 
 
+# ── GET /cycle/preflight ──────────────────────────────────────────────────────
+
+@router.get("/preflight", response_model=dict[str, Any])
+async def cycle_preflight():
+    """
+    System-readiness check for the forecast cycle.
+    Returns pass/fail for each prerequisite with a specific remedy string.
+    Overall ready=true only when ALL blocking checks pass.
+    """
+    import json
+    import pandas as pd
+    from app.core.config import get_settings
+    from app.core.data_files import assert_real_file, resolve_actuals_dir, MANIFEST_REQUIRED_COLS
+
+    checks: list[dict] = []
+    blocking: list[str] = []
+
+    def _check(name: str, passed: bool, detail: str, remedy: str) -> None:
+        checks.append({"name": name, "passed": passed, "detail": detail, "remedy": remedy})
+        if not passed:
+            blocking.append(f"{name}: {detail}")
+
+    settings = get_settings()
+
+    # 1. Raw dataset
+    try:
+        raw_csv = Path(settings.raw_data_dir) / "DataCoSupplyChainDataset.csv"
+        assert_real_file(raw_csv)
+        size_mb = round(raw_csv.stat().st_size / 1_048_576, 1)
+        _check("raw_dataset", True, f"{raw_csv.name} present ({size_mb} MB)", "Already present")
+    except (FileNotFoundError, RuntimeError) as e:
+        _check("raw_dataset", False, str(e),
+               "Download DataCoSupplyChainDataset.csv and place in backend/data/raw/")
+
+    # 2. Holdout manifest
+    actuals_dir = resolve_actuals_dir()
+    manifest_path = actuals_dir / "holdout_manifest.csv"
+    try:
+        assert_real_file(manifest_path)
+        df_m = pd.read_csv(manifest_path)
+        missing_cols = MANIFEST_REQUIRED_COLS - set(df_m.columns)
+        if missing_cols:
+            raise RuntimeError(f"Missing columns: {sorted(missing_cols)}")
+        _check("holdout_manifest", True,
+               f"{manifest_path.name} present, {len(df_m)} rows, columns OK", "Already present")
+    except (FileNotFoundError, RuntimeError) as e:
+        _check("holdout_manifest", False, str(e),
+               "Run: make bootstrap  (or python scripts/create_holdout_actuals.py)")
+
+    # 3. Actuals files
+    actuals_found = []
+    actuals_lfs = []
+    if actuals_dir.exists():
+        for fname in sorted(actuals_dir.glob("????_??_actual.csv")):
+            try:
+                assert_real_file(fname)
+                actuals_found.append(fname.stem.replace("_actual", "").replace("_", "-"))
+            except RuntimeError:
+                actuals_lfs.append(fname.name)
+    if actuals_lfs:
+        _check("actuals_files", False, f"{len(actuals_lfs)} LFS pointer(s): {actuals_lfs}",
+               "Run: git lfs install && git lfs pull")
+    elif not actuals_found:
+        _check("actuals_files", False, f"No actuals CSVs found in {actuals_dir}",
+               "Run: make bootstrap  (or python scripts/create_holdout_actuals.py)")
+    else:
+        _check("actuals_files", True, f"{len(actuals_found)} files: {actuals_found}", "Already present")
+
+    # 4. processed_master.parquet
+    try:
+        pq_path = Path(settings.upload_dir) / "processed_master.parquet"
+        assert_real_file(pq_path)
+        df_pq = pd.read_parquet(pq_path)
+        max_date = str(df_pq["order_date"].max())[:10] if "order_date" in df_pq.columns else "unknown"
+        _check("processed_parquet", True,
+               f"processed_master.parquet: {len(df_pq):,} rows, max_date={max_date}", "Already present")
+    except (FileNotFoundError, RuntimeError, Exception) as e:
+        _check("processed_parquet", False, str(e),
+               "Run: make bootstrap  (POST /api/v1/initialization/run)")
+
+    # 5. Model registry
+    try:
+        registry_path = Path(settings.model_dir) / "registry.json"
+        assert_real_file(registry_path)
+        reg_data = json.loads(registry_path.read_text())
+        active = [v for v in reg_data.get("versions", []) if v.get("status") == "active"]
+        _check("model_registry", True, f"registry.json: {len(active)} active model(s)", "Already present")
+    except (FileNotFoundError, RuntimeError) as e:
+        _check("model_registry", False, str(e),
+               "Run: make bootstrap  (POST /api/v1/initialization/run)")
+    except Exception as e:
+        _check("model_registry", False, f"registry.json unreadable: {e}", "Run: make bootstrap")
+
+    # 6. Models on disk
+    try:
+        from app.ml.registry import ModelRegistry
+        from app.ml.utils import IntelligenceType
+        reg = ModelRegistry()
+        missing_models = []
+        for it in [IntelligenceType.DEMAND, IntelligenceType.SUPPLIER, IntelligenceType.LOGISTICS]:
+            v = reg.get_latest_version(it)
+            if not v:
+                missing_models.append(it.value)
+                continue
+            mp = Path(getattr(v, "model_path", "") or "")
+            if not mp.exists():
+                missing_models.append(f"{it.value} ({mp.name})")
+        if missing_models:
+            _check("models_on_disk", False, f"Missing model files: {missing_models}",
+                   "Run: make bootstrap  (POST /api/v1/initialization/run)")
+        else:
+            _check("models_on_disk", True, "All 3 agent models present", "Already present")
+    except Exception as e:
+        _check("models_on_disk", False, f"Registry read failed: {e}", "Run: make bootstrap")
+
+    # 7. Neo4j
+    try:
+        from app.graph.connection import get_connection_manager
+        conn = get_connection_manager()
+        result = await conn.execute_query("MATCH (n) RETURN count(n) AS nodes LIMIT 1")
+        nodes = result[0]["nodes"] if result else 0
+        _check("neo4j", True, f"Reachable, {nodes:,} nodes", "Already connected")
+    except Exception as e:
+        _check("neo4j", False, f"Unreachable: {e}",
+               "Start Neo4j: docker-compose up neo4j  or  neo4j start")
+
+    # 8. cycle_state.json
+    try:
+        from app.services.cycle_state_store import _load_raw
+        raw = _load_raw()
+        n_periods = len(raw.get("periods", {}))
+        _check("cycle_state", True,
+               f"cycle_state.json readable, {n_periods} period(s) recorded", "Already present")
+    except Exception as e:
+        _check("cycle_state", False, f"cycle_state.json unreadable: {e}",
+               "Delete backend/data/cycle_state.json and restart")
+
+    ready = len(blocking) == 0
+    return {
+        "ready": ready,
+        "checks": checks,
+        "blocking_issues": blocking,
+        "summary": f"{sum(c['passed'] for c in checks)}/{len(checks)} checks passed",
+    }
+
+
 # ── GET /cycle/state ──────────────────────────────────────────────────────────
 
 @router.get("/state", response_model=dict[str, Any])
@@ -108,15 +254,24 @@ async def issue_forecast(period: str):
     duration_ms = (time.perf_counter() - t0) * 1000
 
     if not forecast.get("ready"):
+        msg = forecast.get("message", "unknown reason")
+        # Distinguish system-not-initialized from a transient forecast error
+        not_init_keywords = ("no model", "registry", "not found", "parquet", "not initialized")
+        reason_code = "NOT_INITIALIZED" if any(k in msg.lower() for k in not_init_keywords) else "FORECAST_ERROR"
         record_stage(
             period=period, stage=0,
             status="FAILED", duration_ms=duration_ms,
-            detail={"message": forecast.get("message", "")},
-            error=forecast.get("message"),
+            detail={"message": msg, "reason": reason_code},
+            error=msg,
         )
         raise HTTPException(
             422,
-            f"Forecast not ready: {forecast.get('message', 'unknown reason')}",
+            {
+                "reason": reason_code,
+                "message": msg,
+                "remedy": "Run system initialization: make bootstrap  or  POST /api/v1/initialization/run"
+                if reason_code == "NOT_INITIALIZED" else msg,
+            },
         )
 
     record_stage(

@@ -337,8 +337,8 @@ export function useLiveOpsEntities(params = {}) {
   return useQuery({
     queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsEntities, params],
     queryFn: () => api.getLiveOpsEntities(params).then(r => r.data),
-    staleTime: STALE.normal,
-    refetchInterval: 60_000,
+    staleTime: STALE.fast,
+    refetchInterval: 30_000,
     placeholderData: keepPreviousData,
   })
 }
@@ -348,8 +348,8 @@ export function useLiveOpsEntityAnalytics(params = {}) {
     queryKey: [...SUPPLY_CHAIN_QUERY_KEYS.liveOpsAnalytics, params],
     queryFn: () => api.getLiveOpsEntityAnalytics(params).then(r => r.data),
     enabled: !!params.entity_id,
-    staleTime: STALE.normal,
-    refetchInterval: 60_000,
+    staleTime: STALE.fast,
+    refetchInterval: 30_000,
     placeholderData: keepPreviousData,
   })
 }

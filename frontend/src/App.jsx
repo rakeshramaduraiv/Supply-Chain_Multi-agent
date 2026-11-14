@@ -18,7 +18,7 @@ const qc = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
-      <HashRouter>
+      <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ToastProvider>
           <ErrorBoundary>
             <AppShell />

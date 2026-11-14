@@ -49,10 +49,16 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-_BASE_DIR       = pathlib.Path("data/cumulative")
+# Anchor all data paths from this file's location so they resolve correctly
+# regardless of the process working directory (Defect 3).
+_MODULE_DIR     = pathlib.Path(__file__).resolve().parent          # app/store/
+_BACKEND_DIR    = _MODULE_DIR.parent.parent                        # backend/
+_BASE_DIR       = _BACKEND_DIR / "data" / "cumulative"
 _BASE_PARQUET   = _BASE_DIR / "base.parquet"
 _MANIFEST_FILE  = _BASE_DIR / "manifest.json"
 _INCREMENTS_DIR = _BASE_DIR / "increments"
+
+logger.debug("[CumulativeStore] base dir resolved to: %s", _BASE_DIR)
 
 _MIN_BASE_ROWS = 100_000
 
@@ -115,11 +121,12 @@ class CumulativeStore:
 
         # Bootstrap: copy processed_master.parquet → base.parquet if needed
         if not self._base_parquet.exists():
-            src = pathlib.Path(source_parquet) if source_parquet else pathlib.Path(
-                "data/uploads/processed_master.parquet"
+            src = pathlib.Path(source_parquet) if source_parquet else (
+                _BACKEND_DIR / "data" / "uploads" / "processed_master.parquet"
             )
             if not src.exists():
-                alt_src = pathlib.Path(__file__).resolve().parent.parent.parent / "data" / "uploads" / "processed_master.parquet"
+                # Legacy relative-path fallback
+                alt_src = pathlib.Path("data/uploads/processed_master.parquet")
                 if alt_src.exists():
                     src = alt_src
             if src.exists():
@@ -314,6 +321,24 @@ class CumulativeStore:
                 "appended_at": datetime.now(timezone.utc).isoformat(),
             })
             manifest.setdefault("checksums", {})[period] = inc_checksum
+
+            # Update data_end so next_period() advances correctly after each upload.
+            # Without this, period.py falls back to base.parquet and always returns
+            # the same next_period, deadlocking the cycle.
+            date_col = next(
+                (c for c in ("order date (DateOrders)", "order_date")
+                 if c in df_engineered.columns),
+                None,
+            )
+            if date_col:
+                max_ts = pd.to_datetime(
+                    df_engineered[date_col], errors="coerce"
+                ).max()
+                if pd.notna(max_ts):
+                    current_end = manifest.get("data_end")
+                    if current_end is None or max_ts > pd.Timestamp(current_end):
+                        manifest["data_end"] = max_ts.strftime("%Y-%m-%d")
+
             self._write_manifest(manifest)
 
         # Compute total rows for the report

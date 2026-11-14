@@ -358,6 +358,9 @@ async def reset_cycle(confirm: bool = False):
         store = CumulativeStore()
         increment_result = store.reset_increments(confirm=True)
         clear_dataset_cache()
+        # Also clear the auto-forecast cache so next call recomputes from scratch
+        from app.api.v1.endpoints.dataset_summary import clear_forecast_cache
+        clear_forecast_cache()
     except Exception as e:
         errors.append(f"increments: {e}")
 

@@ -639,8 +639,9 @@ def _stage6_forecast_next(
     """
     Stage 6: Forecast next_period() from app.core.period.
 
-    Uses trained models applied to the last month of the cumulative frame.
-    Period string comes exclusively from next_period() — no literals.
+    Passes the target period explicitly to _compute_auto_forecast so the
+    forecast is always computed FOR the period it is labelled as (Defect 2a).
+    Asserts computed_for_period == target (Defect 2c).
     """
     t0 = time.perf_counter()
     error_msg: str | None = None
@@ -648,8 +649,19 @@ def _stage6_forecast_next(
 
     try:
         from app.api.v1.endpoints.dataset_summary import _compute_auto_forecast
-        forecast_detail = _compute_auto_forecast()
-        forecast_detail["next_period"] = next_period()
+        # Defect 2a: derive target FIRST, then pass it explicitly
+        target = next_period()
+        forecast_detail = _compute_auto_forecast(target_period=target)
+
+        # Defect 2b/2c: assert computed_for_period matches the requested target
+        computed_for = forecast_detail.get("target_period") or forecast_detail.get("forecast_period")
+        if computed_for and computed_for != target:
+            raise RuntimeError(
+                f"Stage 6 period mismatch: requested forecast for {target!r} "
+                f"but _compute_auto_forecast returned computed_for_period={computed_for!r}. "
+                f"trained_through={forecast_detail.get('trained_through')!r}."
+            )
+        forecast_detail["next_period"] = target
 
     except Exception as e:
         error_msg = str(e)
@@ -809,9 +821,16 @@ async def run_upload_cycle(
     stages.append(s6)
     await _emit(s6)
     _record_stage(period, 6, s6.status, s6.duration_ms, s6.detail, s6.error)
-    # Stage 6 of cycle N is Stage 0 of cycle N+1 — record it in the next period's slot
+    # Stage 6 of cycle N is Stage 0 of cycle N+1 — record it in the next period's slot.
+    # Defect 1c: remove the _next_period != period guard — next_period() is now
+    # guaranteed correct by Period arithmetic. If they somehow match, raise.
     _next_period = next_period()
-    if s6.status == "COMPLETED" and _next_period != period:
+    if _next_period == period:
+        raise RuntimeError(
+            f"next_period() returned {_next_period!r} which equals the just-completed "
+            f"period {period!r}. This violates the period-advance invariant."
+        )
+    if s6.status == "COMPLETED":
         _record_stage(_next_period, 0, "COMPLETED", s6.duration_ms, s6.detail, None)
 
     total_ms = (time.perf_counter() - wall_start) * 1000

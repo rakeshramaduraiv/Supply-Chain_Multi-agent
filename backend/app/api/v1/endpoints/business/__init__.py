@@ -289,7 +289,9 @@ async def upload_actual_data(
     except Exception as e_cmp:
         logger.warning(f"comparison_records build failed: {e_cmp}")
 
-    # 4. Record Stage 1 in cycle state machine
+    # 4. Record Stage 1 in cycle state machine (run_upload_cycle will also
+    # record stages 1-6; this early record ensures Stage 1 appears immediately
+    # in the UI before the full pipeline completes)
     try:
         from app.services.cycle_state_store import record_stage as _record_stage
         _record_stage(

@@ -32,9 +32,9 @@ import styles from './EntityPage.module.css'
 import { useSharedParams } from '../hooks/useSharedParams'
 
 export const MULTI_AGENTS = [
-  { key: 'DemandAgent',    label: 'Demand',    icon: TrendingUp, color: '#10b981', entityType: 'Product',  agentName: 'Demand Planning Agent',           rwdaaWeight: '0.30', confidence: '94.0%', taskTarget: 'Master Order Volume & SKUs' },
-  { key: 'SupplierAgent',  label: 'Supplier',  icon: Factory,    color: '#f59e0b', entityType: 'Supplier', agentName: 'Supplier Intelligence Agent',     rwdaaWeight: '0.45', confidence: '91.0%', taskTarget: 'Supplier Delays & Lead-Time' },
-  { key: 'LogisticsAgent', label: 'Logistics', icon: Truck,      color: '#ec4899', entityType: 'Shipment', agentName: 'Logistics & Transportation Agent', rwdaaWeight: '0.25', confidence: '89.0%', taskTarget: 'Carrier SLA & Transit Routes' },
+  { key: 'DemandAgent',    label: 'Demand',    icon: TrendingUp, color: '#10b981', entityType: 'Product',  agentName: 'Demand Planning Agent',           rwdaaWeight: '0.30', taskTarget: 'Master Order Volume & SKUs',        registryKey: 'demand' },
+  { key: 'SupplierAgent',  label: 'Supplier',  icon: Factory,    color: '#f59e0b', entityType: 'Supplier', agentName: 'Supplier Intelligence Agent',      rwdaaWeight: '0.45', taskTarget: 'Supplier Delays & Lead-Time',       registryKey: 'supplier' },
+  { key: 'LogisticsAgent', label: 'Logistics', icon: Truck,      color: '#ec4899', entityType: 'Shipment', agentName: 'Logistics & Transportation Agent',  rwdaaWeight: '0.25', taskTarget: 'Carrier SLA & Transit Routes',      registryKey: 'logistics' },
 ]
 
 export const ENTITY_TYPES = MULTI_AGENTS
@@ -148,6 +148,10 @@ export default function Overview() {
   const kpis = analytics.kpis || {}
   const charts = analytics.charts || {}
 
+  const agentMetrics = entityListQuery.data?.agent_metrics || analyticsQuery.data?.agent_metrics || {}
+  const cycleActuals = entityListQuery.data?.cycle_actuals || analyticsQuery.data?.cycle_actuals || {}
+  const dataCoverage = entityListQuery.data?.data_coverage || analyticsQuery.data?.data_coverage || {}
+
   // ── 3. Fetch Real Graph Relationships from Neo4j (always-on for analytics + modal) ──
   const relsQuery = useLiveOpsRelationships(selectedEntityId || null)
   const relationships = relsQuery.data?.relationships || []
@@ -252,6 +256,36 @@ export default function Overview() {
         </div>
       </div>
 
+      {/* ── DATA COVERAGE BANNER — updates when actuals are uploaded ── */}
+      {(dataCoverage.increment_count > 0 || Object.keys(cycleActuals).length > 0) && (
+        <div style={{
+          background: 'rgba(0,184,148,0.06)',
+          borderBottom: '1px solid rgba(0,184,148,0.2)',
+          padding: '6px 18px',
+          display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#00b894', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Activity size={11} /> Live Data Active
+          </span>
+          <span style={{ fontSize: 10, color: 'var(--tm)' }}>
+            Base: <strong style={{ color: 'var(--tp)' }}>{dataCoverage.base_period_start?.slice(0,7) || '2015-01'} → {dataCoverage.base_period_end?.slice(0,7) || '2017-09'}</strong>
+            {' '}({(dataCoverage.base_row_count || 0).toLocaleString()} rows)
+          </span>
+          {dataCoverage.increment_count > 0 && (
+            <span style={{ fontSize: 10, color: 'var(--tm)' }}>
+              + <strong style={{ color: '#00b894' }}>{dataCoverage.increment_count} uploaded period{dataCoverage.increment_count !== 1 ? 's' : ''}</strong>
+              {' '}({(dataCoverage.increments || []).map(i => i.period).join(', ')})
+              {' · '}{(dataCoverage.combined_total || 0).toLocaleString()} total rows
+            </span>
+          )}
+          {Object.keys(cycleActuals).length > 0 && (
+            <span style={{ fontSize: 10, color: 'var(--tm)' }}>
+              Validated cycles: <strong style={{ color: '#00b894' }}>{Object.keys(cycleActuals).join(', ')}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── MAIN DASHBOARD BODY (SPLIT VIEW) ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
@@ -303,6 +337,9 @@ export default function Overview() {
             {(() => {
               const activeAgentObj = MULTI_AGENTS.find(a => a.entityType === selectedType) || MULTI_AGENTS[0]
               const AgentIcon = activeAgentObj.icon
+              const regMetrics = agentMetrics[activeAgentObj.registryKey] || {}
+              const confidence = regMetrics.confidence != null ? `${regMetrics.confidence}%` : '—'
+              const trainedThrough = regMetrics.trained_through || '—'
               return (
                 <div style={{ padding: '8px 10px', borderRadius: '6px', background: `${activeAgentObj.color}10`, border: `1px solid ${activeAgentObj.color}30`, marginBottom: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
@@ -312,7 +349,10 @@ export default function Overview() {
                   <div style={{ fontSize: '9.5px', color: 'var(--tm)', lineHeight: '1.3' }}>Focus: {activeAgentObj.taskTarget}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '9px', fontWeight: 700, color: 'var(--ts)' }}>
                     <span>RWDAA Weight: <strong style={{ color: activeAgentObj.color }}>{activeAgentObj.rwdaaWeight}</strong></span>
-                    <span>Confidence: <strong style={{ color: 'var(--blue)' }}>{activeAgentObj.confidence}</strong></span>
+                    <span>Confidence: <strong style={{ color: 'var(--blue)' }}>{confidence}</strong></span>
+                  </div>
+                  <div style={{ fontSize: '9px', color: 'var(--tm)', marginTop: 3 }}>
+                    Trained through: <strong style={{ color: 'var(--tp)' }}>{trainedThrough}</strong>
                   </div>
                 </div>
               )
@@ -532,6 +572,11 @@ export default function Overview() {
                   <Target size={15} style={{ color: '#00b894' }} />
                   Forecast Deviation Timeline (Forecast vs Actual)
                 </span>
+                {Object.keys(cycleActuals).length > 0 && (
+                  <span className="badge bdg-low" style={{ fontSize: 9 }}>
+                    ✓ Real actuals: {Object.keys(cycleActuals).join(', ')}
+                  </span>
+                )}
               </div>
               <div style={{ height: '200px', width: '100%' }}>
                 <ResponsiveContainer width="100%" height="100%">

@@ -175,10 +175,39 @@ export default function CycleStepper({
     || availablePeriods[0]
 
   if (!activePeriodEntry && !allComplete) {
+    // Defect 5a: explicit diagnostic when no actionable period exists
+    const blockedPeriod = availablePeriods.find(p => !p.is_complete)
     return (
       <div id="lifecycle-anchor" className={styles.timelineCard}>
-        <div style={{ padding: 24, color: 'var(--tm)', fontSize: 12 }}>
-          No holdout periods available. Ensure actuals_real/ contains CSV files and initialization has run.
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--red,#e17055)' }}>
+            <AlertTriangle size={15} /> Cycle Stalled
+          </div>
+          {blockedPeriod ? (
+            <div style={{ fontSize: 11, color: 'var(--tm)' }}>
+              Period <strong>{blockedPeriod.period}</strong> is incomplete but has no actionable next step.
+              {blockedPeriod.locked_reason && <> Reason: <strong>{blockedPeriod.locked_reason}</strong>.</>}
+              {' '}Recovery: click <strong>Reset</strong> to restart the cycle from the beginning.
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--tm)' }}>
+              No holdout periods available. Ensure <code>actuals_real/</code> contains CSV files and initialization has run.
+            </div>
+          )}
+          <button className="btn btn-sm" style={{ fontSize: 11, alignSelf: 'flex-start' }}
+            onClick={() => setShowResetConfirm(true)}>
+            <RotateCcw size={11} /> Reset Cycle
+          </button>
+          {showResetConfirm && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--tm)' }}>Delete all cycle state?</span>
+              <button className="btn btn-sm"
+                style={{ fontSize: 11, padding: '2px 8px', background: 'var(--red,#e17055)', color: '#fff' }}
+                onClick={() => { setShowResetConfirm(false); onReset?.() }}>Confirm</button>
+              <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }}
+                onClick={() => setShowResetConfirm(false)}>Cancel</button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -293,11 +322,18 @@ export default function CycleStepper({
           <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--tp)' }}>
             Continuous Decision-Support Forecasting Lifecycle
           </div>
-          {/* Defect 3b: show three periods explicitly */}
+          {/* Defect 5c: visible cycle summary */}
           <div style={{ fontSize: 11, color: 'var(--tm)', marginTop: 2 }}>
-            Actuals uploaded: <strong>{lastUploadedPeriod}</strong>
-            {' · '}Standing forecast: <strong>{standingPeriodDisplay}</strong>
-            {' · '}Model trained through: <strong>{trainedThrough}</strong>
+            {nextExpected
+              ? <>Period <strong>{(availablePeriods.findIndex(p => p.period === nextExpected) + 1) || '?'}</strong> of <strong>{totalAvailable}</strong>
+                {' · '}awaiting actuals for <strong>{nextExpected}</strong>
+                {' · '}model trained through <strong>{trainedThrough}</strong>
+              </>
+              : <>Actuals uploaded: <strong>{lastUploadedPeriod}</strong>
+                {' · '}Standing forecast: <strong>{standingPeriodDisplay}</strong>
+                {' · '}Model trained through: <strong>{trainedThrough}</strong>
+              </>
+            }
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -446,7 +482,7 @@ export default function CycleStepper({
                 </div>
               )}
 
-              {/* Stage 1: Upload Actuals — names the exact period (Defect 3c) */}
+      {/* Stage 1: Upload Actuals — names the exact period (Defect 3c) */}
               {showStage1Btn && (
                 <div className={styles.stepAction}>
                   <button className="btn btn-primary btn-sm" style={{ width: '100%', fontSize: 11 }}
@@ -458,6 +494,16 @@ export default function CycleStepper({
                   </button>
                   <div style={{ fontSize: 9, color: 'var(--tm)', marginTop: 3, textAlign: 'center' }}>
                     Select {activePeriodEntry.period.replace('-', '_')}_actual.csv
+                  </div>
+                </div>
+              )}
+
+              {/* Defect 5b: show locked_reason when upload is blocked */}
+              {stage === 1 && stage0Done && stage1Pending && !canUpload && !isLocked && (
+                <div className={styles.stepAction}>
+                  <div style={{ fontSize: 10, color: 'var(--tm)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertTriangle size={10} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                    {lockedReason || activePeriodEntry.locked_reason || 'Upload not available for this period'}
                   </div>
                 </div>
               )}

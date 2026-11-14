@@ -41,3 +41,15 @@ saved_at,target_id,primary_supplier,alternative_supplier,allocation_shift_pct,sc
 2026-11-12T07:44:30.645217+00:00,warehouse_bottleneck_main,Supplier Ground Freight,Alternative Ground Carrier,20.0,scenario_a,Shift 20.0% Volume to Secondary Ground Carrier,0.8,12000,14.5,142500,94.2,True
 2026-11-12T07:44:30.645217+00:00,warehouse_bottleneck_main,Supplier Ground Freight,Alternative Ground Carrier,20.0,scenario_b,Shift 20.0% Volume to Air Express Freight,1.4,45000,18.0,110000,89.5,False
 2026-11-12T07:44:30.645217+00:00,warehouse_bottleneck_main,Supplier Ground Freight,Alternative Ground Carrier,20.0,scenario_c,Increase Warehouse Zone 1 Safety Stock Buffer (+15%),0.4,5500,8.2,48000,91.0,False
+2026-11-14T13:27:37.422676+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_a,Shift 20.0% Volume to Secondary Ground Carrier,0.8,12000,14.5,142500,94.2,True
+2026-11-14T13:27:37.422676+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_b,Shift 20.0% Volume to Air Express Freight,1.4,45000,18.0,110000,89.5,False
+2026-11-14T13:27:37.422676+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_c,Increase Warehouse Zone 1 Safety Stock Buffer (+15%),0.4,5500,8.2,48000,91.0,False
+2026-11-14T13:27:37.880749+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_a,Shift 20.0% Volume to Secondary Ground Carrier,0.8,12000,14.5,142500,94.2,True
+2026-11-14T13:27:37.880749+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_b,Shift 20.0% Volume to Air Express Freight,1.4,45000,18.0,110000,89.5,False
+2026-11-14T13:27:37.880749+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_c,Increase Warehouse Zone 1 Safety Stock Buffer (+15%),0.4,5500,8.2,48000,91.0,False
+2026-11-14T17:25:34.695131+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_a,Shift 20.0% Volume to Secondary Ground Carrier,0.8,12000,14.5,142500,94.2,True
+2026-11-14T17:25:34.695131+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_b,Shift 20.0% Volume to Air Express Freight,1.4,45000,18.0,110000,89.5,False
+2026-11-14T17:25:34.695131+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_c,Increase Warehouse Zone 1 Safety Stock Buffer (+15%),0.4,5500,8.2,48000,91.0,False
+2026-11-14T17:25:35.016887+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_a,Shift 20.0% Volume to Secondary Ground Carrier,0.8,12000,14.5,142500,94.2,True
+2026-11-14T17:25:35.016887+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_b,Shift 20.0% Volume to Air Express Freight,1.4,45000,18.0,110000,89.5,False
+2026-11-14T17:25:35.016887+00:00,supplier_delay_main,Supplier Air Transport,Alternative Ground Carrier,20.0,scenario_c,Increase Warehouse Zone 1 Safety Stock Buffer (+15%),0.4,5500,8.2,48000,91.0,False

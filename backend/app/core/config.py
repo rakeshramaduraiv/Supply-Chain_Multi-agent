@@ -82,13 +82,21 @@ class Settings(BaseSettings):
     # --- Holdout / Evaluation ---
     # Training is restricted to rows strictly before holdout_start_date.
     # Both settings must be set together — they are meaningless apart.
-    holdout_start_date: str | None = None
-    use_real_holdout_actuals: bool = False
+    # Defaults are the safe/intended values so any run without an env file
+    # still guards the holdout (Defect 4a).
+    holdout_start_date: str | None = "2017-10-01"
+    use_real_holdout_actuals: bool = True
     actuals_dir: str = "data/actuals_real"
 
     # --- Continuous Learning ---
     retrain_on_upload: bool = True          # False = skip Stage 9, defer retraining
     coordinator_row_cap: int = 0            # 0 = no cap; >0 = use most-recent N rows
+
+    # --- Cycle Reset ---
+    # When True, every backend restart wipes cycle_state.json and uploaded
+    # increment parquets so the demo always starts from Period 1 of 4.
+    # Set RESET_CYCLE_ON_STARTUP=false in .env to demonstrate persistence.
+    reset_cycle_on_startup: bool = True
 
     # --- TPKE Configuration ---
     # θ: minimum P(B|A) for an edge to be created

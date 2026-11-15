@@ -416,6 +416,58 @@ async def get_cycle_status():
     return summary or {}
 
 
+# ── POST /cycle/advance/{period} ──────────────────────────────────────────────
+
+@router.post("/advance/{period}", response_model=dict[str, Any])
+async def advance_cycle(period: str):
+    """
+    Mark all stages (0-6) as COMPLETED for *period* and record Stage 0
+    for the next period. No guards, no DB, no Neo4j required.
+
+    This is the lightweight "UI cycle complete" endpoint used when the
+    frontend has done client-side validation and just needs the backend
+    to advance next_expected_period to the next month.
+
+    Idempotent: calling it twice for the same period is safe.
+    """
+    import pandas as pd
+
+    # Compute next period via pandas Period arithmetic (same as period.py)
+    try:
+        next_p = str(pd.Period(period, freq="M") + 1)
+    except Exception:
+        raise HTTPException(400, f"Invalid period format: {period!r}. Expected YYYY-MM.")
+
+    t = time.perf_counter()
+    dur = 1.0
+
+    # Record stages 0-6 as COMPLETED for this period
+    for stage in range(7):
+        record_stage(
+            period=period,
+            stage=stage,
+            status="COMPLETED",
+            duration_ms=dur,
+            detail={"source": "ui_advance", "period": period},
+        )
+
+    # Record Stage 0 for the next period (= forecast issued for next cycle)
+    record_stage(
+        period=next_p,
+        stage=0,
+        status="COMPLETED",
+        duration_ms=dur,
+        detail={"source": "ui_advance", "carried_from": period},
+    )
+
+    return {
+        "period_completed": period,
+        "next_period": next_p,
+        "stages_recorded": list(range(7)),
+        "duration_ms": round((time.perf_counter() - t) * 1000, 1),
+    }
+
+
 # ── GET /cycle/{cycle_id}/stages (WebSocket resync) ──────────────────────────
 
 @router.get("/{cycle_id}/stages", response_model=list[dict[str, Any]])

@@ -1,6 +1,7 @@
 # ============================================================
 # AMASCI - Development Docker Compose
 # Hot-reload enabled for backend and frontend
+# All secrets read from .env — never hardcoded here.
 # ============================================================
 
 services:
@@ -11,31 +12,39 @@ services:
     container_name: amasci-api-dev
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - APP_ENV=development
       - DEBUG=true
       - WORKERS=1
-      - DATABASE_URL=postgresql+asyncpg://amasci_user:amasci_dev_pass@postgres:5432/amasci_db
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=neo4j_dev_pass
-      - SECRET_KEY=dev-secret-key-not-for-production
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      - NEO4J_USER=${NEO4J_USER}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=DEBUG
-      - HOLDOUT_START_DATE=2017-10-01
-      - USE_REAL_HOLDOUT_ACTUALS=true
+      - HOLDOUT_START_DATE=${HOLDOUT_START_DATE:-2017-10-01}
+      - USE_REAL_HOLDOUT_ACTUALS=${USE_REAL_HOLDOUT_ACTUALS:-true}
+      - RESET_CYCLE_ON_STARTUP=${RESET_CYCLE_ON_STARTUP:-true}
+      - UPLOAD_DIR=/app/data/uploads
+      - MODEL_DIR=/app/data/models
+      - LOG_DIR=/app/data/logs
+      - RAW_DATA_DIR=/app/data/raw
+      - ACTUALS_DIR=/app/data/actuals_real
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
-      - upload_data:/app/data/uploads
-      - model_data:/app/data/models
       - ./backend/scripts:/app/scripts
-      - ./backend/data/raw:/app/data/raw
+      - ./backend/data/raw:/app/data/raw:ro
       - ./backend/data/stages:/app/data/stages
       - ./backend/data/processed:/app/data/processed
-      - ./backend/data/actuals_real:/app/data/actuals_real
+      - ./backend/data/actuals_real:/app/data/actuals_real:ro
       - ./backend/data/user_uploads:/app/data/user_uploads
-      - ./backend/data/cycle_state.json:/app/data/cycle_state.json
+      - ./backend/data/cumulative:/app/data/cumulative
+      - upload_data:/app/data/uploads
+      - model_data:/app/data/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,13 +67,13 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: amasci_user
-      POSTGRES_PASSWORD: amasci_dev_pass
-      POSTGRES_DB: amasci_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pg_dev_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U amasci_user -d amasci_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -79,7 +88,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/neo4j_dev_pass
+      NEO4J_AUTH: ${NEO4J_USER}/${NEO4J_PASSWORD}
       NEO4J_server_default__listen__address: "0.0.0.0"
       NEO4J_server_bolt_advertised__address: "localhost:7687"
       NEO4J_server_http_advertised__address: "localhost:7474"
@@ -89,7 +98,7 @@ services:
       - neo4j_dev_data:/data
       - neo4j_dev_plugins:/var/lib/neo4j/plugins
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p neo4j_dev_pass 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u ${NEO4J_USER} -p ${NEO4J_PASSWORD} 'RETURN 1' || exit 1"]
       interval: 20s
       timeout: 15s
       retries: 15

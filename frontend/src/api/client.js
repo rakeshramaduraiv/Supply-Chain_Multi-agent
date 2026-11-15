@@ -170,6 +170,7 @@ export const api = {
   getCycleState:        () => http.get('/api/v1/cycle/state'),
   getCyclePreflight:    () => http.get('/api/v1/cycle/preflight'),
   issueForecast:        (period) => http.post(`/api/v1/cycle/forecast/${period}`),
+  cycleAdvance:         (period) => http.post(`/api/v1/cycle/advance/${period}`),
   resetCycle:           () => http.post('/api/v1/cycle/reset?confirm=true'),
 
   // Enterprise AI Supply Chain Investigator

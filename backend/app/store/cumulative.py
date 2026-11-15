@@ -595,6 +595,10 @@ class CumulativeStore:
                 "date_max": dates.max().strftime("%Y-%m-%d") if not dates.empty else None,
                 "written_at": datetime.now(timezone.utc).isoformat(),
             }
+            # Also write top-level data_end so current_data_end() in period.py
+            # reads it directly without scanning base.parquet on every call.
+            if not dates.empty:
+                manifest["data_end"] = dates.max().strftime("%Y-%m-%d")
             self._write_manifest(manifest)
 
     def _invalidate_cache(self) -> None:

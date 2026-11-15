@@ -15,18 +15,30 @@ help: ## Show this help
 bootstrap: ## Verify raw CSV and regenerate training split + holdout actuals
 	cd backend && python -m scripts.bootstrap_data
 
-dev: ## Start development environment
-	docker compose -f docker-compose.dev.yml up -d
+dev: ## Start development environment (Docker)
+	docker compose -f docker-compose.dev.yml --env-file .env up -d
 	@echo ""
 	@echo "Backend: http://localhost:8000"
 	@echo "Neo4j:   http://localhost:7474"
 	@echo ""
 	@echo "Start frontend: cd frontend && npm run dev"
 
+dev-build: ## Rebuild dev images (no cache)
+	docker compose -f docker-compose.dev.yml --env-file .env build --no-cache
+
+dev-init: ## Start dev + run initialization pipeline inside container
+	$(MAKE) dev
+	@echo "Waiting for API to be healthy…"
+	@until docker exec amasci-api-dev curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; do sleep 3; done
+	docker exec amasci-api-dev python -c "import asyncio; from app.initialization.startup import run_initialization; asyncio.run(run_initialization())"
+
+dev-reset: ## Reset cycle state inside running dev container (no restart needed)
+	docker exec amasci-api-dev curl -sf -X POST 'http://localhost:8000/api/v1/cycle/reset?confirm=true' | python -m json.tool
+
 dev-frontend: ## Start frontend dev server
 	cd frontend && npm run dev
 
-dev-backend: ## Start backend with reload
+dev-backend: ## Start backend with reload (local, no Docker)
 	cd backend && uvicorn app.main:app --reload --port 8000
 
 # --- Staging ---
@@ -45,8 +57,17 @@ staging-stop: ## Stop staging environment
 prod: ## Start production environment
 	docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-prod-build: ## Build production images
-	docker compose -f docker-compose.prod.yml build --no-cache
+prod-build: ## Build production images (no cache)
+	docker compose -f docker-compose.prod.yml --env-file .env.production build --no-cache
+
+prod-init: ## Start prod + run initialization pipeline inside container
+	$(MAKE) prod
+	@echo "Waiting for API to be healthy…"
+	@until docker exec amasci-api curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; do sleep 5; done
+	docker exec amasci-api python -c "import asyncio; from app.initialization.startup import run_initialization; asyncio.run(run_initialization())"
+
+prod-reset: ## Reset cycle state inside running prod container
+	docker exec amasci-api curl -sf -X POST 'http://localhost:8000/api/v1/cycle/reset?confirm=true' | python -m json.tool
 
 # --- Testing ---
 
@@ -72,15 +93,15 @@ lint-fix: ## Fix lint issues
 # --- Infrastructure ---
 
 stop: ## Stop all services
-	docker compose -f docker-compose.dev.yml down 2>/dev/null || true
-	docker compose -f docker-compose.prod.yml down 2>/dev/null || true
+	docker compose -f docker-compose.dev.yml --env-file .env down 2>/dev/null || true
+	docker compose -f docker-compose.prod.yml --env-file .env.production down 2>/dev/null || true
 
 restart: ## Restart development environment
 	$(MAKE) stop
 	$(MAKE) dev
 
 logs: ## View all logs
-	docker compose -f docker-compose.dev.yml logs -f 2>/dev/null || docker compose -f docker-compose.prod.yml logs -f
+	docker compose -f docker-compose.dev.yml --env-file .env logs -f 2>/dev/null || docker compose -f docker-compose.prod.yml --env-file .env.production logs -f
 
 status: ## Show container status
 	docker ps --filter "name=amasci" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
@@ -103,10 +124,10 @@ backup: ## Run database backups
 # --- Cleanup ---
 
 clean: ## Remove containers and volumes
-	docker compose -f docker-compose.dev.yml down -v 2>/dev/null || true
-	docker compose -f docker-compose.prod.yml down -v 2>/dev/null || true
+	docker compose -f docker-compose.dev.yml --env-file .env down -v 2>/dev/null || true
+	docker compose -f docker-compose.prod.yml --env-file .env.production down -v 2>/dev/null || true
 	docker image prune -f
 
 clean-all: ## Remove everything including images
-	docker compose -f docker-compose.dev.yml down -v --rmi all 2>/dev/null || true
-	docker compose -f docker-compose.prod.yml down -v --rmi all 2>/dev/null || true
+	docker compose -f docker-compose.dev.yml --env-file .env down -v --rmi all 2>/dev/null || true
+	docker compose -f docker-compose.prod.yml --env-file .env.production down -v --rmi all 2>/dev/null || true

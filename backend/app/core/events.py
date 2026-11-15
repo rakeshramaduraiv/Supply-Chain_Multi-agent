@@ -90,6 +90,15 @@ async def _reset_cycle_on_startup() -> None:
     except Exception as e:
         logger.warning("[startup_reset] increment reset failed (non-fatal): %s", e)
 
+    # 2b. Re-populate manifest data_end from base.parquet so next_period() returns
+    # "2017-10" immediately without scanning the full parquet on every request.
+    try:
+        store = CumulativeStore()
+        store._update_manifest_from_base()
+        logger.info("[startup_reset] manifest data_end refreshed from base.parquet")
+    except Exception as e:
+        logger.warning("[startup_reset] manifest refresh failed (non-fatal): %s", e)
+
     # 3. Clear caches
     try:
         clear_dataset_cache()

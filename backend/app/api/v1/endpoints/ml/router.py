@@ -438,9 +438,21 @@ async def get_feature_importance(intelligence_type: str):
     try:
         from app.ml.feature_importance import compute_feature_importance
 
+        # Guard: INVENTORY has no trained model — return 404 immediately
+        if intel_type not in FEATURE_CONFIGS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No model trained for '{intelligence_type}'. "
+                       f"Trained types: {[t.value for t in FEATURE_CONFIGS]}",
+            )
+
         version = _registry.get_latest_version(intel_type)
         if not version:
-            raise HTTPException(status_code=404, detail=f"No model found for {intelligence_type}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No trained model found for '{intelligence_type}'. Run initialization first.",
+            )
+
         model = _registry.load_model(intel_type)
         # Always use the features the model was actually trained with
         features = version.features_used or []
@@ -450,6 +462,8 @@ async def get_feature_importance(intelligence_type: str):
             data=FeatureImportanceSchema(**result.to_dict()),
             message="Feature importance computed",
         )
+    except HTTPException:
+        raise
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

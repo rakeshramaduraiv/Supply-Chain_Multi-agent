@@ -763,31 +763,6 @@ export default function ForecastPage() {
                     </div>
                   </div>
 
-                  {/* Inventory Agent */}
-                  <div className={styles.agentCard}>
-                    <div className={styles.agentHead}>
-                      <div className={styles.agentName}><Warehouse size={15} style={{ color: '#d4a017' }} /> Inventory Agent</div>
-                      <span className="badge bdg-low">Rule-based</span>
-                    </div>
-                    <div className={styles.agentPredVal} style={{ color: '#d4a017' }}>
-                      <span>{cats.length > 0 ? 'Buffer Monitored' : '—'}</span>
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#00b894', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Minus size={12} /> Stock Buffer Status · {cycleMonth}
-                    </div>
-                    <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--ts)', marginTop: '4px' }}>Inventory Heuristics:</div>
-                    <div className={styles.featureList}>
-                      <div style={{ fontSize: 10, color: 'var(--ts)', lineHeight: 1.6 }}>
-                        • Dynamic safety stock: +15% on high late-risk corridors<br />
-                        • Multi-echelon reorder point triggered by demand spikes<br />
-                        • Grounded in actual category lead-times
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '9.5px', color: 'var(--tm)', borderTop: '1px solid var(--b)', paddingTop: '6px' }}>
-                      Coordinated across regional fulfillment hubs
-                    </div>
-                  </div>
-
                   {/* Logistics Agent */}
                   <div className={styles.agentCard}>
                     <div className={styles.agentHead}>
@@ -844,12 +819,6 @@ export default function ForecastPage() {
                     <Factory size={16} style={{ color: '#e67e22' }} />
                     <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tp)' }}>Supplier Agent</span>
                     <span style={{ fontSize: '9px', color: 'var(--tm)' }}>Capacity Risk: {avgLateRisk}%</span>
-                  </div>
-                  <span className={styles.flowArrow}>➔</span>
-                  <div className={styles.flowNode}>
-                    <Warehouse size={16} style={{ color: '#d4a017' }} />
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--tp)' }}>Inventory Agent</span>
-                    <span style={{ fontSize: '9px', color: 'var(--tm)' }}>Stock Buffer: OK</span>
                   </div>
                   <span className={styles.flowArrow}>➔</span>
                   <div className={styles.flowNode}>
@@ -1070,7 +1039,7 @@ export default function ForecastPage() {
                             : 'Order Allocation Buffer & Monitoring'}
                         </span>
                         <span style={{ fontSize: '10px', color: '#94a3b8', marginLeft: '8px' }}>
-                          Prioritize corridor inventory and backup logistics routing
+                          Prioritize corridor allocation and backup logistics routing
                         </span>
                       </div>
                       <span className="badge bdg-high">High Priority</span>

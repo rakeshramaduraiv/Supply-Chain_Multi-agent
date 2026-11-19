@@ -230,10 +230,13 @@ class TestStage6RecordsStage0:
 
         recorded: list[tuple] = []
 
-        def fake_record_stage(period, stage, status, duration_ms, detail, error=None):
+        def fake_record_stage(period, stage, status, *args, **kwargs):
             recorded.append((period, stage, status))
 
         with patch.object(cycle_service, "_record_stage", side_effect=fake_record_stage), \
+             patch.object(cycle_service, "_stage1_ingest_validate",
+                   return_value=(MagicMock(stage=1, name="Ingest", status="COMPLETED",
+                                           duration_ms=1.0, detail={}, error=None), df, [])), \
              patch("app.core.period.current_data_end",
                    return_value=pd.Timestamp("2017-10-31")), \
              patch("app.ingestion.schema_adapter.adapt",
@@ -263,9 +266,9 @@ class TestStage6RecordsStage0:
                 df_actual=df, period="2017-10", filename="test.csv",
             ))
 
-        # Stage 0 for "2017-11" must have been recorded
+        # Stage 0 for "2017-11" must NOT have been recorded (Part A3 / H6)
         stage0_records = [(p, s, st) for p, s, st in recorded if s == 0]
-        assert any(p == "2017-11" and st == "COMPLETED"
-                   for p, s, st in stage0_records), (
-            f"Stage 0 for '2017-11' was not recorded. All records: {recorded}"
+        assert not any(p == "2017-11" and st == "COMPLETED"
+                       for p, s, st in stage0_records), (
+            f"Stage 0 for '2017-11' was unexpectedly recorded. All records: {recorded}"
         )

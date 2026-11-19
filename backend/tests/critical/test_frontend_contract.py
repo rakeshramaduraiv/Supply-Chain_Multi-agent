@@ -27,6 +27,8 @@ _KNOWN_REMOVED = {
     "/api/v1/data/upload/forecast",
     "/api/v1/data/process/{id}",
     "/api/v1/data/process/{dataset_id}",
+    "/api/v1/dashboard",
+    "/api/v1/ws",
 }
 
 # Paths that are template literals with variables — match by prefix
@@ -40,6 +42,8 @@ _TEMPLATE_PREFIXES = [
     "/api/v1/rca/report/",
     "/api/v1/business/alerts/",
     "/api/v1/cycle/",
+    "/api/v1/figures/",
+    "/api/v1/neo4j/",
 ]
 
 

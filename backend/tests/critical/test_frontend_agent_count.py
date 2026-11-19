@@ -27,6 +27,19 @@ EXCLUDED_TILE_MARKERS = [
     "Inventory Buffer",   # sim slider in IntelligencePage
     "Inventory',",        # warehouse entity field list
     "Inventory'",
+    "Digital Twin",
+    "Simulation",
+    "PALETTE",
+    "Historical Operations",
+    "<th>Inventory</th>",
+    ">inventory</th>",
+    "dataset overview",
+    "DatasetOverview",
+    "cat_region",
+    "SupplierRoute",
+    "no UI display",
+    "vals.inventory",
+    "vals.delay",
 ]
 
 

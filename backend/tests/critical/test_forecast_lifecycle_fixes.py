@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services.cycle_state_store import (
-    _available_periods, get_cycle_state_response, reset_all, record_stage
+    _available_periods, get_cycle_state_response, reset_all, record_stage, record_step, close_period
 )
 from app.services.cycle_service import run_upload_cycle
 from app.core.config import get_settings
@@ -69,10 +69,11 @@ def test_period_mismatch_fails_stage2():
     assert "Period mismatch" in (s2.error or "") or "Period mismatch" in str(s2.detail.get("reason", ""))
 
 def test_terminal_state_after_all_periods():
-    # Complete all 4 periods
+    # Complete and close all 4 periods
     for period in ["2017-10", "2017-11", "2017-12", "2018-01"]:
-        for s in range(7):
-            record_stage(period, s, "COMPLETED", 5.0, {})
+        for s in range(1, 8):
+            record_step(period, s, "COMPLETED", {})
+        close_period(period)
 
     state = get_cycle_state_response()
     assert state["all_complete"] is True

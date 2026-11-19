@@ -124,12 +124,12 @@ class CumulativeStore:
             src = pathlib.Path(source_parquet) if source_parquet else (
                 _BACKEND_DIR / "data" / "uploads" / "processed_master.parquet"
             )
-            if not src.exists():
+            if not src.exists() and source_parquet is None:
                 # Legacy relative-path fallback
                 alt_src = pathlib.Path("data/uploads/processed_master.parquet")
                 if alt_src.exists():
                     src = alt_src
-            if src.exists():
+            if src.exists() and source_parquet is None:
                 shutil.copy2(src, self._base_parquet)
                 logger.info("CumulativeStore: bootstrapped base from %s", src)
 

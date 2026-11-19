@@ -91,7 +91,7 @@ class TestNoHoldoutInTrain:
     )
     def test_train_csv_ends_before_holdout(self):
         train_csv = RAW_DIR / "DataCoSupplyChainDataset_train.csv"
-        df = pd.read_csv(train_csv, usecols=["order date (DateOrders)"])
+        df = pd.read_csv(train_csv, usecols=["order date (DateOrders)"], encoding="latin-1")
         dates = pd.to_datetime(df["order date (DateOrders)"], errors="coerce").dropna()
         max_date = dates.max()
         assert max_date < HOLDOUT_START, (
@@ -104,7 +104,7 @@ class TestNoHoldoutInTrain:
     )
     def test_train_csv_row_count(self):
         train_csv = RAW_DIR / "DataCoSupplyChainDataset_train.csv"
-        df = pd.read_csv(train_csv, usecols=["order date (DateOrders)"])
+        df = pd.read_csv(train_csv, usecols=["order date (DateOrders)"], encoding="latin-1")
         assert len(df) == EXPECTED_TRAIN, (
             f"Training CSV: expected {EXPECTED_TRAIN} rows, got {len(df)}"
         )

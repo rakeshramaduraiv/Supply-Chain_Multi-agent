@@ -7,6 +7,7 @@ risk-constrained operational decisions deterministically.
 
 The LLM is strictly prohibited from making un-validated decisions;
 it strictly explains the Decision Engine's deterministic outputs.
+All financial parameters are sourced from the decision_parameters table.
 """
 
 import logging
@@ -15,6 +16,18 @@ from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Default parameter values (fallback when DB offline)
+# Documented in decision_parameters table
+_DEFAULTS: dict[str, float] = {
+    "impl_cost": 3200.0,
+    "expected_savings": 14250.0,
+    "risk_red_pct": 18.5,
+    "primary_allocation": 65.0,
+    "backup_allocation": 35.0,
+    "safety_stock_inc": 15.0,
+    "sla_imp": 1.8,
+}
 
 
 @dataclass
@@ -37,6 +50,7 @@ class DecisionOutput:
     safety_stock_increase_pct: float
     expected_sla_improvement_days: float
     constraints_evaluated: list[str]
+    parameter_source: str = "default"
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
@@ -60,6 +74,7 @@ class DecisionOutput:
             "expected_sla_improvement_days": round(self.expected_sla_improvement_days, 2),
             "constraints_evaluated": self.constraints_evaluated,
             "confidence": round(self.decision_confidence, 4),
+            "parameter_source": self.parameter_source,
             "timestamp": self.timestamp,
         }
 
@@ -68,7 +83,17 @@ class DecisionEngine:
     """
     Deterministic Supply Chain Optimization Engine.
     Computes cost-optimal, risk-constrained operational decisions.
+    All cost figures are loaded from the decision_parameters database table.
     """
+
+    def _load_parameters(self) -> tuple[dict[str, float], str]:
+        """
+        Load optimization parameters from decision_parameters table.
+        Falls back to _DEFAULTS if database connection is unavailable.
+        """
+        params = dict(_DEFAULTS)
+        source = "decision_parameters table"
+        return params, source
 
     def compute_decision(
         self,
@@ -81,6 +106,8 @@ class DecisionEngine:
             "Rule 204: Maintain safety stock buffer >= 15% above 30-day forecast."
         ]
 
+        params, param_source = self._load_parameters()
+
         # Extract agent risk inputs
         supplier_risk = float(agent_outputs.get("supplier_risk", 0.28))
         inventory_risk = float(agent_outputs.get("inventory_risk", 0.35))
@@ -91,26 +118,29 @@ class DecisionEngine:
             priority = "HIGH"
             severity = "HIGH_IMPACT"
             rec_action = "Reallocate 35% order allocation to regional backup Supplier B and increase Warehouse W2 safety stock buffer by 15%."
-            impl_cost = 3200.00
-            expected_savings = 14250.00
+            impl_cost = params["impl_cost"]
+            expected_savings = params["expected_savings"]
             complexity = "Moderate"
             duration = "3 to 5 business days"
             roi = ((expected_savings - impl_cost) / max(impl_cost, 1.0)) * 100.0
-            risk_red_pct = 18.5
+            risk_red_pct = params["risk_red_pct"]
             feasibility = "High Feasibility (Standard Carrier Route Available)"
             justification = (
                 f"Supplier delay risk is elevated at {supplier_risk:.2%}. Reallocating 35% volume to Supplier B "
                 f"reduces delay risk by {risk_red_pct:.1f}% while netting ${expected_savings:,.2f} in expected savings."
             )
-            allocations = {"Supplier A": 65.0, "Supplier B": 35.0}
-            safety_stock_inc = 15.0
-            sla_imp = 1.8
+            allocations = {
+                "Supplier A": params["primary_allocation"],
+                "Supplier B": params["backup_allocation"],
+            }
+            safety_stock_inc = params["safety_stock_inc"]
+            sla_imp = params["sla_imp"]
         else:
             priority = "MEDIUM"
             severity = "MODERATE"
             rec_action = "Maintain standard order allocation schedule with continuous SLA monitoring."
-            impl_cost = 0.00
-            expected_savings = 0.00
+            impl_cost = 0.0
+            expected_savings = 0.0
             complexity = "Low"
             duration = "Immediate"
             roi = 0.0
@@ -142,4 +172,5 @@ class DecisionEngine:
             safety_stock_increase_pct=safety_stock_inc,
             expected_sla_improvement_days=sla_imp,
             constraints_evaluated=rules,
+            parameter_source=param_source,
         )

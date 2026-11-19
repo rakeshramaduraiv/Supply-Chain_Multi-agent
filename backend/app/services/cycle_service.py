@@ -214,6 +214,33 @@ def _stage2_match_forecast(
     """
     t0 = time.perf_counter()
 
+    if period:
+        try:
+            from app.services.cycle_state_store import _load_raw
+            periods_data = _load_raw().get("periods", {})
+            for p_key, p_val in periods_data.items():
+                steps = p_val.get("steps", {})
+                s0 = steps.get("0") or steps.get("1")
+                if s0 and s0.get("status") == "COMPLETED":
+                    s0_target = (s0.get("detail") or {}).get("target_period", p_key)
+                    if s0_target and s0_target != period:
+                        duration_ms = (time.perf_counter() - t0) * 1000
+                        err_msg = (
+                            f"Period mismatch: Actuals period {period!r} does not match "
+                            f"forecast target_period {s0_target!r}. "
+                            f"A forecast for {period!r} must be issued first."
+                        )
+                        return StageResult(
+                            stage=2,
+                            name="Match Forecast vs Actual",
+                            status="FAILED",
+                            duration_ms=duration_ms,
+                            detail={"reason": err_msg, "actuals_period": period, "forecast_target_period": s0_target},
+                            error=err_msg,
+                        ), pd.DataFrame(), df_actual.copy()
+        except Exception:
+            pass
+
     if session is None:
         duration_ms = (time.perf_counter() - t0) * 1000
         return StageResult(
@@ -270,6 +297,7 @@ def _stage2_match_forecast(
                     detail={"reason": err_msg, "actuals_period": period, "forecast_target_period": forecast_target},
                     error=err_msg,
                 ), pd.DataFrame(), df_actual.copy()
+
 
         if results:
             total_forecast_entities = len([r for r in results if r.predicted_value is not None])
@@ -809,8 +837,8 @@ async def run_upload_cycle(
             f"next_period() returned {_next_period!r} which equals the just-completed "
             f"period {period!r}. This violates the period-advance invariant."
         )
-    if s6.status == "COMPLETED":
-        _record_stage(_next_period, 0, "COMPLETED", detail=s6.detail, error=None)
+    # Keep Stage 6 as preview only (Part A3 / H6) — do NOT record Stage 0 for _next_period
+    s6.detail["next_period"] = _next_period
 
     total_ms = (time.perf_counter() - wall_start) * 1000
 

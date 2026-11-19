@@ -10,9 +10,8 @@ Weights are then normalised to sum to 1.0 before computing the final score.
 
 Default business weights (configurable):
     demand    = 0.30
-    supplier  = 0.35
-    inventory = 0.20
-    logistics = 0.15
+    supplier  = 0.45
+    logistics = 0.25
 
 Output
 ------

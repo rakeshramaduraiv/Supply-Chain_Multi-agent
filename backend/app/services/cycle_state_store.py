@@ -177,11 +177,19 @@ def record_stage(
     period: str,
     stage: int,
     status: str,
-    detail: dict | None = None,
-    error: str | None = None,
-    duration_ms: float = 0.0,
+    arg4: Any = None,
+    arg5: Any = None,
+    arg6: Any = None,
 ) -> None:
-    """Backward compatibility shim mapping stage to record_step."""
+    """Backward compatibility shim mapping stage to record_step, handling both parameter orderings."""
+    if isinstance(arg4, (int, float)):
+        duration_ms = float(arg4)
+        detail = arg5 if isinstance(arg5, dict) else None
+        error = arg6 if isinstance(arg6, str) else None
+    else:
+        detail = arg4 if isinstance(arg4, dict) else None
+        error = arg5 if isinstance(arg5, str) else None
+        duration_ms = float(arg6) if isinstance(arg6, (int, float)) else 0.0
     record_step(period, stage, status, detail=detail, error=error, duration_ms=duration_ms)
 
 
@@ -363,6 +371,7 @@ def get_cycle_state_response() -> dict:
         "trained_through": trained_through,
         "available_periods": period_entries,
         "step_names": STEP_NAMES,
+        "stage_names": STEP_NAMES,
         "all_complete": all_complete,
         "total_available": len(available),
         "total_complete": len(completed_periods),
@@ -374,3 +383,8 @@ def get_period_state(period: str) -> dict | None:
     """Backwards-compatibility shim returning the period record or None."""
     data = _load_raw()
     return data.get("periods", {}).get(period)
+
+
+def get_all_periods() -> dict:
+    """Backwards-compatibility shim returning all period records."""
+    return _load_raw().get("periods", {})

@@ -76,15 +76,16 @@ def _patch_fetch(monkeypatch, results):
                 detail={"reason": "no standing forecast for this period", "match_rate": None},
             ), pd.DataFrame(), df_actual.copy()
 
+        forecast_types = {r.entity_type for r in results if r.predicted_value is not None}
         actual_keys: set[str] = set()
-        if svc._PRODUCT_KEY in df_actual.columns:
+        if "Product" in forecast_types and svc._PRODUCT_KEY in df_actual.columns:
             actual_keys.update(df_actual[svc._PRODUCT_KEY].astype(str).unique())
-        if svc._SUPPLIER_KEY in df_actual.columns:
+        if "Supplier" in forecast_types and svc._SUPPLIER_KEY in df_actual.columns:
             actual_keys.update(df_actual[svc._SUPPLIER_KEY].astype(str).unique())
 
         forecast_keys = set(forecast_map.keys())
         matched_keys = actual_keys & forecast_keys
-        match_rate = len(matched_keys) / len(forecast_keys) if forecast_keys else None
+        match_rate = len(matched_keys) / len(actual_keys) if actual_keys else None
 
         if matched_ids:
             idx_int = [int(i) for i in matched_ids if i.isdigit()]

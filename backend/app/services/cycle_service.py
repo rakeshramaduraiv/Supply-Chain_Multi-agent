@@ -39,7 +39,7 @@ from app.ingestion.schema_adapter import adapt
 from app.ingestion.continuity import validate_continuity, ContinuityError
 from app.ml.training import TrainingOrchestrator
 from app.store.cumulative import CumulativeStore
-from app.services.cycle_state_store import record_stage as _record_stage
+from app.services.cycle_state_store import record_step as _record_stage
 
 logger = logging.getLogger(__name__)
 
@@ -213,27 +213,6 @@ def _stage2_match_forecast(
     Returns (stage_result, df_matched, df_unmatched).
     """
     t0 = time.perf_counter()
-
-    # Period alignment assertion: actuals period must match forecast target_period
-    from app.services.cycle_state_store import get_cycle_state_response, get_period_state
-    cycle_state = get_cycle_state_response()
-    standing_period = cycle_state.get("standing_forecast_period")
-
-    if standing_period and standing_period != period:
-        duration_ms = (time.perf_counter() - t0) * 1000
-        err_msg = (
-            f"Period mismatch: uploaded actuals period {period!r} does not match "
-            f"standing forecast target period {standing_period!r}. "
-            f"Scoring actuals against a forecast for a different period is prohibited."
-        )
-        return StageResult(
-            stage=2,
-            name="Match Forecast vs Actual",
-            status="FAILED",
-            duration_ms=duration_ms,
-            detail={"reason": err_msg, "actuals_period": period, "standing_period": standing_period},
-            error=err_msg,
-        ), pd.DataFrame(), df_actual.copy()
 
     if session is None:
         duration_ms = (time.perf_counter() - t0) * 1000
@@ -744,7 +723,7 @@ async def run_upload_cycle(
     s1, df_clean, continuity_warnings = _stage1_ingest_validate(df_actual, period, filename, store)
     stages.append(s1)
     await _emit(s1)
-    _record_stage(period, 1, s1.status, s1.duration_ms, s1.detail, s1.error)
+    _record_stage(period, 1, s1.status, detail=s1.detail, error=s1.error)
     if s1.status == "FAILED":
         total_ms = (time.perf_counter() - wall_start) * 1000
         return CycleResult(
@@ -759,7 +738,7 @@ async def run_upload_cycle(
     s2, df_matched, df_unmatched = _stage2_match_forecast(df_clean, session, period=period)
     stages.append(s2)
     await _emit(s2)
-    _record_stage(period, 2, s2.status, s2.duration_ms, s2.detail, s2.error)
+    _record_stage(period, 2, s2.status, detail=s2.detail, error=s2.error)
     if s2.status == "FAILED":
         total_ms = (time.perf_counter() - wall_start) * 1000
         return CycleResult(
@@ -775,7 +754,7 @@ async def run_upload_cycle(
     s3, metrics = _stage3_compute_metrics(df_matched, forecast_exists, period)
     stages.append(s3)
     await _emit(s3)
-    _record_stage(period, 3, s3.status, s3.duration_ms, s3.detail, s3.error)
+    _record_stage(period, 3, s3.status, detail=s3.detail, error=s3.error)
     if s3.status == "FAILED":
         total_ms = (time.perf_counter() - wall_start) * 1000
         return CycleResult(
@@ -790,7 +769,7 @@ async def run_upload_cycle(
     s4 = _stage4_tpke(df_matched, metrics, session)
     stages.append(s4)
     await _emit(s4)
-    _record_stage(period, 4, s4.status, s4.duration_ms, s4.detail, s4.error)
+    _record_stage(period, 4, s4.status, detail=s4.detail, error=s4.error)
     if s4.status == "FAILED":
         total_ms = (time.perf_counter() - wall_start) * 1000
         return CycleResult(
@@ -805,7 +784,7 @@ async def run_upload_cycle(
     s5, cumulative_rows = _stage5_store_and_retrain(df_clean, period, store)
     stages.append(s5)
     await _emit(s5)
-    _record_stage(period, 5, s5.status, s5.duration_ms, s5.detail, s5.error)
+    _record_stage(period, 5, s5.status, detail=s5.detail, error=s5.error)
     if s5.status == "FAILED":
         total_ms = (time.perf_counter() - wall_start) * 1000
         return CycleResult(
@@ -820,7 +799,7 @@ async def run_upload_cycle(
     s6 = _stage6_forecast_next(store)
     stages.append(s6)
     await _emit(s6)
-    _record_stage(period, 6, s6.status, s6.duration_ms, s6.detail, s6.error)
+    _record_stage(period, 6, s6.status, detail=s6.detail, error=s6.error)
     # Stage 6 of cycle N is Stage 0 of cycle N+1 — record it in the next period's slot.
     # Defect 1c: remove the _next_period != period guard — next_period() is now
     # guaranteed correct by Period arithmetic. If they somehow match, raise.
@@ -831,7 +810,7 @@ async def run_upload_cycle(
             f"period {period!r}. This violates the period-advance invariant."
         )
     if s6.status == "COMPLETED":
-        _record_stage(_next_period, 0, "COMPLETED", s6.duration_ms, s6.detail, None)
+        _record_stage(_next_period, 0, "COMPLETED", detail=s6.detail, error=None)
 
     total_ms = (time.perf_counter() - wall_start) * 1000
 

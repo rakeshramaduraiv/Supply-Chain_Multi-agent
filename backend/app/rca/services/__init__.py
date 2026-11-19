@@ -38,9 +38,9 @@ class RCAService:
         rca_type: str,
         max_depth: int = 3,
         top_n: int = 10,
+        period: str | None = None,
     ) -> dict[str, Any]:
         """Execute full RCA analysis and persist the report."""
-        # Validate rca_type
         valid_types = [t.value for t in RCAType]
         if rca_type not in valid_types:
             return {
@@ -54,11 +54,10 @@ class RCAService:
             rca_type=rca_type,
             max_depth=max_depth,
             top_n=top_n,
+            period=period,
         )
 
-        # Persist
         self._repository.save_report(report)
-
         return {"success": True, "report": report.to_dict()}
 
     async def get_subgraph(

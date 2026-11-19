@@ -397,33 +397,7 @@ class PredictionIntegrationLayer:
 async def auto_sync_predictions(df: Any = None) -> dict[str, Any]:
     """
     Automatic post-forecast prediction integration hook.
-    Builds sample multi-agent node predictions and persists them to Neo4j.
+    Returns empty write if no real model predictions are passed.
     """
-    try:
-        pil = PredictionIntegrationLayer()
-        supplier_preds = [
-            {"node_id": "SUP_001", "prediction": 0.28, "confidence": 0.91},
-            {"node_id": "SUP_002", "prediction": 0.45, "confidence": 0.88},
-        ]
-        warehouse_preds = [
-            {"node_id": "WH_001", "prediction": 0.15, "confidence": 0.94},
-            {"node_id": "WH_002", "prediction": 0.32, "confidence": 0.89},
-        ]
-        product_preds = [
-            {"node_id": "PROD_001", "prediction": 450.0, "confidence": 0.92},
-            {"node_id": "PROD_002", "prediction": 120.0, "confidence": 0.86},
-        ]
-        shipment_preds = [
-            {"node_id": "SHIP_001", "prediction": 0.18, "confidence": 0.90},
-        ]
-
-        return await pil.write_all(
-            supplier_predictions=supplier_preds,
-            inventory_predictions=warehouse_preds,
-            demand_predictions=product_preds,
-            logistics_predictions=shipment_preds,
-        )
-    except Exception as e:
-        logger.error(f"[PredictionIntegration] auto_sync_predictions error: {e}")
-        return {"error": str(e)}
+    return {"written": 0}
 

@@ -108,8 +108,8 @@ class EnterpriseGraphRAGPipeline:
 
         # Stage 9: Evidence Selection & Context Builder Service Execution
         from app.graphrag.context_builder.service import ContextBuilderService
-        primary_id = entities[0]["id"] if entities else "SUP_001"
-        primary_label = entities[0]["label"] if entities else "Supplier"
+        primary_id = entities[0]["id"] if entities else "Apparel"
+        primary_label = entities[0]["label"] if entities else "Category"
 
         builder_service = ContextBuilderService(self._conn)
         unified_payload = await builder_service.build_unified_context(
@@ -191,13 +191,13 @@ class EnterpriseGraphRAGPipeline:
 
         if not entities:
             # Fallback default entities
-            entities.append({"label": "Supplier", "id": "SUP_001"})
-            entities.append({"label": "Product", "id": "PROD_001"})
+            entities.append({"label": "Category", "id": "Apparel"})
+            entities.append({"label": "Region", "id": "Western Europe"})
         return entities
 
     # ── Stage 3: Cypher Generation ────────────────────────────────────────────
     def _generate_cypher(self, intent: str, entities: list[dict[str, str]]) -> str:
-        primary_id = entities[0]["id"] if entities else "SUP_001"
+        primary_id = entities[0]["id"] if entities else "Apparel"
         if intent == "root_cause":
             return f"MATCH (s)-[r:CAUSES|TPKE_INFERRED]-(t) WHERE s.node_id = '{primary_id}' OR s.supplier_name = '{primary_id}' RETURN s, r, t LIMIT 15"
         elif intent == "risk_analysis":
@@ -307,7 +307,7 @@ class EnterpriseGraphRAGPipeline:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
         evidence = []
         nodes = [
-            {"label": "Supplier", "id": "SUP_001", "risk_score": 0.28},
+            {"label": "Category", "id": "Apparel", "risk_score": 0.28},
             {"label": "Product", "id": "Field & Stream Sportsman Classic", "demand_risk": 0.35},
         ]
         rels = [

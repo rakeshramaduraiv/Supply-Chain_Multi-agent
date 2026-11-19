@@ -37,7 +37,7 @@ def _get_context_builder() -> ContextBuilderService:
 @router.get("/compose", response_model=BaseResponse[dict[str, Any]])
 async def compose_prompt_get(
     query: str = Query(default="Why is supplier delay elevated?", description="User query"),
-    entity_id: str = Query(default="SUP_001", description="Entity node ID"),
+    entity_id: str = Query(default="Apparel", description="Entity node ID"),
     entity_label: str = Query(default="Supplier", description="Entity label"),
 ) -> BaseResponse[dict[str, Any]]:
     """Compose structured 10-component prompt (GET)."""
@@ -62,7 +62,7 @@ async def compose_prompt_post(
 ) -> BaseResponse[dict[str, Any]]:
     """Compose structured 10-component prompt (POST)."""
     query = payload_in.get("query", "Why is supplier delay elevated?")
-    entity_id = payload_in.get("entity_id", "SUP_001")
+    entity_id = payload_in.get("entity_id", "Apparel")
     entity_label = payload_in.get("entity_label", "Supplier")
     try:
         cb = _get_context_builder()

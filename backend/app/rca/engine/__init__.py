@@ -62,6 +62,7 @@ class RCAEngine:
         rca_type: str,
         max_depth: int = 3,
         top_n: int = 10,
+        period: str | None = None,
     ) -> RCAReport:
         """
         Execute the full RCA pipeline.
@@ -72,13 +73,14 @@ class RCAEngine:
             rca_type: Type of disruption (from RCAType enum)
             max_depth: Maximum traversal depth
             top_n: Number of top contributors to return
+            period: Optional cycle period (e.g. 2017-10) for scoped observation scoring
 
         Returns:
             Complete structured RCA report
         """
         with PerformanceTimer("rca_full_pipeline") as timer:
             # Step 1: Traverse dependency graph
-            logger.info(f"[RCA] Starting analysis for {target_label}:{target_id} ({rca_type})")
+            logger.info(f"[RCA] Starting analysis for {target_label}:{target_id} ({rca_type}) period={period}")
             traversal = await self._traversal.bfs(target_id, max_depth=max_depth)
 
             # Step 2: Rank dependencies
@@ -91,10 +93,41 @@ class RCAEngine:
                 {
                     "node_id": n.node_id,
                     "label": n.label,
-                    "properties": n.properties,
+                    "properties": dict(n.properties or {}),
                 }
                 for n in traversal.visited_nodes[:50]
             ]
+
+            # When period is set, contributor scoring must use month-scoped Observation nodes
+            if period and candidate_nodes:
+                node_ids = [c["node_id"] for c in candidate_nodes if c.get("node_id")]
+                obs_query = """
+                MATCH (o:Observation {period: $period})-[:OBSERVED_FOR]->(n)
+                WHERE n.node_id IN $node_ids OR n.id IN $node_ids OR n.name IN $node_ids
+                RETURN coalesce(n.node_id, n.id, n.name) AS node_id,
+                       o.late_rate AS late_rate,
+                       o.avg_delay_days AS avg_delay_days,
+                       o.deviation_pct AS deviation_pct
+                """
+                try:
+                    obs_records = await self._conn.execute_query(obs_query, {"period": period, "node_ids": node_ids})
+                    obs_map = {r["node_id"]: r for r in obs_records}
+                    for cand in candidate_nodes:
+                        nid = cand.get("node_id")
+                        if nid in obs_map:
+                            obs = obs_map[nid]
+                            cand["properties"]["late_rate"] = obs.get("late_rate", 0.0)
+                            cand["properties"]["avg_delay_days"] = obs.get("avg_delay_days", 0.0)
+                            cand["properties"]["actual_delay_days"] = obs.get("avg_delay_days", 0.0)
+                            cand["properties"]["actual_late_delivery"] = 1 if (obs.get("late_rate") or 0.0) > 0.5 else 0
+                            cand["properties"]["deviation_pct"] = obs.get("deviation_pct", 0.0)
+                            cand["properties"]["risk_score"] = max(
+                                float(obs.get("late_rate") or 0.0),
+                                min(1.0, abs(float(obs.get("deviation_pct") or 0.0)) / 100.0)
+                            )
+                except Exception as e:
+                    logger.warning(f"[RCA] Failed to fetch period observations: {e}")
+
             contribution_result = await self._contribution.compute_contributions(
                 target_id, target_label, candidate_nodes, rca_type, top_n=top_n
             )

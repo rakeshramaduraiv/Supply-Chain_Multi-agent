@@ -42,9 +42,6 @@ def _get_service() -> RCAService:
 async def analyze(request: RCAAnalyzeRequest) -> RCAReportResponse:
     """
     Execute full Root Cause Analysis for a supply chain disruption.
-
-    Traverses the knowledge graph, ranks contributing nodes,
-    constructs causal chains, and generates a structured report.
     """
     service = _get_service()
     try:
@@ -54,38 +51,20 @@ async def analyze(request: RCAAnalyzeRequest) -> RCAReportResponse:
             rca_type=request.rca_type,
             max_depth=request.max_depth,
             top_n=request.top_n,
+            period=request.period,
         )
         if not result.get("success"):
             raise HTTPException(status_code=400, detail=result.get("error", "Analysis failed"))
-
-        # Automatically write :CAUSES relationships & contribution scores into Neo4j
-        await auto_sync_rca(result)
-
+        await auto_sync_rca(result, period=request.period)
         return RCAReportResponse(report=result["report"])
     except ConnectionError as e:
         logger.warning(f"RCA graph unavailable: {e}")
-        return RCAReportResponse(report={
-            "problem_summary": "Graph database is currently offline. Start Neo4j to enable RCA.",
-            "causal_chain": {"events": []},
-            "risk_contributors": [],
-            "recommended_actions": ["Start the Neo4j database service to enable root cause analysis."],
-            "affected_entities": {},
-            "overall_confidence": 0.0,
-            "critical_relationships": [],
-        })
+        raise HTTPException(status_code=503, detail=f"Graph database unavailable: {e}")
     except HTTPException:
         raise
     except Exception as e:
-        logger.warning(f"RCA analysis fallback: {e}")
-        return RCAReportResponse(report={
-            "problem_summary": "Operational lead-time delay on distribution corridor",
-            "causal_chain": {"events": ["Supplier Lead Delay", "Port Congestion", "Warehouse Bottleneck"]},
-            "risk_contributors": [{"id": "SUP_001", "name": "Primary Supplier", "score": 0.85}],
-            "recommended_actions": ["Reallocate 35% order volume to regional backup Supplier B"],
-            "affected_entities": {"supplier": "SUP_001"},
-            "overall_confidence": 0.94,
-            "critical_relationships": [],
-        })
+        logger.error(f"RCA analysis failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"RCA analysis failed: {e}")
 
 
 @router.post("/subgraph", response_model=RCASubgraphResponse)
@@ -171,7 +150,7 @@ async def get_report(report_id: str) -> RCAReportResponse:
 
 @router.post("/counterfactual/evaluate")
 async def evaluate_counterfactual(
-    target_id: str = Query(default="SUP_001"),
+    target_id: str = Query(default="Supplier_A"),
     baseline_risk: float = Query(default=0.38),
 ) -> dict[str, Any]:
     """Evaluate multi-supplier counterfactual scenarios (Supplier A, B, C, D)."""
@@ -186,5 +165,5 @@ async def get_counterfactual_scenarios() -> dict[str, Any]:
     """Get historical evaluated counterfactual scenarios."""
     from app.rca.counterfactual import MultiSupplierCounterfactualEngine
     engine = MultiSupplierCounterfactualEngine()
-    result = engine.evaluate_supplier_scenarios(target_entity_id="SUP_001", baseline_risk=0.38)
+    result = engine.evaluate_supplier_scenarios(target_entity_id="Supplier_A", baseline_risk=0.38)
     return {"success": True, "scenarios": result.scenarios_evaluated, "optimal_supplier": result.optimal_supplier}

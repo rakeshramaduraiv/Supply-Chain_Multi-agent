@@ -68,7 +68,7 @@ class MultiSupplierCounterfactualEngine:
 
     def evaluate_supplier_scenarios(
         self,
-        target_entity_id: str = "SUP_001",
+        target_entity_id: str = "Supplier_A",
         baseline_risk: float = 0.38,
         allocated_volume: float = 1000.0,
     ) -> CounterfactualAnalysisResult:

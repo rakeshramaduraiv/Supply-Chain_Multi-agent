@@ -120,7 +120,8 @@ class EvolvingGraphEngine:
                 p.source = 'forecast',
                 p.risk_summary = $summary
             WITH p
-            MATCH (s:Supplier {node_id: 'SUP_001'})
+            MATCH (s:Supplier)
+            WITH p, s LIMIT 1
             MERGE (s)-[:HAS_PREDICTION]->(p)
             RETURN count(p) AS count
         """
@@ -173,8 +174,10 @@ class EvolvingGraphEngine:
         logger.info("[EvolvingGraph] Processing Root Cause Analysis graph evolution...")
         now = datetime.now(timezone.utc).isoformat()
 
+        src = rca_report.get("target_id", "Supplier")
         cypher = """
-            MATCH (s:Supplier {node_id: 'SUP_001'}), (w:Warehouse {node_id: 'W2'})
+            MATCH (s:Supplier), (w:Warehouse)
+            WHERE (s.node_id = $src OR s.id = $src) AND (w.node_id = 'W2' OR w.id = 'W2')
             MERGE (s)-[r:CAUSES {rca_type: 'supplier_delay_cascades_to_stockout'}]->(w)
             SET r.timestamp = $ts,
                 r.contribution_score = 0.842,
@@ -182,7 +185,7 @@ class EvolvingGraphEngine:
             RETURN count(r) AS count
         """
         try:
-            await self._conn.execute_write(cypher, {"ts": now})
+            await self._conn.execute_write(cypher, {"ts": now, "src": src})
         except Exception as e:
             logger.warning(f"[EvolvingGraph] Reasoning layer update fallback: {e}")
 
@@ -195,7 +198,7 @@ class EvolvingGraphEngine:
         now = datetime.now(timezone.utc).isoformat()
 
         cypher = """
-            MATCH (s:Supplier {node_id: 'SUP_001'})-[r:TPKE_INFERRED]->(t)
+            MATCH (s:Supplier)-[r:TPKE_INFERRED]->(t)
             SET r.last_updated = $ts,
                 r.is_stable = true,
                 r.confidence = 0.88

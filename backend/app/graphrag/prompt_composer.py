@@ -86,7 +86,7 @@ class PromptComposerService:
         hist = context_dict.get("historical_pattern", {})
         p_hist = (
             "### [3] HISTORICAL PATTERN (Knowledge Graph Topology)\n"
-            f"Entity: {hist.get('label', 'Node')} ID {hist.get('node_id', 'SUP_001')}\n"
+            f"Entity: {hist.get('label', 'Node')} ID {hist.get('node_id', 'Apparel')}\n"
             f"Attributes: {json.dumps(hist.get('properties', {}))}\n"
             f"Connectivity Degree: {hist.get('degree', 12)} linked nodes.\n"
         )

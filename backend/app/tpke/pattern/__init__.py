@@ -576,7 +576,7 @@ class PatternDetector:
 
         if contributors:
             for c in contributors:
-                source_id = str(c.get("entity_id", c.get("node_id", "SUP_001")))
+                source_id = str(c.get("entity_id", c.get("node_id", "entity_source")))
                 target_id = str(report.get("target_id", "late_delivery_main"))
                 score = float(c.get("score", c.get("contribution_score", 0.75)))
                 conf = float(c.get("confidence", 0.85))

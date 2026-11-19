@@ -138,10 +138,10 @@ async def copilot_query(req: CopilotQueryRequest):
         total_orders, late_rate_pct, avg_delay = 171962, 54.8, 1.25
         financial_loss, affected_orders, affected_customers = 209000.0, 7558, 6424
 
-    primary_rc = "Carrier Ground Transport Transit Delay & Capacity Limitation"
+    primary_rc = "Ground Transit Corridor Transit Delay & Capacity Limitation"
     explanation = (
         f"Based on GraphRAG retrieval for '{user_query}' across entity {entity_id} ({entity_label}), "
-        f"the disruption originated from a capacity constraint at Carrier Ground Transport. "
+        f"the disruption originated from a capacity constraint at Ground Transit Corridor. "
         f"DataCo dataset ({total_orders:,} orders, Jan 2015–Sep 2017) confirms {late_rate_pct}% late delivery rate "
         f"and {avg_delay}d avg shipping delay. Multi-agent predictions confirm supplier risk and transit delay delta."
     )

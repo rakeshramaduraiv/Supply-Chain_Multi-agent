@@ -27,7 +27,7 @@ def _get_context_service() -> ContextBuilderService:
 
 @router.get("/build", response_model=BaseResponse[dict[str, Any]])
 async def build_context_get(
-    entity_id: str = Query(default="SUP_001", description="Entity node ID"),
+    entity_id: str = Query(default="Apparel", description="Entity node ID"),
     entity_label: str = Query(default="Supplier", description="Entity node label"),
     query: str = Query(default="", description="Optional user question"),
 ) -> BaseResponse[dict[str, Any]]:
@@ -50,7 +50,7 @@ async def build_context_post(
     payload_in: dict[str, Any] = Body(...),
 ) -> BaseResponse[dict[str, Any]]:
     """Build unified context synthesizing all 7 platform modules (POST)."""
-    entity_id = payload_in.get("entity_id", "SUP_001")
+    entity_id = payload_in.get("entity_id", "Apparel")
     entity_label = payload_in.get("entity_label", "Supplier")
     query = payload_in.get("query", "")
     try:

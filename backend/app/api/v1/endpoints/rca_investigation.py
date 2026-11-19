@@ -126,7 +126,7 @@ async def analyze_incident(req: IncidentAnalysisRequest):
 
     # 4. Ranked Evidence
     evidence_ranking = [
-        {"rank": 1, "source": "Knowledge Graph Degree", "evidence": "High centrality node Carrier Ground Transport (Degree: 18)", "confidence": 98.2, "impact": "High"},
+        {"rank": 1, "source": "Knowledge Graph Degree", "evidence": "High centrality node Ground Transit Corridor (Degree: 18)", "confidence": 98.2, "impact": "High"},
         {"rank": 2, "source": "Prediction Integration", "evidence": "Logistics Agent predicted 1.25d shipping delay delta", "confidence": 94.5, "impact": "High"},
         {"rank": 3, "source": "Actual Upload Variance", "evidence": "2,123 actual records confirmed 54.8% late delivery risk", "confidence": 93.8, "impact": "Medium"},
         {"rank": 4, "source": "TPKE Pattern History", "evidence": "Temporal edge evolution confirmed 92% causal probability", "confidence": 92.0, "impact": "Medium"},
@@ -137,7 +137,7 @@ async def analyze_incident(req: IncidentAnalysisRequest):
     propagation_flow = [
         {"node": "Supplier Air Transport", "type": "Supplier", "time": "T+0h", "severity": "High", "confidence": "98.5%", "impact": "$142,000"},
         {"node": "Warehouse Zone 1", "type": "Warehouse", "time": "T+12h", "severity": "High", "confidence": "96.0%", "impact": "$210,000"},
-        {"node": "Carrier Ground Transport", "type": "Shipment", "time": "T+24h", "severity": "Critical", "confidence": "94.2%", "impact": "$380,000"},
+        {"node": "Ground Transit Corridor", "type": "Shipment", "time": "T+24h", "severity": "Critical", "confidence": "94.2%", "impact": "$380,000"},
         {"node": "Central Buffer Inventory", "type": "Inventory", "time": "T+36h", "severity": "Medium", "confidence": "91.8%", "impact": "$95,000"},
         {"node": "Western Europe Customers", "type": "Customer", "time": "T+48h", "severity": "Medium", "confidence": "89.0%", "impact": "$120,000"},
     ]
@@ -148,9 +148,9 @@ async def analyze_incident(req: IncidentAnalysisRequest):
         "executive_overview": (
             f"The AMASCI AI Investigator executed a 12-stage grounded analysis across 180,519 historical orders, "
             f"Neo4j Knowledge Graph version v1.4.2, and multi-agent prediction layers. The primary disruption driver is "
-            f"a capacity bottleneck at Carrier Ground Transport, propagating across 5 downstream operational stages."
+            f"a capacity bottleneck at Ground Transit Corridor, propagating across 5 downstream operational stages."
         ),
-        "primary_root_cause": "Carrier Ground Transport Transit Delay & Capacity Limitation",
+        "primary_root_cause": "Ground Transit Corridor Transit Delay & Capacity Limitation",
         "secondary_causes": [
             "Regional freight congestion on Western Europe delivery lanes",
             "Warehouse Zone 1 order item processing queue backlog during peak hours",
@@ -183,11 +183,11 @@ async def analyze_incident(req: IncidentAnalysisRequest):
     # 7. AI Reasoning Chain (Step-by-Step)
     reasoning_chain = [
         {"step": 1, "phase": "Evidence Gathering", "details": "Retrieved 180,519 order records, Neo4j graph version v1.4.2, and LightGBM model weights."},
-        {"step": 2, "phase": "Hypothesis Formulation", "details": "Hypothesized that Carrier Ground Transport capacity constraint is the primary root cause."},
+        {"step": 2, "phase": "Hypothesis Formulation", "details": "Hypothesized that Ground Transit Corridor capacity constraint is the primary root cause."},
         {"step": 3, "phase": "Verification & Graph Grounding", "details": "Verified hypothesis using degree centrality (18) and actual upload variance matching (94.2% match)."},
         {"step": 4, "phase": "Counterfactual Simulation", "details": "Simulated shifting 20% volume to secondary carrier; confirmed 0.8-day delay reduction."},
         {"step": 5, "phase": "Business Recommendation", "details": "Recommended immediate volume reallocation and safety stock adjustment."},
-        {"step": 6, "phase": "Final Conclusion", "details": f"Concluded primary root cause is Carrier Ground Transport constraint with {confidence}% confidence."},
+        {"step": 6, "phase": "Final Conclusion", "details": f"Concluded primary root cause is Ground Transit Corridor constraint with {confidence}% confidence."},
     ]
 
     response = {
@@ -280,7 +280,7 @@ async def get_investigation_history():
             "timestamp": now_iso,
             "target": "Supplier Air Transport",
             "question": "Why did Supplier Air Transport experience late delivery spikes in Q4 2017?",
-            "root_cause": "Carrier Ground Transport Transit Delay & Capacity Limitation",
+            "root_cause": "Ground Transit Corridor Transit Delay & Capacity Limitation",
             "recommendation": "Shift 20% order volume to secondary carrier",
             "confidence": 94.2,
             "financial_savings": "$142,500",

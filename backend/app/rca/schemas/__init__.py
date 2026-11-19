@@ -22,6 +22,7 @@ class RCAAnalyzeRequest(BaseModel):
     )
     max_depth: int = Field(default=3, ge=1, le=5, description="Max traversal depth")
     top_n: int = Field(default=10, ge=1, le=50, description="Top N contributors")
+    period: str | None = Field(default=None, description="Cycle period YYYY-MM for scoped contributor scoring")
 
 
 class RCASubgraphRequest(BaseModel):

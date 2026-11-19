@@ -4,7 +4,6 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 import { api } from '../../api/client'
 import Overview from '../../pages/Overview'
 import ForecastPage from '../../pages/ForecastPage'
-import GraphPage from '../../pages/GraphPage'
 import IntelligencePage from '../../pages/IntelligencePage'
 import RiskPage from '../../pages/RiskPage'
 import EntityPage from '../../pages/EntityPage'

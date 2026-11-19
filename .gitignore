@@ -4,14 +4,9 @@
 
 # Environment files with secrets
 .env
-.env.local
-.env.*.local
-.env.production
-
-# Keep templates
-!.env.development
-!.env.testing
-!.env.production
+.env.*
+!.env.example
+!**/.env.example
 
 # Python
 __pycache__/

@@ -1,3 +1,0 @@
-adge bdg-med">{overallConf != null ? `${round(overallConf * 96.8, 1)}% Conf` : '—'}</span>
-                  </div>
-  

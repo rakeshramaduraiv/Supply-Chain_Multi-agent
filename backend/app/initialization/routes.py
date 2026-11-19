@@ -130,32 +130,19 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
         log_repo = None
 
     try:
-        processed_path = Path(settings.upload_dir) / "processed_master.parquet"
-        if not processed_path.exists():
-            raise FileNotFoundError("Processed master dataset not found. Re-initialize the system.")
+        from app.store.cumulative import CumulativeStore
+        try:
+            df = CumulativeStore().load_full()
+            logger.info(f"[retrain] Training on CumulativeStore: {len(df):,} rows")
+        except Exception as e_store:
+            logger.warning(f"[retrain] CumulativeStore load failed ({e_store}), falling back to parquet read")
+            processed_path = Path(settings.upload_dir) / "processed_master.parquet"
+            if not processed_path.exists():
+                raise FileNotFoundError("Processed master dataset not found. Re-initialize the system.")
+            import pandas as pd
+            df = pd.read_parquet(processed_path)
 
-        import pandas as pd
-        df = pd.read_parquet(processed_path)
-
-        # Apply holdout filter so parquet and models only cover training window
-        holdout_start = settings.holdout_start_date or ""
-        if holdout_start:
-            date_col = next(
-                (c for c in ("order date (DateOrders)", "order_date") if c in df.columns),
-                None,
-            )
-            if date_col:
-                dates = pd.to_datetime(df[date_col], errors="coerce")
-                cutoff = pd.Timestamp(holdout_start)
-                before = len(df)
-                df = df[dates < cutoff].copy()
-                logger.info(
-                    f"[retrain] Holdout filter: {before:,} -> {len(df):,} rows (cutoff {holdout_start})"
-                )
-                # Overwrite parquet so dashboard analytics also reflect training-only data
-                df.to_parquet(processed_path, index=False)
-                logger.info(f"[retrain] Saved training-only parquet: {len(df):,} rows")
-
+        # WARNING: Never overwrite processed_master.parquet here — that erases post-training learning.
         from app.ml.training import TrainingOrchestrator
         orchestrator = TrainingOrchestrator()
         results = orchestrator.train_all(df, dataset_version="retrain")

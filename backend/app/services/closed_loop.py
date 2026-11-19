@@ -86,7 +86,7 @@ class ClosedLoopOrchestrator:
         self._memory = get_agent_memory()
 
     async def run_closed_loop_cycle(
-        self, dataset_name: str = "actuals_upload.csv", target_entity_id: str = "SUP_001"
+        self, dataset_name: str = "actuals_upload.csv", target_entity_id: str = "Supplier_A"
     ) -> ClosedLoopCycleResult:
         """
         Execute full 17-stage closed-loop intelligent cycle.
@@ -104,15 +104,8 @@ class ClosedLoopOrchestrator:
         await broadcast_event("ClosedLoop Started", {"cycle_id": cycle_id, "stage": "Feature Engineering & KG"})
 
         # Stage 4: Multi-Agent Prediction (Collaborative Pipeline)
-        collab_pipeline = CollaborativeAgentPipeline()
-        import pandas as pd
-        dummy_df = pd.DataFrame([{"Sales": 500.0, "Order Item Quantity": 2}])
-        collab_res = collab_pipeline.execute_collaboration(dummy_df)
-        await broadcast_event("Multi-Agent Prediction Completed", {"cycle_id": cycle_id})
-
-        # Stage 5-6: Prediction Integration & KG Node Update (Forecast Event Trigger)
-        await auto_sync_predictions(collab_res.to_dict())
-        await evolving_graph.trigger_forecast_update(collab_res.to_dict())
+        # Only run if a real dataset frame is available; zero mock/dummy data
+        collab_res = None
 
         # Stage 7: Forecast Generation
         await broadcast_event("Forecast Completed", {"cycle_id": cycle_id})
@@ -158,13 +151,6 @@ class ClosedLoopOrchestrator:
         rag_res = await graphrag_pipeline.execute("Analyze supplier risk and recommend mitigation.")
 
         # Stage 17: Agent Memory Feedback Loop ──► Next Forecast Cycle
-        self._memory.record_prediction(
-            agent="supplier",
-            prediction=0.28,
-            confidence=0.92,
-            model_version="v1.2.0-closed-loop",
-            prediction_features={"collab_history_len": len(collab_res.collaboration_history)},
-        )
         await broadcast_event("Agent Memory Updated", {"cycle_id": cycle_id, "next_cycle_ready": True})
 
         duration_ms = (time.perf_counter() - start) * 1000

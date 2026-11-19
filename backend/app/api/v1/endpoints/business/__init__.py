@@ -1014,7 +1014,7 @@ async def get_alerts():
                 type="Logistics",
                 severity="Critical",
                 business_impact="Active shipping delays on ground routes threaten delivery target SLAs, potentially impacting Western Europe retail orders.",
-                affected_entities="Carrier Ground Transport, Western Europe Region",
+                affected_entities="Ground Transit Corridor, Western Europe Region",
                 recommendation="Transition 12% of peak cargo load to ground logistics pipelines or alternative air routes.",
                 forecast_impact="Predictive analytics indicates a 2.4% drop in next-month delivery accuracy if logistics bottlenecks persist.",
                 entity_id="transport_delay_main",

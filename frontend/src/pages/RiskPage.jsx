@@ -82,7 +82,7 @@ const FALLBACK_INCIDENTS = [
   },
   {
     id: 'transport_delay_main',
-    name: 'Carrier Ground Transport Delay',
+    name: 'Ground Transit Corridor Delay',
     type: 'Shipment',
     period: '2016-11',
     periodLabel: 'Nov 2016',
@@ -229,9 +229,48 @@ export default function RiskPage() {
 
   const [rcaFocus, setRcaFocus] = useState(readRcaFocus)
 
+  // When navigated from ForecastPage Step 4, synthesize a period-specific incident
+  // so the workspace always shows the correct month even before actuals are uploaded.
+  const buildFocusIncident = (focus) => {
+    if (!focus?.period) return null
+    return {
+      id: `forecast_rca_${focus.period}`,
+      name: `Forecast RCA — ${focus.period}`,
+      type: 'Product',
+      period: focus.period,
+      periodLabel: focus.period,
+      risk: '61.7%',
+      riskVal: 0.617,
+      severity: 'High',
+      impact: 'Medium',
+      confidence: '61.7%',
+      financialLoss: 0,
+      affectedOrders: 0,
+      expectedDelay: 1.25,
+      region: 'Global',
+      warehouse: 'Zone 1',
+      bu: 'Forecasting',
+      status: 'Open RCA',
+      customers: 0,
+      products: 1,
+      forecastDrop: 0,
+      startedTime: `${focus.period}-01 00:00`,
+      affectedSupplier: 'Ground Transit Corridor',
+      affectedWarehouse: 'Warehouse Zone 1',
+      businessCriticality: 'Medium Priority',
+      graphConfidence: '61.7%',
+      predictionSource: `Forecast Cycle — ${focus.period}`,
+      timeSinceDetection: `Forecast issued for ${focus.period}`,
+      _fromForecast: true,
+      _isFocusSynthetic: true,
+    }
+  }
+
   const [selectedIssueId, setSelectedIssueId] = useState(() => {
     const focus = readRcaFocus()
-    return issueId || focus?.incidentId || 'supplier_delay_main'
+    if (focus?.incidentId) return focus.incidentId
+    if (focus?.period) return `forecast_rca_${focus.period}`
+    return issueId || 'supplier_delay_main'
   })
   const [selectedType, setSelectedType] = useState('Supplier')
 
@@ -279,18 +318,11 @@ export default function RiskPage() {
       if (match) {
         setSelectedIssueId(match.id)
         setSelectedType(match.type || 'Product')
-        setFilterYear(focus.filterYear || 'All')
-        setActiveStep(3) // Jump to Business Impact so RCA context is visible
-        localStorage.removeItem('amasci_rca_focus')
-        setRcaFocus(null)
-        return
       }
     }
-    // No matching incident yet — apply year filter and show step 1
-    if (focus.filterYear) {
-      setFilterYear(focus.filterYear)
-    }
-    // Keep rcaFocus so the Return banner stays visible
+    // Always filter to the focus period and jump to Step 1 (incident overview)
+    if (focus.period) setFilterPeriod(focus.period)
+    setActiveStep(1)
   }, [])
   // Load RCA history from backend — must be declared before backendIncidents useMemo
   const { data: rcaHistoryData } = useQuery({
@@ -335,18 +367,29 @@ export default function RiskPage() {
   }, [rcaHistoryData])
 
   const ALL_INCIDENTS_LIVE = useMemo(() => {
-    // Prefer backend incidents; fall back to static only when backend returns nothing
     const base = backendIncidents.length > 0 ? backendIncidents : FALLBACK_INCIDENTS
     const baseIds = new Set(base.map(i => i.id))
     const fresh = forecastIncidents.filter(i => !baseIds.has(i.id))
-    return [...fresh, ...base]
-  }, [forecastIncidents, backendIncidents])
+    // If navigated from ForecastPage Step 4, prepend a synthetic incident for that period
+    // so the workspace always has something to show even before actuals are uploaded.
+    const synthetic = rcaFocus ? buildFocusIncident(rcaFocus) : null
+    const all = [...fresh, ...base]
+    if (synthetic && !all.some(i => i.id === synthetic.id)) {
+      return [synthetic, ...all]
+    }
+    return all
+  }, [forecastIncidents, backendIncidents, rcaFocus])
 
   // Search & filters in queue
   const [searchQ, setSearchQ] = useState('')
   const [filterSeverity, setFilterSeverity] = useState('All')
   const [filterStatus, setFilterStatus] = useState('All')
   const [filterYear, setFilterYear] = useState('All')
+  // When navigated from ForecastPage, lock the queue to the exact forecast period
+  const [filterPeriod, setFilterPeriod] = useState(() => {
+    const focus = readRcaFocus()
+    return focus?.period || null
+  })
 
   const [expandedSlide, setExpandedSlide] = useState(null)
   const [activeStep, setActiveStep] = useState(1)
@@ -494,7 +537,15 @@ export default function RiskPage() {
   const filteredIncidents = useMemo(() => {
     let list = ALL_INCIDENTS_LIVE
 
-    if (filterYear !== 'All') {
+    // When navigated from ForecastPage Step 4, show only incidents for that exact period
+    if (filterPeriod) {
+      list = ALL_INCIDENTS_LIVE.filter(i => i.period === filterPeriod)
+      // Always include the synthetic focus incident even if list is empty
+      if (list.length === 0) {
+        const synthetic = buildFocusIncident(rcaFocus)
+        if (synthetic) list = [synthetic]
+      }
+    } else if (filterYear !== 'All') {
       const yearMatched = ALL_INCIDENTS_LIVE.filter(i => (i.period && i.period.startsWith(filterYear)) || (i.startedTime && i.startedTime.startsWith(filterYear)))
       if (yearMatched.length > 0) {
         list = yearMatched
@@ -602,10 +653,11 @@ export default function RiskPage() {
               onClick={() => {
                 localStorage.removeItem('amasci_rca_focus')
                 setRcaFocus(null)
+                setFilterPeriod(null)
                 navigateToPage('/forecast')
               }}
             >
-              ← Return to Forecast Lifecycle (Step {rcaFocus.returnStep || 5})
+              Continue to Step {rcaFocus.returnStep || 6} →
             </button>
           )}
           <button className={s.hdrBtn} onClick={() => setPipelineDrawerOpen(v => !v)}>
@@ -661,6 +713,14 @@ export default function RiskPage() {
             <span className={s.sidebarTitle}>Investigation Queue</span>
             <span className={s.badgeCounter}>{filteredIncidents.length} active {forecastIncidents.length > 0 && <span style={{color:'#f59e0b',fontWeight:800}}>+{forecastIncidents.length} from forecast</span>}</span>
           </div>
+
+          {/* Period lock banner — shown when navigated from ForecastPage Step 4 */}
+          {filterPeriod && (
+            <div style={{ margin: '0 0 8px 0', padding: '6px 10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 6, fontSize: '10px', color: '#1e40af', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>📅 Showing: <strong>{filterPeriod}</strong> only</span>
+              <button onClick={() => setFilterPeriod(null)} style={{ background: 'none', border: 'none', color: '#1d4ed8', cursor: 'pointer', fontWeight: 800, fontSize: 11 }}>Show All ×</button>
+            </div>
+          )}
 
           <div className={s.sidebarFilters}>
             <div className={s.searchField}>
@@ -975,7 +1035,7 @@ export default function RiskPage() {
                 <div className={s.stepHeaderTitle}><Layers size={14} color="var(--indigo)" /> Step 4: Ranked Causal Evidence Matrix</div>
                 <div className={s.evidenceCardGrid}>
                   {(evidenceList.length > 0 ? evidenceList : [
-                    { rank: 1, source: 'Knowledge Graph Degree', evidence: 'High centrality Carrier Ground Transport (Degree: 18)', confidence: 98.2, impact: 'High', node: 'n_ship' },
+                    { rank: 1, source: 'Knowledge Graph Degree', evidence: 'High centrality Ground Transit Corridor (Degree: 18)', confidence: 98.2, impact: 'High', node: 'n_ship' },
                     { rank: 2, source: 'Prediction Integration', evidence: 'Logistics Agent predicted 1.25d shipping delay', confidence: 94.5, impact: 'High', node: 'n_sup' },
                     { rank: 3, source: 'Actual Upload Variance', evidence: '2,123 records confirmed 54.8% late delivery risk', confidence: 93.8, impact: 'Medium', node: 'n_wh' },
                     { rank: 4, source: 'TPKE Pattern History', evidence: 'Temporal edge: Late Delivery→Stockout (92% conf)', confidence: 92.0, impact: 'Medium', node: 'n_prod' },
@@ -1257,6 +1317,33 @@ export default function RiskPage() {
               Next <ChevronRight size={13} />
             </button>
           </div>
+
+          {/* Return to Forecast Lifecycle — shown when navigated here from Step 4 */}
+          {rcaFocus && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px',
+              background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
+              border: '1.5px solid #3b82f6', borderRadius: 8,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700 }}>
+                📈 RCA for <strong>{rcaFocus.period}</strong> — Root cause identified.
+                Return to Forecast Lifecycle to continue Step {rcaFocus.returnStep || 5}.
+              </div>
+              <button
+                className={s.approveBtn}
+                style={{ fontSize: '10.5px', padding: '5px 14px' }}
+                onClick={() => {
+                  localStorage.removeItem('amasci_rca_focus')
+                  setRcaFocus(null)
+                  setFilterPeriod(null)
+                  navigateToPage('/forecast')
+                }}
+              >
+                Continue to Step {rcaFocus.returnStep || 6} →
+              </button>
+            </div>
+          )}
         </section>
 
         {/* ── RIGHT PANEL: ALWAYS DOCKED AI INVESTIGATION COPILOT ── */}

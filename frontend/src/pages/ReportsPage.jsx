@@ -351,7 +351,7 @@ export default function ReportsPage({ defaultTab }) {
                   <AlertTriangle size={15} style={{ color: '#ef4444' }} /> Section 5: Root Cause Causal Traversal
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--ts)' }}>
-                  Primary driver: <strong>Carrier Ground Transport Transit Delay</strong><br />
+                  Primary driver: <strong>Ground Shipping Corridor Transit Delay</strong><br />
                   Business impact: <strong>${financialLoss.toLocaleString()} exposure</strong><br />
                   Counterfactual result: <strong>Shift 20% volume to reduce delay by 0.8 days</strong>
                 </div>
@@ -577,7 +577,7 @@ export default function ReportsPage({ defaultTab }) {
                 </thead>
                 <tbody>
                   {[
-                    { p: '2017-09', a: '94.2%', r: 'Carrier Ground Transport Transit Delay', d: 'Shift 20% volume to secondary carrier', s: `$${expectedSavings.toLocaleString()}`, st: 'VERIFIED' },
+                    { p: '2017-09', a: '94.2%', r: 'Ground Shipping Corridor Transit Delay', d: 'Shift 20% volume to secondary carrier', s: `$${expectedSavings.toLocaleString()}`, st: 'VERIFIED' },
                     { p: '2017-08', a: '93.8%', r: 'Warehouse Zone 1 Ingestion Backlog', d: 'Increase warehouse buffer safety stock by +15%', s: '$48,000', st: 'VERIFIED' },
                     { p: '2017-07', a: '92.5%', r: 'Supplier Air Transport Fleet Bottleneck', d: 'Re-route 15% cargo to secondary air freight', s: '$36,500', st: 'VERIFIED' },
                     { p: '2017-06', a: '94.0%', r: 'Pacific Asia Port Congestion Spike', d: 'Adjust safety stock threshold +10%', s: '$52,000', st: 'VERIFIED' },

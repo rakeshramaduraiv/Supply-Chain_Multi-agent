@@ -541,7 +541,7 @@ function EntityDashboard({ entity, allNodes, allEdges, onFocus, upstreamCount, d
         )}
 
         {tab === 'tpke' && (
-          <div className={s.tabSection}>
+          <div className={s.tabSection} id="tpke-section">
             <div className={s.secLabel}>TPKE Learning Evolution</div>
             <div style={{ height: 120 }}>
               {tpkeHistory.some(t => t.confidence != null) ? (
@@ -968,33 +968,33 @@ export default function IntelligencePage() {
   const queryClient = useQueryClient()
   const { navigateToPage } = useSharedParams()
 
-  // Read forecast lifecycle focus context (written by ForecastPage Step 5/6)
-  const [graphFocusBanner, setGraphFocusBanner] = useState(() => {
+  // Read forecast lifecycle focus context (written by ForecastPage Step 4/6)
+  const initialFocus = useMemo(() => {
     try {
       const raw = localStorage.getItem('amasci_graph_focus')
       if (!raw) return null
-      const ctx = JSON.parse(raw)
       localStorage.removeItem('amasci_graph_focus')
-      return ctx
+      return JSON.parse(raw)
     } catch { return null }
-  })
+  }, [])
+
+  const [graphFocusBanner, setGraphFocusBanner] = useState(initialFocus)
 
   // Workspace Pan/Zoom/Drag State
   const [layer, setLayer] = useState(() => {
-    // Auto-select layer from forecast lifecycle context
-    try {
-      const raw = localStorage.getItem('amasci_graph_focus')
-      if (raw) {
-        const ctx = JSON.parse(raw)
-        if (ctx.layer && ['Combined','Historical','Prediction','Impact','TPKE'].includes(ctx.layer)) return ctx.layer
-      }
-    } catch {}
+    if (initialFocus?.layer && ['Combined','Historical','Prediction','Impact','TPKE'].includes(initialFocus.layer)) {
+      return initialFocus.layer
+    }
     return 'Combined'
   })
-  // Apply layer from graphFocusBanner on mount
+
+  // Apply scroll from graphFocusBanner on mount
   useEffect(() => {
-    if (graphFocusBanner?.layer && ['Combined','Historical','Prediction','Impact','TPKE'].includes(graphFocusBanner.layer)) {
-      setLayer(graphFocusBanner.layer)
+    if (graphFocusBanner?.scrollTo) {
+      setTimeout(() => {
+        const el = document.getElementById(graphFocusBanner.scrollTo)
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
     }
   }, [graphFocusBanner])
 
@@ -1408,7 +1408,7 @@ export default function IntelligencePage() {
               style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800, marginRight: 8 }}
               onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
             >
-              ← Return to Forecast Lifecycle ({graphFocusBanner.mode === 'kg_mutation' ? 'Step 5 — Prediction Layer' : 'Step 6 — TPKE Layer'})
+              ← Return to Forecast Lifecycle (Step {graphFocusBanner.returnStep || 5})
             </button>
           )}
           <div style={{ display: 'flex', gap: 4, marginRight: 8 }}>
@@ -1439,43 +1439,33 @@ export default function IntelligencePage() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 16px',
-          background: graphFocusBanner.mode === 'kg_mutation'
+          background: (graphFocusBanner.mode === 'kg_update' || graphFocusBanner.mode === 'kg_mutation')
             ? 'linear-gradient(90deg, rgba(91,138,255,0.10) 0%, rgba(0,184,148,0.06) 100%)'
             : 'linear-gradient(90deg, rgba(124,111,205,0.12) 0%, rgba(91,138,255,0.06) 100%)',
-          border: `1px solid ${graphFocusBanner.mode === 'kg_mutation' ? 'rgba(91,138,255,0.3)' : 'rgba(124,111,205,0.3)'}`,
+          border: `1px solid ${(graphFocusBanner.mode === 'kg_update' || graphFocusBanner.mode === 'kg_mutation') ? 'rgba(91,138,255,0.3)' : 'rgba(124,111,205,0.3)'}`,
           borderRadius: 8, margin: '0 0 0 0', flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 13 }}>{graphFocusBanner.mode === 'kg_mutation' ? '🔗' : '⚡'}</span>
+            <span style={{ fontSize: 13 }}>{(graphFocusBanner.mode === 'kg_update' || graphFocusBanner.mode === 'kg_mutation') ? '🔗' : '⚡'}</span>
             <div>
               <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--tp)' }}>
-                {graphFocusBanner.mode === 'kg_mutation'
-                  ? `Prediction Layer — Forecasted Relationships for ${graphFocusBanner.period}`
-                  : `TPKE Evolution Layer — ${graphFocusBanner.period} · ${graphFocusBanner.tpkeEdgesEvolved || 14} edges evolved`}
+                {(graphFocusBanner.mode === 'kg_update' || graphFocusBanner.mode === 'kg_mutation')
+                  ? `Graph updated with ${graphFocusBanner.period} actuals — ${graphFocusBanner.observations_written || graphFocusBanner.observations || ''} observations on ${graphFocusBanner.nodes_matched || ''} nodes`
+                  : `TPKE Evolution Layer — ${graphFocusBanner.period} · ${graphFocusBanner.edges_created || 0} created, ${graphFocusBanner.edges_strengthened || 0} strengthened`}
               </div>
               <div style={{ fontSize: 10, color: 'var(--ts)', marginTop: 1 }}>
-                {graphFocusBanner.mode === 'kg_mutation'
-                  ? `Root cause: ${graphFocusBanner.rcaCause || 'Carrier Ground Transport'} · Graph ${graphFocusBanner.version} · PREDICTS edges highlighted`
-                  : `TPKE ${graphFocusBanner.tpkeVersion || graphFocusBanner.version} · Temporal edge decay applied · TPKE_INFERRED edges highlighted`}
+                {(graphFocusBanner.mode === 'kg_update' || graphFocusBanner.mode === 'kg_mutation')
+                  ? `Period ${graphFocusBanner.period} · Combined layer active`
+                  : `TPKE ${graphFocusBanner.tpke_version || graphFocusBanner.version || ''} · Temporal edge decay applied · TPKE_INFERRED edges active`}
               </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {graphFocusBanner.mode === 'kg_mutation' && (
-              <div style={{ fontSize: 10, color: 'var(--ts)', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 6, padding: '3px 8px' }}>
-                🔮 Prediction Layer active — PREDICTS relationships shown
-              </div>
-            )}
-            {graphFocusBanner.mode === 'tpke_evolution' && (
-              <div style={{ fontSize: 10, color: 'var(--ts)', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 6, padding: '3px 8px' }}>
-                ⚡ TPKE Layer active — {graphFocusBanner.tpkeEdgesEvolved || 14} TPKE_INFERRED edges for {graphFocusBanner.period}
-              </div>
-            )}
             <button
               style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
               onClick={() => { setGraphFocusBanner(null); navigateToPage('/forecast') }}
             >
-              ← Return to Forecast Lifecycle
+              Continue to Step {graphFocusBanner.returnStep || 5} →
             </button>
           </div>
         </div>

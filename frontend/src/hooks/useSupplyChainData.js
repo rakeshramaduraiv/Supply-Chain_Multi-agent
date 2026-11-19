@@ -142,7 +142,7 @@ export function useNetworkPageData() {
   const totalRels  = graphStats.data?.total_relationships || graphStats.data?.metrics?.total_relationships || 0
 
   // ── Derived: graph version and TPKE edge count ─────────────────────────
-  const graphVersion   = graphStats.data?.graph_version || 'v1.4.2'
+  const graphVersion   = graphStats.data?.graph_version || '—'
   const tpkeEdgeCount  = tpkeEdges.data?.count || (tpkeEdges.data?.edges?.length ?? 0)
 
   // ── Derived: relationship distribution from graph dash + TPKE ──────────

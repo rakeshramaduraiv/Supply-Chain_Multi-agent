@@ -197,7 +197,7 @@ export default function DatasetOverview() {
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>KG Version</span>
-            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>{graphStatsQuery.data?.graph_version || 'v1.4.2'}</div>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#f1f5f9' }}>{graphStatsQuery.data?.graph_version || '—'}</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '8px 10px' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>Next Forecast</span>

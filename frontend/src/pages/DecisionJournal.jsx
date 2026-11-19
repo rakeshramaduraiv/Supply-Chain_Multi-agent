@@ -199,7 +199,7 @@ export default function DecisionJournal() {
               <div className={styles.secBody}>
                 Forecast Cycle: <strong>{currentReplayMonth}</strong><br />
                 Accuracy Score: <strong>{forecastHealth}%</strong><br />
-                Graph Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
+                Graph Version: <strong>{network.graphVersion || '—'}</strong><br />
                 TPKE Version: <strong>v2.1</strong><br />
                 Status: <strong style={{ color: '#10b981' }}>VERIFIED_CLOSED_LOOP</strong>
               </div>
@@ -240,7 +240,7 @@ export default function DecisionJournal() {
             <div className={styles.sectionCard}>
               <span className={styles.secTitle}><Activity size={13} /> Section 4: Knowledge Graph Traversal</span>
               <div className={styles.secBody}>
-                Neo4j Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
+                Neo4j Version: <strong>{network.graphVersion || '—'}</strong><br />
                 Active Node count: <strong>{(network.totalNodes || 0).toLocaleString()} nodes</strong><br />
                 Evolved edge count: <strong>{(network.totalRels || 0).toLocaleString()} relationships</strong>
               </div>

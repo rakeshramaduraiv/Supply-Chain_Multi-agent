@@ -21,9 +21,9 @@ const EnterpriseStoreContext = createContext(null)
 
 export function EnterpriseStoreProvider({ children }) {
   const qc = useQueryClient()
-  const [isUploading, setIsUploading]   = useState(false)
-  const [lastUpload,  setLastUpload]    = useState(null)   // { period, rows, accuracy, timestamp }
-  const [uploadError, setUploadError]   = useState(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [lastUpload, setLastUpload] = useState(null)   // { period, rows, accuracy, timestamp }
+  const [uploadError, setUploadError] = useState(null)
   const abortRef = useRef(null)
 
   /**
@@ -49,8 +49,8 @@ export function EnterpriseStoreProvider({ children }) {
       const result = await api.uploadActual(file, `Actual upload for ${period}`).then(r => r.data)
       setLastUpload({
         period,
-        rows:      result.row_count ?? result.records_loaded ?? 0,
-        accuracy:  result.mape_val != null ? (100 - result.mape_val).toFixed(1) : null,
+        rows: result.row_count ?? result.records_loaded ?? 0,
+        accuracy: result.mape_val != null ? (100 - result.mape_val).toFixed(1) : null,
         timestamp: new Date().toISOString(),
         result,
       })

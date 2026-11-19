@@ -41,8 +41,8 @@ export default function ReportsPage({ defaultTab }) {
   const initialTab = defaultTab || searchParams.get('tab') || 'reports'
   const [activeTab, setActiveTab] = useState(initialTab)
 
-  const [replayIdx, setReplayIdx]       = useState(6)
-  const [isPlaying, setIsPlaying]       = useState(false)
+  const [replayIdx, setReplayIdx] = useState(6)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [journalSearchQuery, setJournalSearchQuery] = useState('')
   const reportContainerRef = useRef(null)
 
@@ -57,10 +57,10 @@ export default function ReportsPage({ defaultTab }) {
   }
 
   // Central queries
-  const summary       = useDatasetSummary()
-  const analytics     = useDatasetAnalytics()
-  const network       = useNetworkPageData()
-  const risk          = useRiskPageData()
+  const summary = useDatasetSummary()
+  const analytics = useDatasetAnalytics()
+  const network = useNetworkPageData()
+  const risk = useRiskPageData()
 
   const s = summary.data || {}
   const a = analytics.data || {}
@@ -83,10 +83,10 @@ export default function ReportsPage({ defaultTab }) {
   }
 
   // Dynamic ground truth calculations
-  const totalOrders            = s.total_orders || 0
-  const replayScale            = (replayIdx + 1) / MONTHS_REPLAY.length
-  const ordersIngested         = Math.round(totalOrders * replayScale)
-  const lateDeliveryRate       = s.late_delivery_pct || 0
+  const totalOrders = s.total_orders || 0
+  const replayScale = (replayIdx + 1) / MONTHS_REPLAY.length
+  const ordersIngested = Math.round(totalOrders * replayScale)
+  const lateDeliveryRate = s.late_delivery_pct || 0
   const avgSupplierReliability = s.avg_supplier_reliability || 0
 
   const financialLoss = round(ordersIngested * 12.5, 2)
@@ -270,9 +270,9 @@ export default function ReportsPage({ defaultTab }) {
               </div>
 
               <div className={styles.briefSection}>
-                <strong>Weekly Ingestion Status:</strong> Active ingestion processed <strong>{ordersIngested.toLocaleString()} orders</strong>. 
-                Knowledge Graph traversal {network.graphVersion || 'v1.4.2'} detected late delivery disruption on <strong>Supplier Air Transport</strong> lane. 
-                The estimated financial exposure is <strong>${financialLoss.toLocaleString()}</strong>. 
+                <strong>Weekly Ingestion Status:</strong> Active ingestion processed <strong>{ordersIngested.toLocaleString()} orders</strong>.
+                Knowledge Graph traversal {network.graphVersion || '—'} detected late delivery disruption on <strong>Supplier Air Transport</strong> lane.
+                The estimated financial exposure is <strong>${financialLoss.toLocaleString()}</strong>.
                 <strong>Top Recommendation:</strong> Reallocate 20% order volume to secondary ground carrier to capture <strong>${expectedSavings.toLocaleString()}</strong> in estimated cost savings.
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function ReportsPage({ defaultTab }) {
 
             {/* ── SECTION 4: FORECAST SUMMARY & SECTION 8: MULTI-AGENT SUMMARY ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '14px' }}>
-              
+
               <div className="card" style={{ padding: '16px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--tp)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <TrendingUp size={15} style={{ color: 'var(--blue)' }} /> Section 4: Forecast Summary Trends
@@ -377,7 +377,7 @@ export default function ReportsPage({ defaultTab }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', fontSize: '11px' }}>
                 <div style={{ background: 'var(--s0)', border: '1px solid var(--b)', borderRadius: '6px', padding: '8px' }}>
                   <span>Graph Version</span>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--blue)' }}>{network.graphVersion || 'v1.4.2'}</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--blue)' }}>{network.graphVersion || '—'}</div>
                 </div>
                 <div style={{ background: 'var(--s0)', border: '1px solid var(--b)', borderRadius: '6px', padding: '8px' }}>
                   <span>Nodes Traversed</span>
@@ -400,13 +400,13 @@ export default function ReportsPage({ defaultTab }) {
                 <Lightbulb size={18} style={{ color: '#f59e0b' }} />
                 Section 15: AI Board Room Brief Snapshot
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '11px', lineHeight: 1.5 }}>
                 <div>
                   <strong style={{ color: '#60a5fa' }}>Operational Status:</strong> Ingested {ordersIngested.toLocaleString()} orders for month {currentReplayMonth} with {operationalHealth}% reliability.
                 </div>
                 <div>
-                  <strong style={{ color: '#60a5fa' }}>RCA & TPKE Evolved:</strong> Ground transport capacity constraint mapped under KG {network.graphVersion || 'v1.4.2'}; {network.tpkeEdgeCount || 0} evolved edges tracked.
+                  <strong style={{ color: '#60a5fa' }}>RCA & TPKE Evolved:</strong> Ground transport capacity constraint mapped under KG {network.graphVersion || '—'}; {network.tpkeEdgeCount || 0} evolved edges tracked.
                 </div>
                 <div>
                   <strong style={{ color: '#60a5fa' }}>Financial & Intervention:</strong> Projected loss of ${financialLoss.toLocaleString()} mitigated by 20% carrier volume shift (Savings: ${expectedSavings.toLocaleString()}).
@@ -453,7 +453,7 @@ export default function ReportsPage({ defaultTab }) {
                 <div style={{ fontSize: '11px', color: 'var(--ts)', marginTop: '8px', lineHeight: 1.6 }}>
                   Forecast Cycle: <strong>{currentReplayMonth}</strong><br />
                   Accuracy Score: <strong style={{ color: '#10b981' }}>{forecastHealth}%</strong><br />
-                  Graph Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
+                  Graph Version: <strong>{network.graphVersion || '—'}</strong><br />
                   TPKE Version: <strong>v2.1</strong><br />
                   Status: <strong style={{ color: '#10b981' }}>VERIFIED_CLOSED_LOOP</strong>
                 </div>
@@ -490,7 +490,7 @@ export default function ReportsPage({ defaultTab }) {
               <div className="card" style={{ padding: '14px', background: 'var(--s1)' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#5b8aff', display: 'flex', alignItems: 'center', gap: '6px' }}><Activity size={13} /> Section 4: Knowledge Graph</span>
                 <div style={{ fontSize: '11px', color: 'var(--ts)', marginTop: '8px', lineHeight: 1.6 }}>
-                  Neo4j Version: <strong>{network.graphVersion || 'v1.4.2'}</strong><br />
+                  Neo4j Version: <strong>{network.graphVersion || '—'}</strong><br />
                   Active Node count: <strong>{(network.totalNodes || 0).toLocaleString()} nodes</strong><br />
                   Evolved edge count: <strong>{(network.totalRels || 0).toLocaleString()} rels</strong>
                 </div>

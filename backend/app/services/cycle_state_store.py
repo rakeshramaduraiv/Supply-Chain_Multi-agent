@@ -3,25 +3,26 @@ app/services/cycle_state_store.py
 ===================================
 File-backed, backend-authoritative state machine for the forecast lifecycle.
 
-One row per target period. The UI derives ALL lifecycle state from here.
-No browser counter, no localStorage lifecycle values.
+Step model (1-7 + close):
+  1  Generate Forecast
+  2  Upload Actuals
+  3  Actual vs Predicted
+  4  Knowledge Graph Update   ← must come BEFORE RCA
+  5  Root Cause Analysis      ← traverses the updated graph
+  6  TPKE Evolution
+  7  Learn & Agent Scores
+  8  (close_period) → advances next_expected_period
 
-Stage numbering (matches the 7-stage canonical lifecycle):
-  0  FORECAST_ISSUED   — forecast for P generated before actuals exist
-  1  INGEST_VALIDATE   — actuals uploaded, schema + continuity checked
-  2  MATCH             — actuals joined to standing forecast
-  3  EVALUATE          — metrics computed on matched pairs
-  4  TPKE_EVOLVE       — edges created / strengthened / decayed / pruned
-  5  STORE_RETRAIN     — period appended, models retrained
-  6  FORECAST_NEXT     — forecast for P+1 generated (= Stage 0 of next cycle)
-
-Stage 6 of cycle N is Stage 0 of cycle N+1 — modelled once, referenced twice.
+current_step(ps) returns 1..7 while steps are pending, 8 when 1-7 are all COMPLETED.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -33,30 +34,41 @@ from app.core.data_files import assert_real_file, resolve_actuals_dir, MANIFEST_
 
 logger = logging.getLogger(__name__)
 
-_STAGE_NAMES = {
-    0: "Forecast Issued",
-    1: "Ingest & Validate",
-    2: "Match",
-    3: "Evaluate",
-    4: "TPKE Evolve",
-    5: "Store & Retrain",
-    6: "Forecast Next",
+_LOCK = threading.RLock()
+
+STEP_NAMES = {
+    1: "Generate Forecast",
+    2: "Upload Actuals",
+    3: "Actual vs Predicted",
+    4: "Knowledge Graph Update",
+    5: "Root Cause Analysis",
+    6: "TPKE Evolution",
+    7: "Learn & Agent Scores",
 }
 
-_TERMINAL_STAGE = 6  # completing stage 6 closes the cycle
+# A RUNNING step that is older than this is treated as FAILED (process killed).
+_RUNNING_TIMEOUT_SECS = 600
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _state_path() -> Path:
     settings = get_settings()
-    p = Path(settings.model_dir).parent / "cycle_state.json"
-    return p
+    return Path(settings.model_dir).parent / "cycle_state.json"
 
 
 def _load_raw() -> dict:
     path = _state_path()
     if path.exists():
         try:
-            return json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            # One-time migration: old file used stage_statuses → treat as empty
+            if "periods" not in data and "stage_statuses" in str(data):
+                logger.warning("[CycleState] Old stage-based state detected — resetting to empty step model")
+                return {"periods": {}}
+            return data
         except Exception as e:
             logger.warning(f"[CycleState] load failed: {e}")
     return {"periods": {}}
@@ -65,111 +77,170 @@ def _load_raw() -> dict:
 def _save_raw(data: dict) -> None:
     path = _state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2, default=str)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+def _period_record(data: dict, period: str) -> dict:
+    return data.setdefault("periods", {}).setdefault(period, {
+        "period": period,
+        "steps": {},
+        "closed_at": None,
+        "updated_at": None,
+    })
 
-def get_all_periods() -> dict[str, dict]:
-    """Return {period: period_state} for all known periods."""
-    return _load_raw().get("periods", {})
+
+# ── Step status helpers ───────────────────────────────────────────────────────
+
+def step_status(ps: dict, step: int) -> str:
+    """Return the status string for a step, accounting for RUNNING timeout."""
+    entry = (ps.get("steps") or {}).get(str(step)) or {}
+    status = entry.get("status", "PENDING")
+    if status == "RUNNING":
+        at_str = entry.get("at", "")
+        if at_str:
+            try:
+                at = datetime.fromisoformat(at_str)
+                elapsed = (datetime.now(timezone.utc) - at).total_seconds()
+                if elapsed > _RUNNING_TIMEOUT_SECS:
+                    return "FAILED"
+            except Exception:
+                pass
+    return status
 
 
-def get_period_state(period: str) -> dict | None:
-    return get_all_periods().get(period)
+def current_step(ps: dict | None) -> int:
+    """First step (1..7) not COMPLETED; 8 when 1..7 are all done."""
+    if not ps:
+        return 1
+    for s in range(1, 8):
+        if step_status(ps, s) != "COMPLETED":
+            return s
+    return 8
+
+
+# ── Public write API ──────────────────────────────────────────────────────────
+
+def require_step(period: str, step: int) -> dict:
+    """
+    Raise RuntimeError if `step` cannot run now for `period`.
+    Returns the period record on success.
+    """
+    data = _load_raw()
+    ps = _period_record(data, period)
+    if ps.get("closed_at"):
+        raise RuntimeError(f"{period} is already closed")
+    cur = current_step(ps)
+    if step > cur:
+        raise RuntimeError(
+            f"{period}: finish step {cur} ({STEP_NAMES.get(cur, 'Close')}) before step {step}"
+        )
+    if step < cur and step_status(ps, step) == "COMPLETED":
+        raise RuntimeError(f"{period}: step {step} already completed")
+    return ps
+
+
+def record_step(
+    period: str,
+    step: int,
+    status: str,
+    detail: dict | None = None,
+    error: str | None = None,
+    duration_ms: float = 0.0,
+) -> None:
+    with _LOCK:
+        data = _load_raw()
+        ps = _period_record(data, period)
+        ps["steps"][str(step)] = {
+            "step": step,
+            "name": STEP_NAMES.get(step, f"Step {step}"),
+            "status": status,
+            "detail": detail or {},
+            "error": error,
+            "duration_ms": round(duration_ms, 1),
+            "at": _now(),
+        }
+        ps["updated_at"] = _now()
+        _save_raw(data)
 
 
 def record_stage(
     period: str,
     stage: int,
-    status: str,          # COMPLETED | SKIPPED | FAILED
-    duration_ms: float,
-    detail: dict[str, Any],
+    status: str,
+    detail: dict | None = None,
     error: str | None = None,
+    duration_ms: float = 0.0,
 ) -> None:
-    """Record the outcome of a single stage for a period."""
-    data = _load_raw()
-    periods = data.setdefault("periods", {})
-    if period not in periods:
-        periods[period] = {
-            "period": period,
-            "stage_reached": -1,
-            "stage_statuses": {},
-            "forecast_run_id": None,
-            "actuals_uploaded_at": None,
-            "updated_at": None,
-        }
-
-    ps = periods[period]
-    ps["stage_statuses"][str(stage)] = {
-        "stage": stage,
-        "name": _STAGE_NAMES.get(stage, f"Stage {stage}"),
-        "status": status,
-        "duration_ms": round(duration_ms, 1),
-        "detail": detail,
-        "error": error,
-    }
-    if status in ("COMPLETED", "SKIPPED") and stage > ps["stage_reached"]:
-        ps["stage_reached"] = stage
-    if stage == 1 and status == "COMPLETED":
-        ps["actuals_uploaded_at"] = datetime.now(timezone.utc).isoformat()
-    ps["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _save_raw(data)
+    """Backward compatibility shim mapping stage to record_step."""
+    record_step(period, stage, status, detail=detail, error=error, duration_ms=duration_ms)
 
 
-def record_forecast_run_id(period: str, run_id: str) -> None:
-    data = _load_raw()
-    ps = data.setdefault("periods", {}).setdefault(period, {
-        "period": period, "stage_reached": -1, "stage_statuses": {},
-        "forecast_run_id": None, "actuals_uploaded_at": None, "updated_at": None,
-    })
-    ps["forecast_run_id"] = run_id
-    ps["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _save_raw(data)
+def get_step_detail(period: str, step: int) -> dict:
+    ps = _load_raw().get("periods", {}).get(period) or {}
+    return (ps.get("steps") or {}).get(str(step), {}).get("detail", {})
+
+
+def close_period(period: str) -> dict:
+    with _LOCK:
+        data = _load_raw()
+        ps = _period_record(data, period)
+        if current_step(ps) != 8:
+            raise RuntimeError(
+                f"{period} is on step {current_step(ps)}; finish steps 1-7 first"
+            )
+        ps["closed_at"] = ps.get("closed_at") or _now()
+        ps["updated_at"] = ps["closed_at"]
+        _save_raw(data)
+        return ps
 
 
 def reset_all() -> None:
-    """Delete all cycle state. Called by POST /cycle/reset."""
+    """Delete all cycle state and per-period artifact folders."""
     path = _state_path()
     if path.exists():
         path.unlink()
+    # Delete per-period artifact folder
+    cycle_dir = path.parent / "cycle"
+    if cycle_dir.exists():
+        import shutil
+        shutil.rmtree(cycle_dir, ignore_errors=True)
     try:
         from app.store.cumulative import CumulativeStore
-        store = CumulativeStore()
-        store.reset_increments(confirm=True)
+        CumulativeStore().reset_increments(confirm=True)
     except Exception as e:
         logger.warning(f"[CycleState] store.reset_increments failed: {e}")
     logger.info("[CycleState] All cycle state cleared.")
 
 
-# ── Derived queries ───────────────────────────────────────────────────────────
+# ── Per-period artifact paths ─────────────────────────────────────────────────
+
+def cycle_dir(period: str) -> Path:
+    p = _state_path().parent / "cycle" / period
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+# ── Available periods (unchanged from original) ───────────────────────────────
 
 def _available_periods() -> list[dict]:
-    """
-    Return the holdout periods that have a CSV file in actuals_real/.
-    Derived from holdout_manifest.csv — never hardcoded.
-
-    Raises RuntimeError if the manifest is an LFS pointer or is missing
-    required columns — a missing column must never be treated as zero rows.
-    Falls back to filesystem glob when manifest is absent.
-    """
     actuals_dir = resolve_actuals_dir()
-
     if not actuals_dir.exists():
-        logger.warning(
-            f"[CycleState] actuals_dir does not exist: {actuals_dir}. "
-            "Run: make bootstrap"
-        )
+        logger.warning(f"[CycleState] actuals_dir does not exist: {actuals_dir}. Run: make bootstrap")
         return []
 
     manifest_path = actuals_dir / "holdout_manifest.csv"
-
-    # ── No manifest: fall back to filesystem glob ─────────────────────────
     if not manifest_path.exists():
-        logger.warning(
-            f"[CycleState] holdout_manifest.csv not found in {actuals_dir}. "
-            "Falling back to filesystem glob."
-        )
+        logger.warning(f"[CycleState] holdout_manifest.csv not found. Falling back to filesystem glob.")
         periods = []
         for f in sorted(actuals_dir.glob("????_??_actual.csv")):
             try:
@@ -177,15 +248,12 @@ def _available_periods() -> list[dict]:
             except RuntimeError as lfs_err:
                 logger.warning(f"[CycleState] Skipping LFS pointer: {lfs_err}")
                 continue
-            stem = f.stem  # e.g. "2017_10_actual"
+            stem = f.stem
             parts = stem.split("_")
             if len(parts) >= 2:
-                period = f"{parts[0]}-{parts[1]}"
-                periods.append({"period": period, "filename": f.name, "rows": None})
-        logger.info(f"[CycleState] glob found {len(periods)} periods: {[p['period'] for p in periods]}")
+                periods.append({"period": f"{parts[0]}-{parts[1]}", "filename": f.name, "rows": None})
         return periods
 
-    # ── Manifest present: validate it before parsing ──────────────────────
     try:
         assert_real_file(manifest_path)
     except (FileNotFoundError, RuntimeError) as e:
@@ -198,77 +266,44 @@ def _available_periods() -> list[dict]:
         logger.warning(f"[CycleState] manifest read failed: {e}")
         return []
 
-    # Validate required columns — a DataFrame missing 'split' must RAISE,
-    # not silently return zero rows.
     missing_cols = MANIFEST_REQUIRED_COLS - set(df.columns)
     if missing_cols:
         raise RuntimeError(
             f"[CycleState] holdout_manifest.csv is missing required columns: "
-            f"{sorted(missing_cols)}. "
-            f"Columns found: {sorted(df.columns.tolist())}. "
-            f"This usually means the file is an LFS pointer or was regenerated "
-            f"with a different schema. Run: make bootstrap"
+            f"{sorted(missing_cols)}. Run: make bootstrap"
         )
 
     periods = []
-    skipped_train = 0
-    skipped_no_file = 0
-    skipped_lfs = 0
-
     for _, row in df.iterrows():
         split = str(row.get("split", "")).strip()
-        if split == "train":
-            skipped_train += 1
+        if split == "train" or not split:
             continue
-        if not split:
-            logger.warning(f"[CycleState] manifest row has empty split value — skipping: {dict(row)}")
-            continue
-
-        period = split  # e.g. "2017-10"
+        period = split
         rows = int(row["rows"]) if pd.notna(row.get("rows")) else None
         filename = f"{period.replace('-', '_')}_actual.csv"
         csv_path = actuals_dir / filename
-
         if not csv_path.exists():
-            skipped_no_file += 1
-            logger.warning(f"[CycleState] actuals file not found for period {period}: {csv_path}")
             continue
-
         try:
             assert_real_file(csv_path)
-        except RuntimeError as lfs_err:
-            skipped_lfs += 1
-            logger.warning(f"[CycleState] {lfs_err}")
+        except RuntimeError:
             continue
-
         periods.append({"period": period, "filename": filename, "rows": rows})
 
-    logger.info(
-        f"[CycleState] _available_periods: {len(periods)} valid periods "
-        f"(skipped train={skipped_train}, no_file={skipped_no_file}, lfs={skipped_lfs})"
-    )
-    if not periods:
-        logger.warning(
-            f"[CycleState] _available_periods returned empty list. "
-            f"actuals_dir={actuals_dir}, manifest rows={len(df)}. "
-            f"Check that actuals CSVs exist and are not LFS pointers."
-        )
     return periods
 
 
+# ── Main response builder ─────────────────────────────────────────────────────
+
 def get_cycle_state_response() -> dict:
-    """
-    Build the full response for GET /api/v1/cycle/state.
-    This is the single source of truth the UI reads.
-    """
+    """Build the full response for GET /api/v1/cycle/state."""
     from app.core.period import current_data_end
     from app.ml.registry import ModelRegistry
     from app.ml.utils import IntelligenceType
 
-    all_ps = get_all_periods()
+    all_ps = _load_raw().get("periods", {})
     available = _available_periods()
 
-    # trained_through: from the active demand model registry entry
     trained_through = ""
     try:
         reg = ModelRegistry()
@@ -280,93 +315,62 @@ def get_cycle_state_response() -> dict:
     except Exception as e:
         logger.warning(f"[CycleState] trained_through lookup failed: {e}")
 
-    # next_expected_period: earliest available period with no completed cycle
-    completed_periods = {
-        p for p, ps in all_ps.items()
-        if ps.get("stage_reached", -1) >= _TERMINAL_STAGE
-    }
+    # next_expected_period: earliest available period whose closed_at is None
     next_expected = None
     for ap in available:
-        if ap["period"] not in completed_periods:
+        ps = all_ps.get(ap["period"], {})
+        if not ps.get("closed_at"):
             next_expected = ap["period"]
             break
 
-    # Build per-period entries
+    completed_periods = {
+        ap["period"] for ap in available
+        if all_ps.get(ap["period"], {}).get("closed_at")
+    }
+
+    all_complete = len(available) > 0 and len(completed_periods) == len(available)
+
     period_entries = []
     for ap in available:
         period = ap["period"]
         ps = all_ps.get(period, {})
-        stage_reached = ps.get("stage_reached", -1)
-        stage_statuses = ps.get("stage_statuses", {})
-
-        # can_upload: Stage 0 completed AND Stage 1 not yet completed
-        stage0_done = stage_statuses.get("0", {}).get("status") == "COMPLETED"
-        stage1_done = stage_statuses.get("1", {}).get("status") == "COMPLETED"
-        can_upload = (period == next_expected) and stage0_done and not stage1_done
-
-        # locked_reason: why a period cannot be acted on
-        locked_reason = None
-        if period != next_expected and stage_reached < _TERMINAL_STAGE:
-            if next_expected:
-                locked_reason = f"Upload {next_expected} first"
-            else:
-                locked_reason = "All cycles complete"
-
+        steps = ps.get("steps", {})
+        closed_at = ps.get("closed_at")
+        ui_step = current_step(ps) if not closed_at else 8
+        has_failed = any(
+            (steps.get(str(s)) or {}).get("status") == "FAILED"
+            for s in range(1, 8)
+        )
         period_entries.append({
             "period": period,
             "filename": ap["filename"],
             "rows": ap["rows"],
-            "stage_reached": stage_reached,
-            "stage_statuses": stage_statuses,
-            "forecast_run_id": ps.get("forecast_run_id"),
-            "actuals_uploaded_at": ps.get("actuals_uploaded_at"),
+            "ui_step": ui_step,
+            "steps": steps,
+            "closed_at": closed_at,
             "updated_at": ps.get("updated_at"),
-            "can_upload": can_upload,
-            "locked_reason": locked_reason,
-            "is_complete": stage_reached >= _TERMINAL_STAGE,
+            "is_complete": bool(closed_at),
+            "has_failed_step": has_failed,
         })
 
-    # current_period: the period currently being worked on
     current_period = next_expected
     if current_period is None and available:
         current_period = available[-1]["period"]
-
-    # all_complete: every available period has reached terminal stage
-    all_complete = (
-        len(available) > 0
-        and all(
-            all_ps.get(ap["period"], {}).get("stage_reached", -1) >= _TERMINAL_STAGE
-            for ap in available
-        )
-    )
-
-    # standing_forecast_period: the period the current standing forecast covers
-    # = the period whose Stage 0 is COMPLETED but Stage 6 is not yet COMPLETED
-    standing_forecast_period = None
-    for ap in available:
-        p = ap["period"]
-        ps = all_ps.get(p, {})
-        ss = ps.get("stage_statuses", {})
-        stage0_done = ss.get("0", {}).get("status") == "COMPLETED"
-        stage6_done = ss.get("6", {}).get("status") == "COMPLETED"
-        if stage0_done and not stage6_done:
-            standing_forecast_period = p
-            break
-
-    # awaiting_actuals_for: the period whose actuals upload is expected next
-    # = next_expected (the earliest incomplete period)
-    awaiting_actuals_for = next_expected
 
     return {
         "current_period": current_period,
         "next_expected_period": next_expected,
         "trained_through": trained_through,
         "available_periods": period_entries,
-        "stage_names": _STAGE_NAMES,
+        "step_names": STEP_NAMES,
         "all_complete": all_complete,
-        "standing_forecast_period": standing_forecast_period,
-        "awaiting_actuals_for": awaiting_actuals_for,
         "total_available": len(available),
         "total_complete": len(completed_periods),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": _now(),
     }
+
+
+def get_period_state(period: str) -> dict | None:
+    """Backwards-compatibility shim returning the period record or None."""
+    data = _load_raw()
+    return data.get("periods", {}).get(period)

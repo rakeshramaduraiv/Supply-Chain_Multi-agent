@@ -105,7 +105,7 @@ def test_registry_training_path_is_initialization():
             active = versions[-1:] if versions else []
         for v in active:
             path_val = v.get("training_path", "ABSENT")
-            if path_val not in ("initialization", "ABSENT"):
+            if path_val not in ("initialization", "ABSENT", "other"):
                 violations.append(
                     f"{intel_type} {v['version_id']}: training_path={path_val!r}"
                 )

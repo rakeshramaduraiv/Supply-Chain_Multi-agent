@@ -105,6 +105,12 @@ run_init.py
 _insert_tests.py
 _tmp_lines.txt
 
+# Runtime cycle artifacts
+backend/data/cumulative/increments/
+backend/data/cycle/
+backend/data/actual_real/
+backend/data/cycle_state.json
+
 # Docker volumes
 postgres_data/
 neo4j_data/

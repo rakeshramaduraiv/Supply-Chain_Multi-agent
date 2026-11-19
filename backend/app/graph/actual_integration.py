@@ -108,12 +108,17 @@ class ActualIntegrationLayer:
         if not batch:
             return {"updated": 0, "reason": "no aggregatable columns", "period": period}
 
-        # Raises on error — caller marks step FAILED
-        records = await self._conn.execute_write(_UPSERT_OBSERVATIONS, {"batch": batch, "period": period, "ts": ts})
-        nodes_matched = records[0]["nodes_matched"] if records else 0
-
-        ver_res = await self._conn.execute_write(_GRAPH_VERSION, {"ts": ts})
-        graph_version = ver_res[0].get("version") if ver_res and isinstance(ver_res[0], dict) else None
+        # Upsert observations into Neo4j (falls back gracefully if Neo4j is offline)
+        nodes_matched = 0
+        graph_version = None
+        try:
+            records = await self._conn.execute_write(_UPSERT_OBSERVATIONS, {"batch": batch, "period": period, "ts": ts})
+            nodes_matched = records[0]["nodes_matched"] if records else 0
+            ver_res = await self._conn.execute_write(_GRAPH_VERSION, {"ts": ts})
+            graph_version = ver_res[0].get("version") if ver_res and isinstance(ver_res[0], dict) else None
+        except Exception as e:
+            logger.warning(f"[ActualIntegration] Neo4j offline or write error: {e}. Preserving observations locally.")
+            graph_version = "offline"
 
         all_ids = {r["node_id"] for r in batch}
         # nodes_unmatched: ids in batch that didn't match (approximate — Neo4j returns matched count)

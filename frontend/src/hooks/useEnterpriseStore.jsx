@@ -50,7 +50,7 @@ export function EnterpriseStoreProvider({ children }) {
       setLastUpload({
         period,
         rows:      result.row_count ?? result.records_loaded ?? 0,
-        accuracy:  result.overall_accuracy ?? null,
+        accuracy:  result.mape_val != null ? (100 - result.mape_val).toFixed(1) : null,
         timestamp: new Date().toISOString(),
         result,
       })

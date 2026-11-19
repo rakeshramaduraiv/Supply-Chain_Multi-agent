@@ -71,7 +71,7 @@ function UploadResultCard({ result }) {
               {result.period} — {result.records_loaded?.toLocaleString()} rows uploaded
             </div>
             <div style={{ fontSize: 10, color: 'var(--tm)', marginTop: 1 }}>
-              Matched: {result.records_matched?.toLocaleString()} · Accuracy: {result.overall_accuracy?.toFixed(1)}%
+              Matched: {result.records_matched?.toLocaleString()} · MAPE: {result.mape_val?.toFixed(1)}%
             </div>
           </div>
         </div>

@@ -118,7 +118,7 @@ export default function AgentMetricsPanel({
           {logisticsFeatures.map((feat, i) => <FeatureBar key={i} feat={feat} color="#d63031" />)}
         </div>
         <div style={{ fontSize: '9.5px', color: 'var(--tm)', borderTop: '1px solid var(--b)', paddingTop: '6px' }}>
-          Carrier Ground Transport · Shipment {cycleMonth || '—'}
+          Shipping Route Analysis · Shipment {cycleMonth || '—'}
         </div>
       </div>
     </div>

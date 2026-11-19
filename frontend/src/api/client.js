@@ -169,9 +169,23 @@ export const api = {
   // Cycle state machine (backend-authoritative lifecycle)
   getCycleState:        () => http.get('/api/v1/cycle/state'),
   getCyclePreflight:    () => http.get('/api/v1/cycle/preflight'),
-  issueForecast:        (period) => http.post(`/api/v1/cycle/forecast/${period}`),
-  cycleAdvance:         (period) => http.post(`/api/v1/cycle/advance/${period}`),
+  issueForecast:        (period) => http.post(`/api/v1/cycle/${period}/forecast`),
   resetCycle:           () => http.post('/api/v1/cycle/reset?confirm=true'),
+
+  cycle: {
+    state:       ()            => http.get('/api/v1/cycle/state'),
+    forecast:    (p)           => http.post(`/api/v1/cycle/${p}/forecast`),
+    getForecast: (p)           => http.get(`/api/v1/cycle/${p}/forecast`),
+    actuals:     (p, file)     => { const fd = new FormData(); fd.append('file', file); return http.post(`/api/v1/cycle/${p}/actuals`, fd) },
+    evaluate:    (p)           => http.post(`/api/v1/cycle/${p}/evaluate`),
+    graphUpdate: (p)           => http.post(`/api/v1/cycle/${p}/graph-update`),
+    rca:         (p)           => http.post(`/api/v1/cycle/${p}/rca`),
+    getRca:      (p)           => http.get(`/api/v1/cycle/${p}/rca`),
+    tpke:        (p)           => http.post(`/api/v1/cycle/${p}/tpke`),
+    learn:       (p)           => http.post(`/api/v1/cycle/${p}/learn`),
+    close:       (p)           => http.post(`/api/v1/cycle/${p}/close`),
+    reset:       ()            => http.post('/api/v1/cycle/reset?confirm=true'),
+  },
 
   // Enterprise AI Supply Chain Investigator
   investigateIncident:    (b) => http.post('/api/v1/rca/investigation/analyze-incident', b),

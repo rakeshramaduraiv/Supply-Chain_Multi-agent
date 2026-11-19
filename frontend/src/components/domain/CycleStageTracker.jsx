@@ -1,21 +1,22 @@
 /**
  * CycleStageTracker.jsx
  *
- * Displays live 6-stage cycle progress from useCycleStream.
+ * Displays live lifecycle progress from useCycleLifecycle.
  * Shows EmptyState when no cycle is active.
- * Zero fabricated values — all data from WebSocket events.
+ * Zero fabricated values — all data from backend cycle state.
  */
 
-import { Layers, CheckCircle, Clock, AlertTriangle, Loader } from 'lucide-react'
+import { Layers, CheckCircle, AlertTriangle, Loader } from 'lucide-react'
 import EmptyState from '../ui/EmptyState'
 
 const STAGE_NAMES = {
-  1: 'Ingest & Validate',
-  2: 'Match Forecast vs Actual',
-  3: 'Compute Metrics',
-  4: 'TPKE Evolution',
-  5: 'Store & Retrain',
-  6: 'Forecast Next Period',
+  1: 'Generate Forecast',
+  2: 'Upload Actuals',
+  3: 'Actual vs Predicted',
+  4: 'Knowledge Graph Update',
+  5: 'Root Cause Analysis',
+  6: 'TPKE Evolution',
+  7: 'Learn & Agent Scores',
 }
 
 const STATUS_COLOR = {
@@ -26,7 +27,7 @@ const STATUS_COLOR = {
 }
 
 function StageCard({ num, event }) {
-  const name   = STAGE_NAMES[num] || `Stage ${num}`
+  const name   = event?.name || STAGE_NAMES[num] || `Step ${num}`
   const status = event?.status || 'WAITING'
   const color  = STATUS_COLOR[status] || 'var(--tm)'
   const pct    = status === 'COMPLETED' || status === 'SKIPPED' ? '100%'
@@ -43,7 +44,7 @@ function StageCard({ num, event }) {
       display: 'flex', flexDirection: 'column', gap: 6,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--tm)' }}>STAGE {num}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--tm)' }}>STEP {num}</span>
         <span className={`badge ${status === 'COMPLETED' ? 'bdg-low' : status === 'RUNNING' ? 'bdg-blue' : status === 'FAILED' ? 'bdg-high' : 'bdg-med'}`}>
           {status === 'RUNNING' ? <><Loader size={9} style={{ marginRight: 3 }} />{status}</> : status}
         </span>
@@ -60,7 +61,7 @@ function StageCard({ num, event }) {
       {event?.detail && Object.keys(event.detail).length > 0 && (
         <div style={{ fontSize: 10, color: 'var(--ts)', lineHeight: 1.4 }}>
           {Object.entries(event.detail)
-            .filter(([, v]) => v != null && v !== '')
+            .filter(([, v]) => v != null && v !== '' && typeof v !== 'object')
             .slice(0, 3)
             .map(([k, v]) => (
               <span key={k} style={{ marginRight: 8 }}>
@@ -86,7 +87,7 @@ export default function CycleStageTracker({ cycleId, stages, complete, connected
       <EmptyState
         icon={Layers}
         title="No active cycle"
-        description={`Upload actuals for ${period || 'the current period'} to start the 6-stage pipeline.`}
+        description={`Upload actuals for ${period || 'the current period'} to start the pipeline.`}
       />
     )
   }
@@ -98,21 +99,21 @@ export default function CycleStageTracker({ cycleId, stages, complete, connected
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--tp)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Layers size={18} style={{ color: 'var(--blue)' }} />
-          6-Stage Upload Cycle Pipeline {period ? `(${period})` : ''}
+          Continuous Lifecycle Pipeline {period ? `(${period})` : ''}
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 10, color: connected ? '#00b894' : 'var(--tm)', fontWeight: 700 }}>
-            {connected ? '● Live' : '○ Reconnecting'}
+            {connected ? '● Live' : '○ Pending'}
           </span>
           <span className="badge bdg-blue">
-            {complete ? 'Complete' : `Stage ${completedCount}/6`}
+            {complete ? 'Complete' : `Step ${completedCount}/7`}
           </span>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-        {[1, 2, 3, 4, 5, 6].map(n => (
-          <StageCard key={n} num={n} event={stages?.[n]} />
+        {[1, 2, 3, 4, 5, 6, 7].map(n => (
+          <StageCard key={n} num={n} event={stages?.[n] || stages?.[String(n)]} />
         ))}
       </div>
 

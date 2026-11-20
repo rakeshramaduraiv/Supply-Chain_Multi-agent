@@ -76,13 +76,28 @@ def _resolve_intelligence_type(value: str) -> IntelligenceType:
 
 
 def _load_processed_dataset() -> pd.DataFrame:
-    """Load the cumulative dataset (base + all uploaded increments)."""
+    """Load the cumulative dataset (base + all uploaded increments).
+    CumulativeStore is always the primary source — processed_master.parquet
+    is only used if CumulativeStore has fewer rows than it (stub detection).
+    """
     from app.store.cumulative import CumulativeStore
+    store = CumulativeStore()
     try:
-        store = CumulativeStore()
-        df = store.load_full()
-        logger.info(f"Loaded cumulative dataset: {len(df)} rows")
-        return df
+        df_cumulative = store.load_full()
+        # Sanity check: if cumulative store returns suspiciously few rows,
+        # fall back to processed_master.parquet only if it is larger.
+        settings = get_settings()
+        parquet_path = Path(settings.upload_dir) / "processed_master.parquet"
+        if len(df_cumulative) < 1000 and parquet_path.exists():
+            df_parquet = pd.read_parquet(parquet_path)
+            if len(df_parquet) > len(df_cumulative):
+                logger.warning(
+                    f"CumulativeStore returned only {len(df_cumulative)} rows — "
+                    f"falling back to processed_master.parquet ({len(df_parquet)} rows)"
+                )
+                return df_parquet
+        logger.info(f"Loaded cumulative dataset: {len(df_cumulative)} rows")
+        return df_cumulative
     except FileNotFoundError:
         pass
     # Fallback to processed_master.parquet
@@ -446,14 +461,16 @@ async def get_feature_importance(intelligence_type: str):
                        f"Trained types: {[t.value for t in FEATURE_CONFIGS]}",
             )
 
-        version = _registry.get_latest_version(intel_type)
+        # Always reload registry from disk to pick up latest trained models
+        registry = ModelRegistry()
+        version = registry.get_latest_version(intel_type)
         if not version:
             raise HTTPException(
                 status_code=404,
                 detail=f"No trained model found for '{intelligence_type}'. Run initialization first.",
             )
 
-        model = _registry.load_model(intel_type)
+        model = registry.load_model(intel_type)
         # Always use the features the model was actually trained with
         features = version.features_used or []
 

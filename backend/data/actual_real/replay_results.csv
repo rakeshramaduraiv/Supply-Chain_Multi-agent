@@ -1,0 +1,5 @@
+month,rows_uploaded,matched_pairs,unmatched_excluded,demand_mae,demand_rmse,demand_r2,supplier_auc,supplier_f1,supplier_brier,logistics_auc,logistics_f1,logistics_brier,tpke_edges_created,tpke_edges_strengthened,tpke_edges_decayed,tpke_edges_removed,total_inferred_edges,cycle_duration_s,stage2_status,stage3_status,notes
+2017-10,2255,2255,0,0.0812,0.3409,0.6116,0.7388,0.6777,0.1959,0.7401,0.6712,0.1951,0,0,0,0,0,1.2,OK,OK,Cycle 1: no standing forecast — stages 2+3 SKIPPED as expected
+2017-11,2055,2055,0,0.0161,0.0367,0.0,0.7291,0.6639,0.2003,0.7393,0.6617,0.1988,0,0,0,0,0,0.14,OK,OK,
+2017-12,2124,2124,0,0.0136,0.0408,0.0,0.7121,0.6625,0.2023,0.7289,0.6667,0.2049,0,0,0,0,0,0.12,OK,OK,
+2018-01,2123,2123,0,0.0133,0.0316,0.0,0.7444,0.6805,0.192,0.7354,0.6768,0.212,0,0,0,0,0,0.11,OK,OK,

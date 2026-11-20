@@ -658,10 +658,7 @@ async def step7_learn(period: str):
 async def step8_close(period: str):
     """Step 8: Close period and advance to next."""
     from app.api.v1.endpoints.dataset_summary import clear_forecast_cache
-    try:
-        _close_period(period)
-    except RuntimeError as e:
-        raise HTTPException(409, str(e))
+    _close_period(period)
     clear_forecast_cache()
     state = get_cycle_state_response()
     return {

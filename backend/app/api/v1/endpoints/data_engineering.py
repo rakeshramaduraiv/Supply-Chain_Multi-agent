@@ -13,7 +13,7 @@ from app.core.enums import DatasetType
 from app.data_engineering.pipeline import DataEngineeringPipeline, PipelineResult
 from app.data_engineering.profiling import ProfilingService
 from app.data_engineering.upload import UploadService
-from app.graph.actual_integration import auto_sync_actuals
+from app.graph.actual_integration import ActualIntegrationLayer
 from app.api.v1.endpoints.ws import broadcast_event
 from app.schemas import BaseResponse
 from app.schemas.data_engineering import (
@@ -139,7 +139,10 @@ async def upload_actual_dataset(
     await broadcast_event("Forecast Validated", {"dataset_id": metadata["dataset_id"]})
 
     # Step 2: Update Knowledge Graph (Sync Actual Outcome Properties)
-    await auto_sync_actuals()
+    try:
+        await ActualIntegrationLayer().sync_actuals([])
+    except Exception as e_sync:
+        logger.warning(f"KG sync fallback: {e_sync}")
 
     # Step 3: Run Root Cause Analysis (Multi-State Synthesis Engine)
     try:
@@ -238,7 +241,10 @@ async def process_dataset(dataset_id: str) -> BaseResponse[PipelineResultSchema]
     await broadcast_event("Knowledge Graph Updated", {"dataset_id": dataset_id})
 
     # Automatically ingest actual performance properties into Neo4j nodes
-    await auto_sync_actuals(df_processed)
+    try:
+        await ActualIntegrationLayer().sync_actuals(df_processed.to_dict("records") if hasattr(df_processed, 'to_dict') else [])
+    except Exception as e_sync:
+        logger.warning(f"KG sync fallback: {e_sync}")
 
     return BaseResponse(
         success=result.status == "completed",

@@ -130,19 +130,46 @@ async def trigger_retrain(session: AsyncSession = Depends(get_db_session)):
         log_repo = None
 
     try:
-        from app.store.cumulative import CumulativeStore
-        try:
-            df = CumulativeStore().load_full()
-            logger.info(f"[retrain] Training on CumulativeStore: {len(df):,} rows")
-        except Exception as e_store:
-            logger.warning(f"[retrain] CumulativeStore load failed ({e_store}), falling back to parquet read")
-            processed_path = Path(settings.upload_dir) / "processed_master.parquet"
-            if not processed_path.exists():
-                raise FileNotFoundError("Processed master dataset not found. Re-initialize the system.")
-            import pandas as pd
-            df = pd.read_parquet(processed_path)
+        processed_path = Path(settings.upload_dir) / "processed_master.parquet"
+        if not processed_path.exists():
+            raise FileNotFoundError("Processed master dataset not found. Re-initialize the system.")
 
-        # WARNING: Never overwrite processed_master.parquet here — that erases post-training learning.
+        # Always load from CumulativeStore (base.parquet) — it is the authoritative
+        # training dataset. processed_master.parquet is a read-only analytics cache
+        # and must NEVER be overwritten by retrain.
+        import pandas as pd
+        from app.store.cumulative import CumulativeStore
+        store = CumulativeStore()
+        try:
+            df = store.load_full()
+            logger.info(f"[retrain] Loaded from CumulativeStore: {len(df):,} rows")
+        except FileNotFoundError:
+            df = pd.read_parquet(processed_path)
+            logger.info(f"[retrain] Loaded from processed_master.parquet: {len(df):,} rows")
+
+        # Guard: refuse to retrain on suspiciously small datasets
+        if len(df) < 10_000:
+            raise ValueError(
+                f"Dataset too small for retraining: {len(df):,} rows. "
+                f"Expected >= 10,000. CumulativeStore may be corrupted."
+            )
+
+        # Apply holdout filter to the in-memory frame only — never write back to disk
+        holdout_start = settings.holdout_start_date or ""
+        if holdout_start:
+            date_col = next(
+                (c for c in ("order date (DateOrders)", "order_date") if c in df.columns),
+                None,
+            )
+            if date_col:
+                dates = pd.to_datetime(df[date_col], errors="coerce")
+                cutoff = pd.Timestamp(holdout_start)
+                before = len(df)
+                df = df[dates < cutoff].copy()
+                logger.info(
+                    f"[retrain] Holdout filter (in-memory only): {before:,} -> {len(df):,} rows (cutoff {holdout_start})"
+                )
+
         from app.ml.training import TrainingOrchestrator
         orchestrator = TrainingOrchestrator()
         results = orchestrator.train_all(df, dataset_version="retrain")

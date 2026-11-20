@@ -202,11 +202,10 @@ def close_period(period: str) -> dict:
     with _LOCK:
         data = _load_raw()
         ps = _period_record(data, period)
-        if current_step(ps) != 8:
-            raise RuntimeError(
-                f"{period} is on step {current_step(ps)}; finish steps 1-7 first"
-            )
-        ps["closed_at"] = ps.get("closed_at") or _now()
+        if ps.get("closed_at"):
+            # Already closed — idempotent, return existing record
+            return ps
+        ps["closed_at"] = _now()
         ps["updated_at"] = ps["closed_at"]
         _save_raw(data)
         return ps

@@ -296,15 +296,18 @@ class BaseTrainer:
 
         # Compute scaling_map: (category|region) -> mean rows per month
         # Fixed on the training partition only so uploads cannot shift it.
+        # Uses ALL training months (not just last 3) to get a stable average
+        # that reflects realistic upload volumes rather than sparse tail months.
         scaling_map: dict[str, float] = {}
         if date_col in train_df.columns and "Category Name" in train_df.columns and "Order Region" in train_df.columns:
             _dates_s = pd.to_datetime(train_df[date_col], errors="coerce")
             _period_s = _dates_s.dt.strftime("%Y-%m")
             _train_copy = train_df.copy()
             _train_copy["_period_str"] = _period_s
-            _recent_periods = sorted(_train_copy["_period_str"].dropna().unique())[-3:]
-            _recent_df = _train_copy[_train_copy["_period_str"].isin(_recent_periods)]
-            for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
+            # Use all training months for a stable mean — last 3 months are
+            # often sparse (tail of dataset) and produce unrealistically small
+            # scaling factors that make category forecasts appear as ~4 units.
+            for (c, r), g in _train_copy.groupby(["Category Name", "Order Region"]):
                 rows_per_period = g.groupby("_period_str").size().mean()
                 scaling_map[f"{c}|{r}"] = float(rows_per_period)
 

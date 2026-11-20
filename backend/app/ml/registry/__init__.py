@@ -72,12 +72,30 @@ class ModelRegistry:
         if self._registry_file.exists():
             try:
                 data = json.loads(self._registry_file.read_text())
+                registry_dir = self._registry_file.parent
                 for intel_type, versions in data.items():
                     self._versions[intel_type] = [
                         ModelVersion(**{k: val for k, val in v.items()
                                        if k in ModelVersion.__dataclass_fields__})
                         for v in versions
                     ]
+                # Resolve relative model_path entries.
+                # Paths in registry.json are stored relative to the backend root
+                # (e.g. "data\models\demand\model.joblib").
+                # registry_dir is <backend>/data/models, so backend root = registry_dir.parent.parent.
+                backend_root = registry_dir.parent.parent
+                for versions in self._versions.values():
+                    for v in versions:
+                        p = Path(v.model_path)
+                        if not p.is_absolute():
+                            resolved = (backend_root / p).resolve()
+                            if resolved.exists():
+                                v.model_path = str(resolved)
+                            else:
+                                # fallback: try relative to registry_dir itself
+                                alt = (registry_dir / p).resolve()
+                                if alt.exists():
+                                    v.model_path = str(alt)
             except (json.JSONDecodeError, TypeError) as e:
                 logger.warning(f"Registry file corrupted, starting fresh: {e}")
                 self._versions = {}

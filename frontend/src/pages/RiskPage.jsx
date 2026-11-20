@@ -649,7 +649,19 @@ export default function RiskPage() {
           {rcaFocus && (
             <button
               className={s.hdrBtn}
-              style={{ background: '#dbeafe', color: '#1d4ed8', border: '1px solid #93c5fd', fontWeight: 800 }}
+              style={{
+                background: 'var(--blue)',
+                color: '#fff',
+                border: 'none',
+                fontWeight: 800,
+                padding: '7px 16px',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                boxShadow: '0 2px 12px rgba(91,138,255,0.35)',
+                cursor: 'pointer',
+              }}
               onClick={() => {
                 localStorage.removeItem('amasci_rca_focus')
                 setRcaFocus(null)
@@ -657,7 +669,11 @@ export default function RiskPage() {
                 navigateToPage('/forecast')
               }}
             >
-              Continue to Step {rcaFocus.returnStep || 6} →
+              <ChevronLeft size={13} />
+              Return to Forecast Center
+              <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 5, padding: '1px 6px', fontSize: '9px', fontWeight: 800 }}>
+                Step {rcaFocus.returnStep || 6}
+              </span>
             </button>
           )}
           <button className={s.hdrBtn} onClick={() => setPipelineDrawerOpen(v => !v)}>
@@ -1321,18 +1337,22 @@ export default function RiskPage() {
           {/* Return to Forecast Lifecycle — shown when navigated here from Step 4 */}
           {rcaFocus && (
             <div style={{
-              marginTop: 12, padding: '10px 14px',
-              background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
-              border: '1.5px solid #3b82f6', borderRadius: 8,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginTop: 12, padding: '12px 18px',
+              background: 'linear-gradient(135deg, rgba(91,138,255,0.12) 0%, rgba(91,138,255,0.06) 100%)',
+              border: '1.5px solid rgba(91,138,255,0.45)', borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
             }}>
-              <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: 700 }}>
-                📈 RCA for <strong>{rcaFocus.period}</strong> — Root cause identified.
-                Return to Forecast Lifecycle to continue Step {rcaFocus.returnStep || 5}.
+              <div style={{ fontSize: '11px', color: 'var(--tp)', fontWeight: 700 }}>
+                <span style={{ color: 'var(--blue)' }}>📈</span> RCA for <strong style={{ color: 'var(--blue)' }}>{rcaFocus.period}</strong> — investigation complete.
+                <div style={{ fontSize: '10px', color: 'var(--ts)', marginTop: 2 }}>Return to Forecast Lifecycle to continue Step {rcaFocus.returnStep || 6}.</div>
               </div>
               <button
-                className={s.approveBtn}
-                style={{ fontSize: '10.5px', padding: '5px 14px' }}
+                style={{
+                  background: 'var(--blue)', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', fontSize: '11px', fontWeight: 800,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                  whiteSpace: 'nowrap', flexShrink: 0, boxShadow: '0 2px 12px rgba(91,138,255,0.35)',
+                }}
                 onClick={() => {
                   localStorage.removeItem('amasci_rca_focus')
                   setRcaFocus(null)
@@ -1340,7 +1360,9 @@ export default function RiskPage() {
                   navigateToPage('/forecast')
                 }}
               >
-                Continue to Step {rcaFocus.returnStep || 6} →
+                <ChevronLeft size={12} />
+                Return to Forecast Center
+                <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 4, padding: '1px 5px', fontSize: '9px' }}>Step {rcaFocus.returnStep || 6}</span>
               </button>
             </div>
           )}

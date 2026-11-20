@@ -5,10 +5,10 @@
   "base": {
     "row_count": 171962,
     "col_count": 106,
-    "checksum": "ee859550fd025a8b16697c0620fc418921160add2bb95bd23ff43756393a4531",
+    "checksum": "f796155f9a740586e53158afb29385b90fec3686a57d4d2bcaa33a191f79d9e9",
     "date_min": "2015-01-01",
     "date_max": "2017-09-30",
-    "written_at": "2026-11-19T19:41:23.184846+00:00"
+    "written_at": "2026-11-20T21:28:42.141109+00:00"
   },
   "data_end": "2017-09-30"
 }

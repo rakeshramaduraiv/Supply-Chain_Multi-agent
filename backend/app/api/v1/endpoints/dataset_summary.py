@@ -110,7 +110,7 @@ def clear_dataset_cache():
     global _cache, _analytics_cache, _forecast_cache
     _cache = None
     _analytics_cache = None
-    _forecast_cache = None
+    _forecast_cache = {}
     try:
         _get_store()._invalidate_cache()
     except Exception:
@@ -476,21 +476,28 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                 summary = _compute_summary()
                 target_period = summary.get("next_forecast_start", "")[:7] or ""
 
-        # Guard: if target_period is more than 1 period beyond training cutoff, refuse (except for valid holdout periods)
-        HOLDOUT_PERIODS = {"2017-10", "2017-11", "2017-12", "2018-01"}
-        if trained_through and target_period and target_period not in HOLDOUT_PERIODS:
-            _cutoff_ts = pd.Timestamp(trained_through + "-01")
+        # Guard: if target_period is beyond the holdout window, refuse.
+        # Holdout window = dataset end (2017-09) + up to 5 months forward.
+        # trained_through reflects the 80% train split (e.g. 2017-03), NOT the
+        # dataset end — so we derive the allowed ceiling from the data itself.
+        dates_check = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
+        _dataset_end = dates_check.max().strftime("%Y-%m") if not dates_check.isna().all() else trained_through
+        _dataset_end_ts = pd.Timestamp(_dataset_end + "-01")
+        # Allow up to 5 months beyond dataset end (covers 2017-10 through 2018-02)
+        _max_forecast_ts = _dataset_end_ts + pd.offsets.MonthBegin(5)
+        if target_period:
             _target_ts = pd.Timestamp(target_period + "-01")
-            _max_allowed = (_cutoff_ts + pd.offsets.MonthBegin(1))
-            if _target_ts > _max_allowed + pd.offsets.MonthBegin(1):
+            if _target_ts > _max_forecast_ts:
                 return {
                     "ready": False,
                     "message": (
-                        f"target_period {target_period!r} is more than one period beyond "
-                        f"training cutoff {trained_through!r}. Retrain the model first."
+                        f"target_period {target_period!r} is beyond the allowed forecast window "
+                        f"(dataset ends {_dataset_end}, max allowed: "
+                        f"{_max_forecast_ts.strftime('%Y-%m')}). Ingest more actuals first."
                     ),
                     "target_period": target_period,
                     "trained_through": trained_through,
+                    "dataset_end": _dataset_end,
                 }
 
         # ── Template: last COMPLETE period at or before training cutoff ────────
@@ -651,7 +658,8 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                     parts = key_str.split("|", 1)
                     _expected_rows[(parts[0], parts[1])] = float(val)
 
-        # If registry has no scaling_map (old model), compute from training partition only
+        # If registry has no scaling_map (old model), compute from ALL training months
+        # (not just last 3 — sparse tail months produce unrealistically small values)
         if not _expected_rows and trained_through:
             _dates_col = pd.to_datetime(df["order date (DateOrders)"], errors="coerce")
             _period_s = _dates_col.dt.strftime("%Y-%m")
@@ -659,10 +667,8 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
             _train_mask = _period_s <= _cutoff_str
             _train_df = df[_train_mask].copy()
             _train_df["_period_str"] = _period_s[_train_mask]
-            _recent_periods = sorted(_train_df["_period_str"].dropna().unique())[-3:]
-            _recent_df = _train_df[_train_df["_period_str"].isin(_recent_periods)]
-            if "Category Name" in _recent_df.columns and "Order Region" in _recent_df.columns:
-                for (c, r), g in _recent_df.groupby(["Category Name", "Order Region"]):
+            if "Category Name" in _train_df.columns and "Order Region" in _train_df.columns:
+                for (c, r), g in _train_df.groupby(["Category Name", "Order Region"]):
                     rows_per_period = g.groupby("_period_str").size().mean()
                     _expected_rows[(c, r)] = float(rows_per_period)
 
@@ -692,8 +698,10 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
                     expected_rows = _expected_rows.get((cat, region))
                     if expected_rows is not None:
                         predicted_demand_val = mean_per_row * expected_rows
+                        # Cap at 10x the historical mean per-row quantity * expected_rows
+                        # (was 5x which was too tight for high-volume category/region pairs)
                         hist_mean = float(grp["Order Item Quantity"].mean()) if "Order Item Quantity" in grp.columns else 2.0
-                        predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * expected_rows * 5))
+                        predicted_demand_val = float(np.clip(predicted_demand_val, 0, hist_mean * expected_rows * 10))
                     else:
                         # No scaling map entry — return per-row prediction, mark expected_rows null
                         predicted_demand_val = mean_per_row
@@ -785,13 +793,14 @@ def _compute_auto_forecast(target_period: str | None = None) -> dict:
         return {"ready": False, "message": f"Forecast generation failed: {str(e)}"}
 
 
-# Cache for auto-forecast (expensive computation) — cleared on backend restart
-_forecast_cache: dict | None = None
+# Cache for auto-forecast (expensive computation) — keyed by period
+# so different periods never share a cached result.
+_forecast_cache: dict[str, dict] = {}
 
 
 def clear_forecast_cache():
     global _forecast_cache
-    _forecast_cache = None
+    _forecast_cache = {}
 
 
 
@@ -879,18 +888,23 @@ def get_next_forecast_period():
 
 
 @router.get("/auto-forecast")
-def get_auto_forecast():
+def get_auto_forecast(period: str | None = None, refresh: bool = False):
     """
     Automatic forecast for the next period after training data ends.
     Generated from trained models applied to last month's feature distribution.
     No user upload required.
+
+    ?period=YYYY-MM  — force forecast for a specific period (bypasses cache)
+    ?refresh=true    — force recompute even if cache is warm
     """
     global _forecast_cache
-    if _forecast_cache is not None:
-        return _forecast_cache
-    _forecast_cache = _compute_auto_forecast()
-    result_store.save_auto_forecast(_forecast_cache)
-    return _forecast_cache
+    cache_key = period or "default"
+    if not refresh and cache_key in _forecast_cache:
+        return _forecast_cache[cache_key]
+    result = _compute_auto_forecast(target_period=period)
+    result_store.save_auto_forecast(result)
+    _forecast_cache[cache_key] = result
+    return result
 
 
 @router.get("/available-periods")

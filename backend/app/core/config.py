@@ -140,10 +140,13 @@ class Settings(BaseSettings):
 
     @property
     def model_path(self) -> Path:
-        """Resolved model directory path."""
-        path = Path(self.model_dir)
-        path.mkdir(parents=True, exist_ok=True)
-        return path
+        """Resolved model directory path — always absolute, anchored to this file's location."""
+        p = Path(self.model_dir)
+        if not p.is_absolute():
+            # Anchor relative paths to backend root (parent of app/core/)
+            p = Path(__file__).resolve().parent.parent.parent / p
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     @property
     def raw_data_path(self) -> Path:

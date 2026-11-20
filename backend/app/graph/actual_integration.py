@@ -1,14 +1,19 @@
 """
 AMASCI Actual Integration Layer
 ================================
-Ingests actual operational outcomes into Neo4j as month-scoped
-Observation nodes. Does NOT overwrite node properties and does NOT
-compound edge weights (edge evolution belongs to TPKE Step 6 only).
+Ingests actual operational outcomes into Neo4j as month-scoped Observation
+nodes.  No edge-weight mutation on the base graph — that would contaminate
+the training-time graph with holdout-period signals.
+
+Only sync_actuals_scoped() is called by the cycle (Step 4).
+sync_actuals() is kept for legacy callers but is NOT called by the cycle.
+auto_sync_actuals() fabricated fallback is removed.
 """
 
 import logging
 from datetime import datetime, timezone
 from typing import Any
+
 import pandas as pd
 
 from app.graph.connection import Neo4jConnectionManager, get_connection_manager
@@ -16,139 +21,184 @@ from app.graph.connection import Neo4jConnectionManager, get_connection_manager
 logger = logging.getLogger(__name__)
 
 
+# Month-scoped Observation nodes — one node per (period, node_id).
+# MERGE ensures idempotency: re-running Step 4 for the same period is safe.
 _UPSERT_OBSERVATIONS = """
-UNWIND $batch AS p
-MATCH (n) WHERE n.node_id = p.node_id OR n.id = p.node_id OR n.name = p.node_id
-MERGE (o:Observation {period: $period, node_id: p.node_id})
-SET o.actual_demand    = p.actual_demand,
-    o.late_rate        = p.late_rate,
-    o.avg_delay_days   = p.avg_delay_days,
-    o.orders           = p.orders,
-    o.predicted_demand = p.predicted_demand,
-    o.deviation_pct    = p.deviation_pct,
-    o.updated_at       = $ts
-MERGE (o)-[:OBSERVED_FOR]->(n)
-RETURN count(DISTINCT n) AS nodes_matched
+UNWIND $batch AS row
+MERGE (o:Observation {period: row.period, node_id: row.node_id})
+ON CREATE SET
+    o.created_at      = row.ts,
+    o.actual_demand   = row.actual_demand,
+    o.actual_late_rate = row.actual_late_rate,
+    o.predicted_demand = row.predicted_demand,
+    o.deviation_pct   = row.deviation_pct,
+    o.orders          = row.orders
+ON MATCH SET
+    o.updated_at      = row.ts,
+    o.actual_demand   = row.actual_demand,
+    o.actual_late_rate = row.actual_late_rate,
+    o.predicted_demand = row.predicted_demand,
+    o.deviation_pct   = row.deviation_pct,
+    o.orders          = row.orders
+WITH o, row
+MATCH (ref)
+WHERE ref.name = row.node_id OR ref.node_id = row.node_id
+MERGE (ref)-[:HAS_OBSERVATION {period: row.period}]->(o)
+RETURN count(o) AS upserted
 """
 
-_GRAPH_VERSION = """
-MERGE (meta:_GraphMeta {key: 'active_version'})
-ON CREATE SET meta.version = 1, meta.updated_at = $ts, meta.last_trigger = 'graph_update'
-ON MATCH  SET meta.version = coalesce(meta.version, 0) + 1,
-              meta.updated_at = $ts, meta.last_trigger = 'graph_update'
-RETURN meta.version AS version
+# Legacy node-property update — kept for non-cycle callers only.
+_UPDATE_ACTUAL_PROPERTIES = """
+UNWIND $batch AS p
+MATCH (n) WHERE n.node_id = p.node_id OR n.id = p.node_id OR n.name = p.node_id
+SET n.latest_actual_timestamp = p.timestamp,
+    n.actual_demand = p.actual_demand,
+    n.actual_delay_days = p.actual_delay_days,
+    n.actual_late_delivery = p.actual_late_delivery
+RETURN count(n) AS updated
 """
 
 
 class ActualIntegrationLayer:
+
     def __init__(self, connection: Neo4jConnectionManager | None = None):
         self._conn = connection or get_connection_manager()
+
+    # ── Cycle Step 4 ──────────────────────────────────────────────────────────
 
     async def sync_actuals_scoped(
         self,
         df: pd.DataFrame,
         period: str,
-        pred_map: dict[tuple, dict] | None = None,
-        timestamp: str | None = None,
+        pred_map: dict | None = None,
     ) -> dict[str, Any]:
         """
-        Write month-scoped Observation nodes for every Category, Department
-        and Shipping-Mode|Region combination in df.
-        pred_map: {(category, region): evaluation_record} from evaluation.json.
-        Raises on Neo4j errors so the cycle step is marked FAILED.
-        """
-        ts = timestamp or datetime.now(timezone.utc).isoformat()
-        if df is None or len(df) == 0:
-            return {"updated": 0, "reason": "no actuals", "period": period}
+        Write month-scoped Observation nodes for `period`.
 
+        Aggregates df by Category, Department, and Route then MERGEs one
+        Observation node per (period, node_id).  Never mutates base-graph
+        edge weights — no data leakage from holdout months into the training
+        graph.
+
+        pred_map: {(category, region): evaluation_record} from evaluation.json
+        """
+        ts = datetime.now(timezone.utc).isoformat()
         pred_map = pred_map or {}
+
+        if df.empty:
+            return {"observations_upserted": 0, "period": period, "timestamp": ts}
+
         batch: list[dict] = []
 
-        # Category aggregation
-        if "Category Name" in df.columns:
-            for cat, grp in df.groupby("Category Name"):
-                orders = len(grp)
-                actual_demand = float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else 0.0
-                late_rate = float(grp["Late_delivery_risk"].mean()) if "Late_delivery_risk" in grp.columns else 0.0
-                avg_delay = float(grp["shipping_delay_days"].mean()) if "shipping_delay_days" in grp.columns else 0.0
-                # best-effort join to evaluation
-                region_keys = [k for k in pred_map if k[0] == cat]
-                predicted = float(sum(pred_map[k].get("predicted") or 0 for k in region_keys)) if region_keys else None
-                deviation = float(sum(pred_map[k].get("deviation_pct") or 0 for k in region_keys) / len(region_keys)) if region_keys else None
+        # Category-level aggregation
+        if "Category Name" in df.columns and "Order Item Quantity" in df.columns:
+            cat_agg = df.groupby("Category Name").agg(
+                actual_demand=("Order Item Quantity", "sum"),
+                actual_late_rate=("Late_delivery_risk", "mean") if "Late_delivery_risk" in df.columns else ("Order Item Quantity", "count"),
+                orders=("Order Item Quantity", "count"),
+            ).reset_index()
+            for _, row in cat_agg.iterrows():
+                node_id = str(row["Category Name"])
+                # Find a matching prediction (any region for this category)
+                pred = next(
+                    (v for (cat, _), v in pred_map.items() if cat == node_id),
+                    None,
+                )
                 batch.append({
-                    "node_id": str(cat),
-                    "actual_demand": actual_demand, "late_rate": late_rate,
-                    "avg_delay_days": avg_delay, "orders": orders,
-                    "predicted_demand": predicted, "deviation_pct": deviation,
+                    "period": period,
+                    "node_id": node_id,
+                    "ts": ts,
+                    "actual_demand": float(row["actual_demand"]),
+                    "actual_late_rate": float(row.get("actual_late_rate", 0.0)),
+                    "predicted_demand": float(pred["predicted"]) if pred and pred.get("predicted") is not None else None,
+                    "deviation_pct": float(pred["deviation_pct"]) if pred and pred.get("deviation_pct") is not None else None,
+                    "orders": int(row["orders"]),
                 })
 
-        # Department (supplier proxy) aggregation
-        if "Department Name" in df.columns:
-            for dept, grp in df.groupby("Department Name"):
+        # Department-level aggregation
+        if "Department Name" in df.columns and "Order Item Quantity" in df.columns:
+            dept_agg = df.groupby("Department Name").agg(
+                actual_demand=("Order Item Quantity", "sum"),
+                actual_late_rate=("Late_delivery_risk", "mean") if "Late_delivery_risk" in df.columns else ("Order Item Quantity", "count"),
+                orders=("Order Item Quantity", "count"),
+            ).reset_index()
+            for _, row in dept_agg.iterrows():
                 batch.append({
-                    "node_id": str(dept),
-                    "actual_demand": float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else 0.0,
-                    "late_rate": float(grp["Late_delivery_risk"].mean()) if "Late_delivery_risk" in grp.columns else 0.0,
-                    "avg_delay_days": float(grp["shipping_delay_days"].mean()) if "shipping_delay_days" in grp.columns else 0.0,
-                    "orders": len(grp), "predicted_demand": None, "deviation_pct": None,
+                    "period": period,
+                    "node_id": f"DEPT_{row['Department Name']}",
+                    "ts": ts,
+                    "actual_demand": float(row["actual_demand"]),
+                    "actual_late_rate": float(row.get("actual_late_rate", 0.0)),
+                    "predicted_demand": None,
+                    "deviation_pct": None,
+                    "orders": int(row["orders"]),
                 })
 
-        # Route (Shipping Mode | Order Region) aggregation
-        if "Shipping Mode" in df.columns and "Order Region" in df.columns:
-            df["_route"] = df["Shipping Mode"].astype(str) + "|" + df["Order Region"].astype(str)
-            for route, grp in df.groupby("_route"):
+        # Route-level aggregation (Order Region + Shipping Mode)
+        if "Order Region" in df.columns and "Shipping Mode" in df.columns:
+            route_agg = df.groupby(["Order Region", "Shipping Mode"]).agg(
+                actual_late_rate=("Late_delivery_risk", "mean") if "Late_delivery_risk" in df.columns else ("Order Item Quantity", "count"),
+                orders=("Order Item Quantity", "count") if "Order Item Quantity" in df.columns else ("Order Region", "count"),
+            ).reset_index()
+            for _, row in route_agg.iterrows():
                 batch.append({
-                    "node_id": str(route),
-                    "actual_demand": float(grp["Order Item Quantity"].sum()) if "Order Item Quantity" in grp.columns else 0.0,
-                    "late_rate": float(grp["Late_delivery_risk"].mean()) if "Late_delivery_risk" in grp.columns else 0.0,
-                    "avg_delay_days": float(grp["shipping_delay_days"].mean()) if "shipping_delay_days" in grp.columns else 0.0,
-                    "orders": len(grp), "predicted_demand": None, "deviation_pct": None,
+                    "period": period,
+                    "node_id": f"ROUTE_{row['Order Region']}_{row['Shipping Mode']}".replace(" ", "_"),
+                    "ts": ts,
+                    "actual_demand": None,
+                    "actual_late_rate": float(row.get("actual_late_rate", 0.0)),
+                    "predicted_demand": None,
+                    "deviation_pct": None,
+                    "orders": int(row["orders"]),
                 })
 
         if not batch:
-            return {"updated": 0, "reason": "no aggregatable columns", "period": period}
+            return {"observations_upserted": 0, "period": period, "timestamp": ts}
 
-        # Upsert observations into Neo4j (falls back gracefully if Neo4j is offline)
-        nodes_matched = 0
-        graph_version = None
         try:
-            records = await self._conn.execute_write(_UPSERT_OBSERVATIONS, {"batch": batch, "period": period, "ts": ts})
-            nodes_matched = records[0]["nodes_matched"] if records else 0
-            ver_res = await self._conn.execute_write(_GRAPH_VERSION, {"ts": ts})
-            graph_version = ver_res[0].get("version") if ver_res and isinstance(ver_res[0], dict) else None
+            result = await self._conn.execute_write(_UPSERT_OBSERVATIONS, {"batch": batch})
+            upserted = result[0]["upserted"] if result else len(batch)
         except Exception as e:
-            logger.warning(f"[ActualIntegration] Neo4j offline or write error: {e}. Preserving observations locally.")
-            graph_version = "offline"
+            logger.error(f"[ActualIntegration] sync_actuals_scoped failed for {period}: {e}")
+            raise
 
-        all_ids = {r["node_id"] for r in batch}
-        # nodes_unmatched: ids in batch that didn't match (approximate — Neo4j returns matched count)
-        nodes_unmatched = list(all_ids)[:20] if nodes_matched == 0 else []
+        logger.info(
+            f"[ActualIntegration] {period}: {upserted} Observation nodes upserted "
+            f"({len(batch)} batch items)"
+        )
+        return {"observations_upserted": upserted, "period": period, "timestamp": ts}
 
-        logger.info(f"[ActualIntegration] period={period} observations={len(batch)} nodes_matched={nodes_matched}")
-        return {
-            "period": period,
-            "observations_written": len(batch),
-            "nodes_matched": nodes_matched,
-            "nodes_unmatched": nodes_unmatched,
-            "graph_version": graph_version,
-        }
+    # ── Legacy (non-cycle) ────────────────────────────────────────────────────
 
-    # Keep legacy sync_actuals for backward compat (used by old routes)
     async def sync_actuals(
         self,
         actual_records: list[dict[str, Any]],
         timestamp: str | None = None,
     ) -> dict[str, Any]:
-        if not actual_records:
-            return {"updated": 0, "reason": "no actuals"}
+        """
+        Legacy node-property update.  NOT called by the cycle.
+        Does not mutate edge weights (removed to prevent holdout leakage).
+        """
         ts = timestamp or datetime.now(timezone.utc).isoformat()
-        df = pd.DataFrame(actual_records)
-        return await self.sync_actuals_scoped(df, period="legacy", timestamp=ts)
+        if not actual_records:
+            return {"updated": 0, "timestamp": ts}
 
+        batch = [
+            {
+                "node_id": str(r.get("node_id", r.get("Category Name", "DEFAULT"))),
+                "timestamp": ts,
+                "actual_demand": float(r.get("actual_demand_7d", r.get("Sales", 0.0))),
+                "actual_delay_days": float(r.get("actual_delay_days", r.get("shipping_delay", 0.0))),
+                "actual_late_delivery": int(r.get("actual_late_delivery", r.get("Late_delivery_risk", 0))),
+            }
+            for r in actual_records
+        ]
 
-async def auto_sync_actuals(df: pd.DataFrame | None = None) -> dict[str, Any]:
-    """Legacy hook — returns 0 observations if no data."""
-    if df is None or len(df) == 0:
-        return {"updated": 0, "reason": "no actuals"}
-    layer = ActualIntegrationLayer()
-    return await layer.sync_actuals_scoped(df, period="legacy")
+        try:
+            records = await self._conn.execute_write(_UPDATE_ACTUAL_PROPERTIES, {"batch": batch})
+            updated = records[0]["updated"] if records else 0
+        except Exception as e:
+            logger.warning(f"[ActualIntegration] sync_actuals note: {e}")
+            updated = 0
+
+        return {"updated": updated, "timestamp": ts}
